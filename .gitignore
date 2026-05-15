@@ -9,3 +9,15 @@
 .opencode/worktrees.log
 .opencode/node_modules/
 session-ses_*.md
+
+# OpenWRT build artifacts
+openwrt-builder/
+*.img
+*.bin
+*.manifest
+sha256sums*
+downloads/
+staging_dir/
+build_dir/
+tmp/
+logs/

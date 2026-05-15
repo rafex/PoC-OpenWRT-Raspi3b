@@ -1,0 +1,78 @@
+# OpenWRT 25.12.2 Package Configuration for TP-Link TL-WDR3600 v1.0
+# Profile: tplink_tl-wdr3600-v1
+# Target: ath79/generic
+#
+# This file lists packages to INCLUDE and EXCLUDE.
+# Packages prefixed with "-" will be excluded from the image.
+
+# --- SSH Server ---
+dropbear
+
+# --- Core Networking ---
+dnsmasq
+firewall4
+
+# --- Wi-Fi Dual-Band (2.4GHz + 5GHz) ---
+wpad-basic-mbedtls
+
+# --- TLS / HTTPS Support ---
+uclient-fetch
+libustream-mbedtls
+ca-bundle
+ca-certificates
+
+# --- USB Storage Support ---
+kmod-usb-core
+kmod-usb2
+kmod-usb-ehci
+kmod-usb-storage
+kmod-usb-storage-uas
+kmod-scsi-core
+kmod-scsi-generic
+kmod-fs-ext4
+block-mount
+e2fsprogs
+
+# --- VPN ---
+# Option A: WireGuard (lighter, recommended for embedded)
+wireguard-tools
+kmod-wireguard
+
+# Option B: OpenVPN (uncomment and comment WireGuard above)
+# openvpn-openssl
+
+# --- Tor Client ---
+tor
+
+# ============================================
+# EXCLUDED: LuCi web interface (administration via SSH)
+# ============================================
+-luci
+-luci-base
+-luci-light
+-luci-theme-bootstrap
+-luci-app-firewall
+-luci-app-package-manager
+-luci-mod-admin-full
+-luci-mod-network
+-luci-mod-status
+-luci-mod-system
+-luci-proto-ipv6
+-luci-proto-ppp
+
+# ============================================
+# EXCLUDED: uhttpd (web server for LuCi)
+# ============================================
+-uhttpd
+-uhttpd-mod-ubus
+
+# ============================================
+# EXCLUDED: rpcd (remote procedure call daemon)
+# ============================================
+-rpcd
+-rpcd-mod-file
+-rpcd-mod-iwinfo
+-rpcd-mod-luci
+-rpcd-mod-rpcsys
+-rpcd-mod-rrdns
+-rpcd-mod-ucode
