@@ -136,7 +136,7 @@ build:
 
 # generate-config: Generar archivos de configuración desde templates + secrets
 generate-config ENV:
-    ./scripts/generate-config.sh {{ ENV }}
+    ./scripts/templates/generate.sh {{ ENV }}
 
 # ─────────────────────────────────────────────────────
 # Validación
@@ -154,7 +154,7 @@ validate:
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
     just build-prod
-    ./scripts/verify-image.sh openwrt-builder/*/bin/targets/ath79/generic || true
+    ./scripts/build/verify.sh openwrt-builder/*/bin/targets/ath79/generic || true
     @echo ""
     @echo "✅ Imagen compilada. Para flashear el router:"
     @echo "   Ver docs/FLASH_INSTRUCTIONS.md"
