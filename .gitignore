@@ -1,3 +1,4 @@
+# .gitignore (root) — Globales que NUNCA deben subirse
 
 # opencode (local, no versionar)
 .opencode/sessions.db
@@ -9,3 +10,49 @@
 .opencode/worktrees.log
 .opencode/node_modules/
 session-ses_*.md
+
+# ── Secrets y claves (NUNCA en el repo) ──
+**/*.key
+**/*.pem
+**/*.crt
+**/*.priv
+**/.age/poc-openwrt-privkey.txt
+**/.age/keys*.txt
+.envrc
+
+# ── OpenWRT build artifacts ──
+openwrt-builder/
+*.img
+*.bin
+*.manifest
+sha256sums*
+downloads/
+staging_dir/
+build_dir/
+tmp/
+logs/
+
+# ── Config overlay generado ──
+config/overlay/
+
+# ── Secrets temporales generados por scripts ──
+/tmp/secrets-*.yaml
+
+# ── IDEs y editors ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Python ──
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ── Node ──
+node_modules/
