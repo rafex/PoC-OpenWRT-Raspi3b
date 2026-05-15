@@ -1,0 +1,18 @@
+# Solo permitir archivos encryptados y .env
+# NUNCA permitir .yaml o .yml sin encryptar
+
+# Permitir explícitamente
+!.env
+!secrets.enc.yaml
+!secrets.enc.yml
+
+# Bloquear TODO lo demás con extensión de config
+*.yaml
+*.yml
+*.json
+*.toml
+*.ini
+
+# Permitir solo los encryptados
+!*.enc.yaml
+!*.enc.yml

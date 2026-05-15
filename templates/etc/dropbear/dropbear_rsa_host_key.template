@@ -1,0 +1,4 @@
+# Dropbear RSA Host Key Template
+# Generado por scripts/generate-config.sh
+# Placeholder: {{DROPBEAR_RSA_HOST_KEY}}
+{{DROPBEAR_RSA_HOST_KEY}}
