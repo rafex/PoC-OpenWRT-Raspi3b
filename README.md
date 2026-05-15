@@ -31,6 +31,48 @@ Prueba de concepto para compilar una imagen personalizada de **OpenWRT 25.12.2**
 
 ## Quick Start
 
+### Forma recomendada: con `just`
+
+```bash
+# 1. Clonar
+git clone https://github.com/rafex/PoC-OpenWRT-Raspi3b.git
+cd PoC-OpenWRT-Raspi3b
+
+# 2. Instalar herramientas
+brew install just sops age shellcheck
+
+# 3. Setup automático (genera clave age, crea environments)
+just setup
+
+# 4. Configurar secrets para prod
+just edit-secrets prod
+# Agrega: WIFI_KEY_24, WIREGUARD_PRIVATE_KEY, etc.
+```
+
+### Build
+
+```bash
+# Desarrollo (valores dummy, sin secrets)
+just build-dev
+
+# Producción (con secrets reales)
+just build-prod
+
+# Validar scripts
+just validate
+```
+
+### Flashear router
+
+```bash
+# Compilar y verificar
+just flash prod
+
+# Luego seguir docs/FLASH_INSTRUCTIONS.md
+```
+
+### Forma manual: con los scripts directamente
+
 ```bash
 # 1. Preparar entorno
 chmod +x scripts/setup-build-env.sh
@@ -44,32 +86,53 @@ chmod +x build-openwrt.sh
 chmod +x scripts/verify-image.sh
 ./scripts/verify-image.sh openwrt-builder/*/bin/targets/ath79/generic
 
-# 4. Flashear router
-# Ver docs/FLASH_INSTRUCTIONS.md
+# 4. Flashear router — Ver docs/FLASH_INSTRUCTIONS.md
 ```
 
 ## Estructura del repositorio
 
 ```
 PoC-OpenWRT-Raspi3b/
-├── build-openwrt.sh              # Script principal de compilación
+├── justfile                       # Task manager (único punto de entrada)
+├── Makefile                       # Build tasks (compilación)
+├── Makefile.just                  # Wrappers de make para just
+├── .sops.yaml                     # Config sops (clave age del proyecto)
+├── .age-pubkey.txt                # Clave pública age (committeada)
+├── .envrc.example                 # Ejemplo de variables (copiar a .envrc)
+├── build-openwrt.sh               # Script principal de compilación
 ├── config/
-│   └── openwrt-packages.txt      # Paquetes a incluir/excluir
+│   └── openwrt-packages.txt       # Paquetes a incluir/excluir
+├── environments/
+│   ├── .gitignore                 # Bloquea secrets no encryptados
+│   ├── dev/
+│   │   ├── .env                   # Variables públicas dev
+│   │   └── secrets.enc.yaml       # Secrets encryptados dev (dummy)
+│   └── prod/
+│       ├── .env                   # Variables públicas prod
+│       └── secrets.enc.yaml       # Secrets encryptados prod (reales)
 ├── scripts/
-│   ├── setup-build-env.sh        # Preparación del entorno
-│   └── verify-image.sh           # Verificación de imagen
+│   ├── setup-build-env.sh         # Preparación del entorno
+│   ├── verify-image.sh            # Verificación de imagen
+│   └── generate-config.sh         # Genera configs desde templates + secrets
+├── templates/
+│   └── etc/
+│       ├── dropbear/              # Template SSH host keys
+│       ├── wireguard/             # Template WireGuard config
+│       └── config/                # Template wireless config
 ├── docs/
-│   ├── BUILD_INSTRUCTIONS.md     # Guía de compilación
-│   └── FLASH_INSTRUCTIONS.md     # Guía de instalación
-├── AGENTS.md                     # Requisitos del proyecto
-├── LICENSE                       # MIT
-└── README.md                     # Este archivo
+│   ├── BUILD_INSTRUCTIONS.md
+│   ├── FLASH_INSTRUCTIONS.md
+│   └── SECRETS.md                 # Guía de gestión de secrets
+├── AGENTS.md                      # Requisitos del proyecto
+├── LICENSE                        # MIT
+└── README.md
 ```
 
 ## Documentación
 
 - [Instrucciones de compilación](docs/BUILD_INSTRUCTIONS.md)
 - [Instrucciones de instalación/flasheo](docs/FLASH_INSTRUCTIONS.md)
+- [Gestión de secrets](docs/SECRETS.md)
 
 ## Licencia
 

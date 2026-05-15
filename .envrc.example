@@ -1,0 +1,27 @@
+# .envrc.example - Variables de entorno públicas (valores dummy para dev)
+# Copiar a .envrc y ajustar según tu entorno
+
+# Entorno actual (dev, prod)
+ENV=dev
+
+# OpenWRT
+OPENWRT_VERSION=25.12.2
+TARGET=ath79
+SUBTARGET=generic
+
+# Profile del router
+PROFILE=tplink_tl-wdr3600-v1
+
+# Dirección IP del router (post-flasheo)
+ROUTER_IP=192.168.1.1
+
+# Puerto SSH
+SSH_PORT=22
+
+# --- Secrets (NUNCA pongas valores reales aquí, usa environments/<env>/secrets.enc.yaml) ---
+# WIFI_SSID_24=MyWiFi24
+# WIFI_KEY_24=changeme
+# WIFI_SSID_5=MyWiFi5G
+# WIFI_KEY_5=changeme
+# WIREGUARD_PRIVATE_KEY=nunca_aqui
+# ROOT_PASSWORD_HASH=nunca_aqui
