@@ -40,6 +40,8 @@ just setup       # Setup inicial
 just build-prod  # Compilar con secrets reales
 ```
 
+Ver [docs/JUST.md](docs/JUST.md) para la guía completa de recipes.
+
 ### Build: `make`
 
 `Makefile` contiene solo tareas de compilación y validación. No orquesta — es llamado por `just`.
@@ -52,21 +54,39 @@ Los secretos (Wi-Fi passwords, claves WireGuard, SSH host keys) se almacenan enc
 
 Múltiples `.gitignore` aseguran que los secrets sin encryptar y archivos temporales no lleguen al repo.
 
+### Scripts modulares
+
+Los scripts están organizados en `scripts/` por responsabilidad: `commons/`, `deps/`, `install/`, `build/`, `templates/`. Ver [docs/SCRIPTS.md](docs/SCRIPTS.md).
+
 ## Estructura de archivos
 
 ```
 repo/
-├── justfile                       # Task manager
+├── justfile                       # Task manager (14 recipes)
 ├── Makefile                       # Build tasks
 ├── Makefile.just                  # Wrappers de make
 ├── .sops.yaml                     # Config sops
 ├── .age-pubkey.txt                # Clave pública (committeada)
 ├── .envrc.example                 # Ejemplo de variables
-├── build-openwrt.sh               # Script principal
-├── config/openwrt-packages.txt    # Paquetes
+├── build-openwrt.sh               # Wrapper → scripts/build/openwrt.sh
+├── config/
+│   └── openwrt-packages.txt       # Paquetes a incluir/excluir
 ├── environments/{dev,prod}/       # Secrets por entorno
-├── scripts/                       # Scripts auxiliares
+├── scripts/
+│   ├── commons/{logging,utils}.sh # Utilidades compartidas
+│   ├── deps/check-tools.sh        # Verificación de herramientas
+│   ├── install/setup-env.sh       # Descarga Image Builder
+│   ├── build/{openwrt,compile,verify}.sh  # Compilación
+│   └── templates/generate.sh      # Generación de configs
 ├── templates/etc/                 # Templates de config
 ├── docs/                          # Documentación
 └── .gitignore                     # NUNCA subir secrets/basura
 ```
+
+## Documentación
+
+- [Uso de Just](docs/JUST.md) — Todas las recipes
+- [Referencia de Scripts](docs/SCRIPTS.md) — Scripts modulares
+- [Compilación](docs/BUILD_INSTRUCTIONS.md) — Guía de compilación
+- [Flasheo](docs/FLASH_INSTRUCTIONS.md) — Instalación en router
+- [Secrets](docs/SECRETS.md) — Gestión con sops+age

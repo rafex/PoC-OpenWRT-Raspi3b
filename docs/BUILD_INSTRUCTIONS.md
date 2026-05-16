@@ -35,11 +35,12 @@ cd PoC-OpenWRT-Raspi3b
 
 ### 2. Preparar el entorno
 
-Descarga y extrae el Image Builder de OpenWRT:
-
 ```bash
-chmod +x scripts/setup-build-env.sh
-./scripts/setup-build-env.sh
+# Recomendado: con just
+just setup           # Instala herramientas, genera clave age, crea environments
+
+# O manualmente:
+./scripts/install/setup-env.sh
 ```
 
 Esto descargará `openwrt-imagebuilder-25.12.2-ath79-generic.Linux-x86_64.tar.zst` y lo extraerá en el directorio `openwrt-builder/`.
@@ -70,14 +71,25 @@ cat config/openwrt-packages.txt
 ### 4. Compilar la imagen
 
 ```bash
-chmod +x build-openwrt.sh
-./build-openwrt.sh
+# Recomendado: con just
+just build-dev       # Desarrollo (valores dummy)
+just build-prod      # Producción (con secrets reales)
+
+# O con scripts modulares:
+./scripts/build/openwrt.sh --builder openwrt-builder/*/
+
+# O con el wrapper (compatible con versión anterior):
+./build-openwrt.sh --builder openwrt-builder/*/
 ```
 
 Opciones disponibles:
 
 ```bash
-./build-openwrt.sh --profile tplink_tl-wdr3600-v1 \
+# Con just (recomendado):
+just build --profile tplink_tl-wdr3600-v1
+
+# Con scripts modulares:
+./scripts/build/openwrt.sh --profile tplink_tl-wdr3600-v1 \
                    --packages config/openwrt-packages.txt \
                    --builder openwrt-builder/openwrt-imagebuilder-*/
 ```
@@ -87,8 +99,11 @@ Opciones disponibles:
 ### 5. Verificar la imagen
 
 ```bash
-chmod +x scripts/verify-image.sh
-./scripts/verify-image.sh openwrt-builder/openwrt-imagebuilder-*/bin/targets/ath79/generic
+# Recomendado: con just
+just flash prod      # Compila + verifica + prepara para flashear
+
+# O con script modular:
+./scripts/build/verify.sh openwrt-builder/openwrt-imagebuilder-*/bin/targets/ath79/generic
 ```
 
 El script verifica:

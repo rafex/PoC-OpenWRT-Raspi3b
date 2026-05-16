@@ -2,6 +2,8 @@
 
 Procedimiento para instalar la imagen personalizada de OpenWRT 25.12.2 en el router TP-Link TL-WDR3600 v1.0.
 
+> ⚡ **Pre-compila con**: `just flash prod` (compila, verifica y prepara la imagen)
+
 ## ⚠️ Advertencias
 
 - **Haz backup** de la configuración del router antes de flashear.
