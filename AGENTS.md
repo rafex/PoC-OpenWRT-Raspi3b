@@ -56,7 +56,19 @@ Múltiples `.gitignore` aseguran que los secrets sin encryptar y archivos tempor
 
 ### Scripts modulares
 
-Los scripts están organizados en `scripts/` por responsabilidad: `commons/`, `deps/`, `install/`, `build/`, `templates/`. Ver [docs/SCRIPTS.md](docs/SCRIPTS.md).
+Los scripts están organizados en `scripts/` por responsabilidad:
+
+| Directorio | Responsabilidad |
+|-----------|-----------------|
+| `commons/` | Utilidades compartidas: logging, utils, parsers |
+| `deps/` | Verificación de dependencias |
+| `install/` | Instalación y validación de herramientas |
+| `build/` | Compilación de OpenWRT |
+| `templates/` | Generación de configuraciones |
+
+**Regla arquitectónica:** Just llama a scripts; Make llama a scripts; **Scripts NUNCA llaman a Just ni a Make**. No hay tareas duplicadas entre `justfile` y `Makefile`.
+
+Ver [docs/SCRIPTS.md](docs/SCRIPTS.md).
 
 ## Estructura de archivos
 
@@ -73,10 +85,10 @@ repo/
 │   └── openwrt-packages.txt       # Paquetes a incluir/excluir
 ├── environments/{dev,prod}/       # Secrets por entorno
 ├── scripts/
-│   ├── commons/{logging,utils}.sh # Utilidades compartidas
-│   ├── deps/check-tools.sh        # Verificación de herramientas
-│   ├── install/setup-env.sh       # Descarga Image Builder
-│   ├── build/{openwrt,compile,verify}.sh  # Compilación
+│   ├── commons/{logging,utils,toml-parser}.sh # Utilidades compartidas
+│   ├── deps/check-tools.sh        # Verificación de dependencias
+│   ├── install/{setup-env,validate-tools}.sh  # Setup + validación
+│   ├── build/{openwrt,compile,verify}.sh      # Compilación
 │   └── templates/generate.sh      # Generación de configs
 ├── templates/etc/                 # Templates de config
 ├── docs/                          # Documentación
