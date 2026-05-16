@@ -243,11 +243,14 @@ create-environments:
     fi
 
     mkdir -p environments/{dev,prod}
+
     # Crear .env.public con valores de ejemplo si no existen
+    # Contiene: parámetros de build + SSID de WiFi (no contraseñas)
     if [ ! -f environments/dev/.env.public ]; then
         printf '%s\n' \
             '# Variables públicas para entorno DEV' \
             '# Estos valores son seguros de commitear' \
+            '' \
             'ENV=dev' \
             "OPENWRT_VERSION=${O_VERSION}" \
             'TARGET=ath79' \
@@ -255,6 +258,10 @@ create-environments:
             'PROFILE=tplink_tl-wdr3600-v1' \
             'ROUTER_IP=192.168.1.1' \
             'SSH_PORT=22' \
+            '' \
+            '# Red WiFi (nombres de red — no contraseñas)' \
+            'WIFI_SSID_24=TestWiFi24' \
+            'WIFI_SSID_5=TestWiFi5G' \
             > environments/dev/.env.public
         echo "✅ environments/dev/.env.public creado"
     fi
@@ -262,6 +269,7 @@ create-environments:
         printf '%s\n' \
             '# Variables públicas para entorno PROD' \
             '# Estos valores son seguros de commitear' \
+            '' \
             'ENV=prod' \
             "OPENWRT_VERSION=${O_VERSION}" \
             'TARGET=ath79' \
@@ -269,10 +277,16 @@ create-environments:
             'PROFILE=tplink_tl-wdr3600-v1' \
             'ROUTER_IP=192.168.1.1' \
             'SSH_PORT=22' \
+            '' \
+            '# Red WiFi (nombres de red — no contraseñas)' \
+            'WIFI_SSID_24=' \
+            'WIFI_SSID_5=' \
             > environments/prod/.env.public
         echo "✅ environments/prod/.env.public creado"
     fi
-    # Crear secrets.enc.yaml con estructura YAML válida si no existen
+
+    # Crear secrets.enc.yaml vacíos (usuario los llena con just edit-secrets)
+    # Contiene SOLO contraseñas: WiFi keys, WireGuard, root hash
     PUBKEY=$(cat .age-pubkey.txt 2>/dev/null || echo "")
     if [ -z "$PUBKEY" ]; then
         echo "⚠️  No se encontró .age-pubkey.txt. Ejecuta: just generate-age-key"
@@ -282,8 +296,9 @@ create-environments:
         SECRETS_FILE="environments/${env}/secrets.enc.yaml"
         if [ ! -f "$SECRETS_FILE" ]; then
             printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "$SECRETS_FILE"
-            SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt" sops --encrypt --in-place "$SECRETS_FILE"
+            SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt" sops --config .sops.yaml --encrypt --in-place "$SECRETS_FILE"
             echo "✅ environments/${env}/secrets.enc.yaml creado y encriptado"
+            echo "   Llena tus datos con: just edit-secrets ${env}"
         fi
     done
 
@@ -389,19 +404,29 @@ setup-hooks:
 # Build
 # ─────────────────────────────────────────────────────
 
-# build-dev: Compilar imagen para desarrollo (sin secrets reales)
+# build-dev: Compilar imagen para desarrollo
+# Carga variables públicas de dev + intenta descifrar secrets de dev.
+# Los secrets vacíos se omiten (no configuran esa funcionalidad).
 build-dev:
-    @echo "=== Build DEV (valores dummy) ==="
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Build DEV ==="
+    scripts/install/ensure-secrets.sh dev || exit 1
+    just generate-config dev
     ENV=dev make build
 
-# build-prod: Compilar imagen para producción (con secrets reales)
+# build-prod: Compilar imagen para producción
+# Carga variables públicas de prod + intenta descifrar secrets de prod.
+# Los secrets vacíos se omiten (no configuran esa funcionalidad).
 build-prod:
-    @echo "=== Build PROD ==="
-    just decrypt-secrets prod
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Build PROD ==="
+    scripts/install/ensure-secrets.sh prod || exit 1
     just generate-config prod
     ENV=prod make build
 
-# build: Compilar sin secrets (usa valores por defecto)
+# build: Compilar sin secrets (usa valores por defecto del entorno)
 build:
     @echo "=== Build ==="
     make build
