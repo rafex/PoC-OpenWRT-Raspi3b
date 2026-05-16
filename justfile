@@ -74,7 +74,8 @@ install-tools force="false":
                            if [ "$FORCE" = "true" ]; then
                                cmds+=("rm -rf ~/.local/bin/sops")
                            fi
-                           cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops.linux.${ARCH}")
+                           cmds+=("SOPS_VER=\$(curl -s https://api.github.com/repos/getsops/sops/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
+                           cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/download/v\${SOPS_VER}/sops-v\${SOPS_VER}.linux.\${ARCH}")
                            cmds+=("chmod +x ~/.local/bin/sops")
                            path_hint=true ;;
                      age)  cmds+=("mkdir -p ~/.local/bin")
