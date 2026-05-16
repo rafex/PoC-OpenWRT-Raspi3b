@@ -1,9 +1,13 @@
+# AUTO-GENERATED — DO NOT EDIT MANUALLY
+# Source of truth: config/openwrt-packages.toml
+# Regenerate with: scripts/build/convert-toml-packages.sh --output config/openwrt-packages.txt
+#
+# ============================================================================
 # OpenWRT 25.12.2 Package Configuration for TP-Link TL-WDR3600 v1.0
 # Profile: tplink_tl-wdr3600-v1
 # Target: ath79/generic
-#
-# This file lists packages to INCLUDE and EXCLUDE.
-# Packages prefixed with "-" will be excluded from the image.
+# RAM: 64 MB
+# ============================================================================
 
 # --- SSH Server ---
 dropbear
@@ -30,22 +34,33 @@ kmod-usb-storage-uas
 kmod-scsi-core
 kmod-scsi-generic
 kmod-fs-ext4
+kmod-nls-base
+kmod-nls-cp437
+kmod-nls-iso8859-1
 block-mount
 e2fsprogs
 
 # --- VPN ---
-# Option A: WireGuard (lighter, recommended for embedded)
 wireguard-tools
 kmod-wireguard
 
-# Option B: OpenVPN (uncomment and comment WireGuard above)
-# openvpn-openssl
+# --- Firewall (nftables backend) ---
+kmod-nft-core
+kmod-nft-nat
 
-# --- Tor Client ---
-tor
+# --- System Tools ---
+htop
+usbutils
+nano
+logrotate
+
+# --- RPC Daemon (base, required by ubus/netifd) ---
+rpcd
+rpcd-mod-file
+rpcd-mod-iwinfo
 
 # ============================================
-# EXCLUDED: LuCi web interface (administration via SSH)
+# EXCLUDED: LuCI web interface (administration via SSH)
 # ============================================
 -luci
 -luci-base
@@ -61,17 +76,14 @@ tor
 -luci-proto-ppp
 
 # ============================================
-# EXCLUDED: uhttpd (web server for LuCi)
+# EXCLUDED: uhttpd (web server for LuCI)
 # ============================================
 -uhttpd
 -uhttpd-mod-ubus
 
 # ============================================
-# EXCLUDED: rpcd (remote procedure call daemon)
+# EXCLUDED: rpcd LuCI modules only (base rpcd daemon is included above)
 # ============================================
--rpcd
--rpcd-mod-file
--rpcd-mod-iwinfo
 -rpcd-mod-luci
 -rpcd-mod-rpcsys
 -rpcd-mod-rrdns
