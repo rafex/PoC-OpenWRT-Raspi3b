@@ -31,6 +31,20 @@ install-tools force="false":
     FORCE="{{ force }}"
     echo "Verificando herramientas..."
 
+    # Función para detectar binarios corruptos (descargas 404 de GitHub)
+    _is_valid_binary() {
+        local tpath
+        tpath="$(command -v "$1" 2>/dev/null || true)"
+        [ -z "${tpath}" ] && return 1
+        # file no estándar en todos los sistemas; si falla, asumimos OK
+        if command -v file &>/dev/null; then
+            if file "${tpath}" 2>/dev/null | grep -qi 'text'; then
+                return 1  # es texto/HTML, no binario
+            fi
+        fi
+        return 0
+    }
+
     # Determinar qué instalar
     if [ "$FORCE" = "true" ]; then
         echo "(modo force: se reinstalarán todas las herramientas)"
@@ -40,10 +54,14 @@ install-tools force="false":
         for tool in just make sops age; do
             if ! command -v "$tool" &>/dev/null; then
                 missing+=("$tool")
+            elif ! _is_valid_binary "$tool"; then
+                echo "⚠️  '${tool}' detectado pero no es un binario válido (HTML/texto)"
+                echo "   Probable descarga fallida de GitHub (error 404). Se reinstalará."
+                missing+=("$tool")
             fi
         done
         if [ ${#missing[@]} -eq 0 ]; then
-            echo "✅ Todas las herramientas instaladas"
+            echo "✅ Todas las herramientas instaladas y verificadas"
             echo "   Usa 'just install-tools force=true' para forzar reinstalación"
             exit 0
         fi
