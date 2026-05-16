@@ -244,6 +244,20 @@ generate-config ENV:
     ./scripts/templates/generate.sh {{ ENV }}
 
 # ─────────────────────────────────────────────────────
+# Paquetes
+# ─────────────────────────────────────────────────────
+
+# packages: Mostrar configuración de paquetes (TOML → display estructurado)
+packages:
+    @./scripts/build/show-packages.sh
+
+# refresh-packages: Regenerar config/openwrt-packages.txt desde el TOML
+refresh-packages:
+    @echo "Regenerando config/openwrt-packages.txt desde config/openwrt-packages.toml..."
+    ./scripts/build/convert-toml-packages.sh --output config/openwrt-packages.txt
+    @echo "✅ Regenerado: config/openwrt-packages.txt"
+
+# ─────────────────────────────────────────────────────
 # Validación
 # ─────────────────────────────────────────────────────
 
