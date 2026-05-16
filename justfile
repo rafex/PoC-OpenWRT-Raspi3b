@@ -164,6 +164,10 @@ install-tools force="false":
         exit 1
     fi
 
+# validate-tools: Validar que todas las herramientas requeridas estén instaladas
+validate-tools:
+    @scripts/install/validate-tools.sh
+
 # generate-age-key: Generar clave age única del proyecto (si no existe)
 generate-age-key:
     #!/usr/bin/env bash
