@@ -65,20 +65,20 @@ install-tools force="false":
                 case "$tool" in
                     make)  cmds+=("sudo apt-get install -y make") ;;
                     just)  if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -f ~/.local/bin/just")
+                               cmds+=("rm -rf ~/.local/bin/just")
                            fi
                            cmds+=("curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin")
                            path_hint=true ;;
                     sops)  cmds+=("mkdir -p ~/.local/bin")
                            if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -f ~/.local/bin/sops")
+                               cmds+=("rm -rf ~/.local/bin/sops")
                            fi
                            cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops.linux.${ARCH}")
                            cmds+=("chmod +x ~/.local/bin/sops")
                            path_hint=true ;;
                      age)  cmds+=("mkdir -p ~/.local/bin")
                            if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -f ~/.local/bin/age ~/.local/bin/age-keygen")
+                               cmds+=("rm -rf ~/.local/bin/age ~/.local/bin/age-keygen")
                            fi
                            cmds+=("AGE_VER=\$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
                            cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v\${AGE_VER}-linux-${ARCH}.tar.gz")
