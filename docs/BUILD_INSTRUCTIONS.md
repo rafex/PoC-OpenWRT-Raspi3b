@@ -51,11 +51,11 @@ La configuración de paquetes se define en **`config/openwrt-packages.toml`** (f
 El archivo `config/openwrt-packages.txt` se genera automáticamente desde el TOML — **no se edita manualmente**.
 
 ```bash
-# Ver la config fuente (TOML)
-cat config/openwrt-packages.toml
+# Ver la config fuente con display estructurado
+just packages
 
 # Regenerar el .txt manualmente si es necesario
-scripts/build/convert-toml-packages.sh --output config/openwrt-packages.txt
+just refresh-packages
 ```
 
 **Paquetes incluidos:**
