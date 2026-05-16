@@ -18,7 +18,7 @@ default:
 # force=true: reinstalar herramientas aunque ya existan
 setup force="false":
     @echo "=== Setup inicial del proyecto ==="
-    just install-tools {{ force }}
+    just install-tools force={{ force }}
     just generate-age-key
     just create-environments
 
