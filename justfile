@@ -28,20 +28,49 @@ install-tools:
     echo "Verificando herramientas..."
     missing=()
     for tool in just make sops age; do
-        if ! command -v $tool &>/dev/null; then
+        if ! command -v "$tool" &>/dev/null; then
             missing+=("$tool")
         fi
     done
-    if [ ${#missing[@]} -gt 0 ]; then
-        echo "Faltan: ${missing[*]}"
-        echo ""
-        echo "Instalar con:"
-        echo "  macOS:  brew install ${missing[*]}"
-        echo "  Debian: sudo apt-get install ${missing[*]}"
-        echo "  Fedora: sudo dnf install ${missing[*]}"
-        exit 1
+    if [ ${#missing[@]} -eq 0 ]; then
+        echo "✅ Todas las herramientas instaladas"
+        exit 0
     fi
-    echo "✅ Todas las herramientas instaladas"
+    echo "Faltan: ${missing[*]}"
+    echo ""
+    # Detectar SO
+    case "$(uname -s)" in
+        Darwin)
+            echo "Instalar con:"
+            echo "  brew install ${missing[*]}"
+            ;;
+        Linux)
+            echo "Instrucciones para Debian/Ubuntu:"
+            for tool in "${missing[@]}"; do
+                case "$tool" in
+                    make)  echo "  sudo apt-get install make" ;;
+                    just)  echo "  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin" ;;
+                    sops)  echo "  curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m)"
+                           echo "  chmod +x ~/.local/bin/sops" ;;
+                    age)   echo "  curl -Lo ~/.local/bin/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v1.2.1-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m).tar.gz"
+                           echo "  tar -xzf ~/.local/bin/age.tar.gz -C ~/.local/bin age age-keygen"
+                           echo "  chmod +x ~/.local/bin/age ~/.local/bin/age-keygen"
+                           echo "  rm ~/.local/bin/age.tar.gz" ;;
+                esac
+            done
+            echo ""
+            echo "Asegúrate de que ~/.local/bin esté en tu PATH:"
+            echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+            ;;
+        *)
+            echo "Sistema no reconocido. Instala manualmente:"
+            echo "  just:  https://github.com/casey/just#installation"
+            echo "  make:  gestor de paquetes de tu sistema"
+            echo "  sops:  https://github.com/getsops/sops#download"
+            echo "  age:   https://github.com/FiloSottile/age#installation"
+            ;;
+    esac
+    exit 1
 
 # generate-age-key: Generar clave age única del proyecto (si no existe)
 generate-age-key:
