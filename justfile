@@ -21,7 +21,7 @@ setup:
     just generate-age-key
     just create-environments
 
-# install-tools: Verificar e instalar herramientas necesarias
+# install-tools: Verificar herramientas faltantes y ofrecer instalarlas
 install-tools:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -36,31 +36,35 @@ install-tools:
         echo "✅ Todas las herramientas instaladas"
         exit 0
     fi
+
     echo "Faltan: ${missing[*]}"
     echo ""
-    # Detectar SO
+
+    # Construir comandos según SO
+    cmds=()
+    path_hint=false
     case "$(uname -s)" in
         Darwin)
-            echo "Instalar con:"
-            echo "  brew install ${missing[*]}"
+            cmds+=("brew install ${missing[*]}")
             ;;
         Linux)
-            echo "Instrucciones para Debian/Ubuntu:"
             for tool in "${missing[@]}"; do
                 case "$tool" in
-                    make)  echo "  sudo apt-get install make" ;;
-                    just)  echo "  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin" ;;
-                    sops)  echo "  curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m)"
-                           echo "  chmod +x ~/.local/bin/sops" ;;
-                    age)   echo "  curl -Lo ~/.local/bin/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v1.2.1-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m).tar.gz"
-                           echo "  tar -xzf ~/.local/bin/age.tar.gz -C ~/.local/bin age age-keygen"
-                           echo "  chmod +x ~/.local/bin/age ~/.local/bin/age-keygen"
-                           echo "  rm ~/.local/bin/age.tar.gz" ;;
+                    make)  cmds+=("sudo apt-get install -y make") ;;
+                    just)  cmds+=("curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin")
+                           path_hint=true ;;
+                    sops)  cmds+=("mkdir -p ~/.local/bin")
+                           cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m)")
+                           cmds+=("chmod +x ~/.local/bin/sops")
+                           path_hint=true ;;
+                    age)   cmds+=("mkdir -p ~/.local/bin")
+                           cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v1.2.1-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m).tar.gz")
+                           cmds+=("tar -xzf /tmp/age.tar.gz -C ~/.local/bin age age-keygen")
+                           cmds+=("chmod +x ~/.local/bin/age ~/.local/bin/age-keygen")
+                           cmds+=("rm /tmp/age.tar.gz")
+                           path_hint=true ;;
                 esac
             done
-            echo ""
-            echo "Asegúrate de que ~/.local/bin esté en tu PATH:"
-            echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
             ;;
         *)
             echo "Sistema no reconocido. Instala manualmente:"
@@ -68,9 +72,58 @@ install-tools:
             echo "  make:  gestor de paquetes de tu sistema"
             echo "  sops:  https://github.com/getsops/sops#download"
             echo "  age:   https://github.com/FiloSottile/age#installation"
+            exit 1
             ;;
     esac
-    exit 1
+
+    # Mostrar comandos que se ejecutarán
+    echo "Se ejecutarán los siguientes comandos:"
+    echo "──────────────────────────────────────"
+    for cmd in "${cmds[@]}"; do
+        echo "  $ $cmd"
+    done
+    if [ "$path_hint" = true ]; then
+        echo ""
+        echo "  Nota: asegúrate de tener ~/.local/bin en tu PATH:"
+        echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+    echo "──────────────────────────────────────"
+    echo ""
+
+    # Pedir confirmación
+    read -r -p "¿Ejecutar estos comandos ahora? (s/N) " answer
+    if [ "${answer,,}" != "s" ] && [ "${answer,,}" != "si" ]; then
+        echo "Cancelado. Ejecuta los comandos manualmente y vuelve a intentar."
+        exit 1
+    fi
+
+    echo ""
+    echo "Ejecutando..."
+    for cmd in "${cmds[@]}"; do
+        echo "  $ $cmd"
+        eval "$cmd" || { echo "❌ Falló: $cmd"; exit 1; }
+    done
+
+    echo ""
+    if [ "$path_hint" = true ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+
+    # Re-verificar
+    still_missing=()
+    for tool in "${missing[@]}"; do
+        if ! command -v "$tool" &>/dev/null; then
+            still_missing+=("$tool")
+        fi
+    done
+    if [ ${#still_missing[@]} -eq 0 ]; then
+        echo "✅ Todas las herramientas instaladas correctamente"
+        exit 0
+    else
+        echo "⚠️  Algunas herramientas no se detectan: ${still_missing[*]}"
+        echo "   Verifica que ~/.local/bin esté en tu PATH y vuelve a intentar."
+        exit 1
+    fi
 
 # generate-age-key: Generar clave age única del proyecto (si no existe)
 generate-age-key:
