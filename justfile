@@ -48,17 +48,20 @@ install-tools:
             cmds+=("brew install ${missing[*]}")
             ;;
         Linux)
+            # Normalizar arquitectura: x86_64 → amd64, aarch64 → arm64
+            ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
             for tool in "${missing[@]}"; do
                 case "$tool" in
                     make)  cmds+=("sudo apt-get install -y make") ;;
                     just)  cmds+=("curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin")
                            path_hint=true ;;
                     sops)  cmds+=("mkdir -p ~/.local/bin")
-                           cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m)")
+                           cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops.linux.${ARCH}")
                            cmds+=("chmod +x ~/.local/bin/sops")
                            path_hint=true ;;
                     age)   cmds+=("mkdir -p ~/.local/bin")
-                           cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v1.2.1-\$(uname -s)-\$(dpkg --print-architecture 2>/dev/null || uname -m).tar.gz")
+                           cmds+=("AGE_VER=\$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
+                           cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v\${AGE_VER}-linux-${ARCH}.tar.gz")
                            cmds+=("tar -xzf /tmp/age.tar.gz -C ~/.local/bin age age-keygen")
                            cmds+=("chmod +x ~/.local/bin/age ~/.local/bin/age-keygen")
                            cmds+=("rm /tmp/age.tar.gz")
