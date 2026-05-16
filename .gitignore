@@ -1,5 +1,10 @@
 # .gitignore (root) — Globales que NUNCA deben subirse
 
+# claude code (local, no versionar)
+# .claude/settings.json SÍ se puede versionar (config compartida del proyecto)
+.claude/settings.local.json
+.claude/worktrees/
+
 # opencode (local, no versionar)
 .opencode/sessions.db
 .opencode/sessions*db
