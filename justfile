@@ -168,10 +168,10 @@ install-tools force="false":
 validate-tools:
     @scripts/install/validate-tools.sh
 
-# create-password: Generar hash SHA-512 de contraseña root para OpenWRT
-# El hash resultante se usa como ROOT_PASSWORD_HASH en: just edit-secrets <env>
-create-password:
-    @scripts/install/generate-password-hash.sh
+# create-password: Generar hash SHA-512 de root e inyectarlo en secrets
+# El hash se guarda directamente en secrets.enc.yaml sin mostrarse en pantalla.
+create-password ENV:
+    @scripts/install/generate-password-hash.sh {{ ENV }}
 
 # generate-age-key: Generar clave age única del proyecto (si no existe)
 generate-age-key:
