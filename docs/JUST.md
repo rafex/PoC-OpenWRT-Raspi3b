@@ -13,8 +13,8 @@ just <recipe>                  # Ejecutar una recipe
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just setup` | Setup inicial completo (tools + age key + environments) |
-| `just install-tools` | Verificar herramientas faltantes, mostrar comandos y preguntar antes de instalar |
+| `just setup` | Setup inicial (tools + age key + environments). Usa `just setup force=true` para forzar reinstalación |
+| `just install-tools` | Verificar herramientas faltantes. Usa `just install-tools force=true` para reinstalar |
 | `just generate-age-key` | Generar clave age del proyecto en `~/.age/poc-openwrt-privkey.txt` |
 | `just create-environments` | Crear estructura `environments/{dev,prod}/` con secrets vacíos |
 

@@ -15,29 +15,40 @@ default:
 # ─────────────────────────────────────────────────────
 
 # setup: Instalar herramientas, generar clave age y crear environments
-setup:
+# force=true: reinstalar herramientas aunque ya existan
+setup force="false":
     @echo "=== Setup inicial del proyecto ==="
-    just install-tools
+    just install-tools {{ force }}
     just generate-age-key
     just create-environments
 
 # install-tools: Verificar herramientas faltantes y ofrecer instalarlas
-install-tools:
+# force=true: reinstalar aunque la herramienta ya exista
+install-tools force="false":
     #!/usr/bin/env bash
     set -euo pipefail
+    FORCE="{{ force }}"
     echo "Verificando herramientas..."
-    missing=()
-    for tool in just make sops age; do
-        if ! command -v "$tool" &>/dev/null; then
-            missing+=("$tool")
+
+    # Determinar qué instalar
+    if [ "$FORCE" = "true" ]; then
+        echo "(modo force: se reinstalarán todas las herramientas)"
+        missing=(just make sops age)
+    else
+        missing=()
+        for tool in just make sops age; do
+            if ! command -v "$tool" &>/dev/null; then
+                missing+=("$tool")
+            fi
+        done
+        if [ ${#missing[@]} -eq 0 ]; then
+            echo "✅ Todas las herramientas instaladas"
+            echo "   Usa 'just install-tools force=true' para forzar reinstalación"
+            exit 0
         fi
-    done
-    if [ ${#missing[@]} -eq 0 ]; then
-        echo "✅ Todas las herramientas instaladas"
-        exit 0
     fi
 
-    echo "Faltan: ${missing[*]}"
+    echo "A instalar: ${missing[*]}"
     echo ""
 
     # Construir comandos según SO
@@ -53,14 +64,22 @@ install-tools:
             for tool in "${missing[@]}"; do
                 case "$tool" in
                     make)  cmds+=("sudo apt-get install -y make") ;;
-                    just)  cmds+=("curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin")
+                    just)  if [ "$FORCE" = "true" ]; then
+                               cmds+=("rm -f ~/.local/bin/just")
+                           fi
+                           cmds+=("curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin")
                            path_hint=true ;;
                     sops)  cmds+=("mkdir -p ~/.local/bin")
+                           if [ "$FORCE" = "true" ]; then
+                               cmds+=("rm -f ~/.local/bin/sops")
+                           fi
                            cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops.linux.${ARCH}")
                            cmds+=("chmod +x ~/.local/bin/sops")
                            path_hint=true ;;
-                     age)   cmds+=("mkdir -p ~/.local/bin")
-                           cmds+=("rm -f ~/.local/bin/age ~/.local/bin/age-keygen")
+                     age)  cmds+=("mkdir -p ~/.local/bin")
+                           if [ "$FORCE" = "true" ]; then
+                               cmds+=("rm -f ~/.local/bin/age ~/.local/bin/age-keygen")
+                           fi
                            cmds+=("AGE_VER=\$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
                            cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v\${AGE_VER}-linux-${ARCH}.tar.gz")
                            cmds+=("tar -xzf /tmp/age.tar.gz --strip-components=1 -C ~/.local/bin")
