@@ -129,9 +129,23 @@ install-tools force="false":
     done
 
     echo ""
+
+    # ── Post-download: verificar que binarios sean válidos ──────────
     if [ "$path_hint" = true ]; then
         export PATH="$HOME/.local/bin:$PATH"
     fi
+    for tool in "${missing[@]}"; do
+        if command -v "$tool" &>/dev/null; then
+            TPATH="$(command -v "$tool")"
+            if file "${TPATH}" 2>/dev/null | grep -qi 'text'; then
+                echo "❌ Error: '${tool}' en ${TPATH} no es un binario (parece texto/HTML)"
+                echo "   La descarga desde GitHub probablemente falló (error 404)."
+                echo "   Verifica la URL e inténtalo de nuevo."
+                exit 1
+            fi
+        fi
+    done
+    echo ""
 
     # Re-verificar
     still_missing=()
@@ -156,50 +170,83 @@ generate-age-key:
     KEYFILE="$HOME/.age/poc-openwrt-privkey.txt"
     if [ -f "$KEYFILE" ]; then
         echo "ℹ️  Clave age ya existe: $KEYFILE"
-    else
-        mkdir -p "$(dirname "$KEYFILE")"
-        age-keygen -o "$KEYFILE"
-        chmod 600 "$KEYFILE"
-        echo "✅ Clave privada generada: $KEYFILE"
-        echo "⚠️  GUARDA ESTE ARCHIVO EN UN LUGAR SEGURO (NO en el repo)"
-        # Extraer clave pública para el repo
-        grep "public key" "$KEYFILE" | awk '{print $3}' > .age-pubkey.txt
-        chmod 644 .age-pubkey.txt
-        echo "✅ Clave pública guardada en .age-pubkey.txt (committeable)"
+        exit 0
     fi
+
+    # ── Pre-flight: verificar age-keygen ────────────────────────────
+    if ! command -v age-keygen &>/dev/null; then
+        echo "❌ Error: 'age-keygen' no encontrado en PATH"
+        echo "   Buscando: age-keygen (necesario para generar clave age)"
+        echo "   Solución: just install-tools"
+        exit 1
+    fi
+    AGEPATH="$(command -v age-keygen)"
+    if file "${AGEPATH}" 2>/dev/null | grep -qi 'text'; then
+        echo "❌ Error: 'age-keygen' en ${AGEPATH} no es un binario válido"
+        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
+        echo "   Solución: just install-tools force=true"
+        exit 1
+    fi
+
+    mkdir -p "$(dirname "$KEYFILE")"
+    age-keygen -o "$KEYFILE"
+    chmod 600 "$KEYFILE"
+    echo "✅ Clave privada generada: $KEYFILE"
+    echo "⚠️  GUARDA ESTE ARCHIVO EN UN LUGAR SEGURO (NO en el repo)"
+    # Extraer clave pública para el repo
+    grep "public key" "$KEYFILE" | awk '{print $3}' > .age-pubkey.txt
+    chmod 644 .age-pubkey.txt
+    echo "✅ Clave pública guardada en .age-pubkey.txt (committeable)"
 
 # create-environments: Crear estructura environments/ y secrets vacíos
 create-environments:
     #!/usr/bin/env bash
     set -euo pipefail
+    O_VERSION="25.12.2"
+
+    # ── Pre-flight: verificar sops ──────────────────────────────────
+    if ! command -v sops &>/dev/null; then
+        echo "❌ Error: 'sops' no encontrado en PATH"
+        echo "   Buscando: sops (necesario para encriptar secrets)"
+        echo "   Solución: just install-tools"
+        exit 1
+    fi
+    SOPATH="$(command -v sops)"
+    if file "${SOPATH}" 2>/dev/null | grep -qi 'text'; then
+        echo "❌ Error: 'sops' en ${SOPATH} no es un binario válido"
+        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
+        echo "   Solución: just install-tools force=true"
+        exit 1
+    fi
+
     mkdir -p environments/{dev,prod}
     # Crear .env.public con valores de ejemplo si no existen
     if [ ! -f environments/dev/.env.public ]; then
-        cat > environments/dev/.env.public << 'ENVEOF'
-# Variables públicas para entorno DEV
-# Estos valores son seguros de commitear
-ENV=dev
-OPENWRT_VERSION=25.12.2
-TARGET=ath79
-SUBTARGET=generic
-PROFILE=tplink_tl-wdr3600-v1
-ROUTER_IP=192.168.1.1
-SSH_PORT=22
-ENVEOF
+        printf '%s\n' \
+            '# Variables públicas para entorno DEV' \
+            '# Estos valores son seguros de commitear' \
+            'ENV=dev' \
+            "OPENWRT_VERSION=${O_VERSION}" \
+            'TARGET=ath79' \
+            'SUBTARGET=generic' \
+            'PROFILE=tplink_tl-wdr3600-v1' \
+            'ROUTER_IP=192.168.1.1' \
+            'SSH_PORT=22' \
+            > environments/dev/.env.public
         echo "✅ environments/dev/.env.public creado"
     fi
     if [ ! -f environments/prod/.env.public ]; then
-        cat > environments/prod/.env.public << 'ENVEOF'
-# Variables públicas para entorno PROD
-# Estos valores son seguros de commitear
-ENV=prod
-OPENWRT_VERSION=25.12.2
-TARGET=ath79
-SUBTARGET=generic
-PROFILE=tplink_tl-wdr3600-v1
-ROUTER_IP=192.168.1.1
-SSH_PORT=22
-ENVEOF
+        printf '%s\n' \
+            '# Variables públicas para entorno PROD' \
+            '# Estos valores son seguros de commitear' \
+            'ENV=prod' \
+            "OPENWRT_VERSION=${O_VERSION}" \
+            'TARGET=ath79' \
+            'SUBTARGET=generic' \
+            'PROFILE=tplink_tl-wdr3600-v1' \
+            'ROUTER_IP=192.168.1.1' \
+            'SSH_PORT=22' \
+            > environments/prod/.env.public
         echo "✅ environments/prod/.env.public creado"
     fi
     # Crear secrets.enc.yaml con estructura YAML válida si no existen
@@ -226,9 +273,36 @@ decrypt-secrets ENV:
     #!/usr/bin/env bash
     set -euo pipefail
     export SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt"
+
+    # ── Pre-flight: verificar sops ──────────────────────────────────
+    if ! command -v sops &>/dev/null; then
+        echo "❌ Error: 'sops' no encontrado en PATH"
+        echo "   Buscando: sops (necesario para desencriptar secrets)"
+        echo "   Solución: just install-tools"
+        exit 1
+    fi
+    SOPATH="$(command -v sops)"
+    if file "${SOPATH}" 2>/dev/null | grep -qi 'text'; then
+        echo "❌ Error: 'sops' en ${SOPATH} no es un binario válido"
+        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
+        echo "   Solución: just install-tools force=true"
+        exit 1
+    fi
+
+    # ── Pre-flight: verificar clave age ─────────────────────────────
+    if [ ! -f "${SOPS_AGE_KEY_FILE}" ]; then
+        echo "❌ Error: clave age no encontrada"
+        echo "   Buscando: ${SOPS_AGE_KEY_FILE}"
+        echo "   Solución: just generate-age-key"
+        exit 1
+    fi
+
+    # ── Desencriptar ────────────────────────────────────────────────
     SECRETS_FILE="environments/{{ ENV }}/secrets.enc.yaml"
     if [ ! -f "$SECRETS_FILE" ]; then
-        echo "Error: $SECRETS_FILE no existe. Ejecuta: just create-environments"
+        echo "❌ Error: archivo de secrets no existe"
+        echo "   Buscando: ${SECRETS_FILE}"
+        echo "   Solución: just create-environments"
         exit 1
     fi
     sops -d "$SECRETS_FILE" > /tmp/secrets-{{ ENV }}.yaml
@@ -241,9 +315,35 @@ edit-secrets ENV:
     #!/usr/bin/env bash
     set -euo pipefail
     export SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt"
+
+    # ── Pre-flight: verificar sops ──────────────────────────────────
+    if ! command -v sops &>/dev/null; then
+        echo "❌ Error: 'sops' no encontrado en PATH"
+        echo "   Buscando: sops (necesario para editar secrets)"
+        echo "   Solución: just install-tools"
+        exit 1
+    fi
+    SOPATH="$(command -v sops)"
+    if file "${SOPATH}" 2>/dev/null | grep -qi 'text'; then
+        echo "❌ Error: 'sops' en ${SOPATH} no es un binario válido"
+        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
+        echo "   Solución: just install-tools force=true"
+        exit 1
+    fi
+
+    # ── Pre-flight: verificar clave age ─────────────────────────────
+    if [ ! -f "${SOPS_AGE_KEY_FILE}" ]; then
+        echo "❌ Error: clave age no encontrada"
+        echo "   Buscando: ${SOPS_AGE_KEY_FILE}"
+        echo "   Solución: just generate-age-key"
+        exit 1
+    fi
+
     SECRETS_FILE="environments/{{ ENV }}/secrets.enc.yaml"
     if [ ! -f "$SECRETS_FILE" ]; then
-        echo "Error: $SECRETS_FILE no existe. Ejecuta: just create-environments"
+        echo "❌ Error: archivo de secrets no existe"
+        echo "   Buscando: ${SECRETS_FILE}"
+        echo "   Solución: just create-environments"
         exit 1
     fi
     # Si el archivo no tiene metadata sops, encriptarlo primero
