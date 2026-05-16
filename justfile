@@ -21,6 +21,7 @@ setup force="false":
     just install-tools force={{ force }}
     just generate-age-key
     just create-environments
+    just setup-hooks
 
 # install-tools: Verificar herramientas faltantes y ofrecer instalarlas
 # force=true: reinstalar aunque la herramienta ya exista
@@ -172,22 +173,49 @@ create-environments:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p environments/{dev,prod}
-    touch environments/dev/.env
-    touch environments/prod/.env
-    # Crear secrets.enc.yaml vacíos con clave pública
+    # Crear .env.public con valores de ejemplo si no existen
+    if [ ! -f environments/dev/.env.public ]; then
+        cat > environments/dev/.env.public << 'ENVEOF'
+# Variables públicas para entorno DEV
+# Estos valores son seguros de commitear
+ENV=dev
+OPENWRT_VERSION=25.12.2
+TARGET=ath79
+SUBTARGET=generic
+PROFILE=tplink_tl-wdr3600-v1
+ROUTER_IP=192.168.1.1
+SSH_PORT=22
+ENVEOF
+        echo "✅ environments/dev/.env.public creado"
+    fi
+    if [ ! -f environments/prod/.env.public ]; then
+        cat > environments/prod/.env.public << 'ENVEOF'
+# Variables públicas para entorno PROD
+# Estos valores son seguros de commitear
+ENV=prod
+OPENWRT_VERSION=25.12.2
+TARGET=ath79
+SUBTARGET=generic
+PROFILE=tplink_tl-wdr3600-v1
+ROUTER_IP=192.168.1.1
+SSH_PORT=22
+ENVEOF
+        echo "✅ environments/prod/.env.public creado"
+    fi
+    # Crear secrets.enc.yaml con estructura YAML válida si no existen
     PUBKEY=$(cat .age-pubkey.txt 2>/dev/null || echo "")
     if [ -z "$PUBKEY" ]; then
         echo "⚠️  No se encontró .age-pubkey.txt. Ejecuta: just generate-age-key"
         exit 1
     fi
-    if [ ! -f environments/prod/secrets.enc.yaml ]; then
-        echo "# secrets.enc.yaml — Secrets para entorno prod" | sops --encrypt --age "$PUBKEY" /dev/stdin > environments/prod/secrets.enc.yaml
-        echo "✅ environments/prod/secrets.enc.yaml creado"
-    fi
-    if [ ! -f environments/dev/secrets.enc.yaml ]; then
-        echo "# secrets.enc.yaml — Secrets dummy para entorno dev" | sops --encrypt --age "$PUBKEY" /dev/stdin > environments/dev/secrets.enc.yaml
-        echo "✅ environments/dev/secrets.enc.yaml creado"
-    fi
+    for env in dev prod; do
+        SECRETS_FILE="environments/${env}/secrets.enc.yaml"
+        if [ ! -f "$SECRETS_FILE" ]; then
+            printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "$SECRETS_FILE"
+            SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt" sops --encrypt --in-place "$SECRETS_FILE"
+            echo "✅ environments/${env}/secrets.enc.yaml creado y encriptado"
+        fi
+    done
 
 # ─────────────────────────────────────────────────────
 # Secrets
@@ -207,6 +235,8 @@ decrypt-secrets ENV:
     echo "✅ Secrets desencriptados: /tmp/secrets-{{ ENV }}.yaml"
 
 # edit-secrets: Editar secrets del entorno especificado
+# Si el archivo no está encriptado, lo encripta automáticamente antes de abrir el editor.
+# Al cerrar el editor, sops re-encripta automáticamente.
 edit-secrets ENV:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -216,7 +246,21 @@ edit-secrets ENV:
         echo "Error: $SECRETS_FILE no existe. Ejecuta: just create-environments"
         exit 1
     fi
+    # Si el archivo no tiene metadata sops, encriptarlo primero
+    if ! grep -q 'sops:' "$SECRETS_FILE" && ! python3 -c "import json,sys; d=json.load(open('$SECRETS_FILE')); assert 'sops' in d" 2>/dev/null; then
+        echo "⚠️  El archivo no está encriptado. Encriptando antes de editar..."
+        sops --encrypt --in-place "$SECRETS_FILE"
+        echo "✅ Archivo encriptado. Abriendo editor..."
+    fi
     sops "$SECRETS_FILE"
+
+# ─────────────────────────────────────────────────────
+# Git hooks
+# ─────────────────────────────────────────────────────
+
+# setup-hooks: Configurar .githooks como directorio de hooks de git
+setup-hooks:
+    @bash scripts/git/setup-hooks.sh
 
 # ─────────────────────────────────────────────────────
 # Build

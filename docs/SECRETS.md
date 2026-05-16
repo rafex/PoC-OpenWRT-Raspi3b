@@ -9,7 +9,7 @@ Este proyecto usa **sops** (Secrets OPerationS) con **age** para encryptar secre
 .age-pubkey.txt                    ← Clave pública (committeada, no es secreta)
 .sops.yaml                         ← Config sops (mapea entornos → claves age)
 environments/{dev,prod}/
-├── .env                            ← Variables públicas (committeadas)
+├── .env.public                     ← Variables públicas (committeadas, sin secrets)
 └── secrets.enc.yaml                ← Secrets encryptados (committeados, solo sops puede leerlos)
 ```
 
@@ -72,7 +72,7 @@ TOR_CONTROL_PASSWORD: tor-password
 
 Los archivos `*.enc.yaml` son seguros de commitear porque están encryptados con age. El `.gitignore` multinivel asegura que:
 
-- `environments/.gitignore`: bloquea cualquier `.yaml` que NO termine en `.enc.yaml`
+- `environments/.gitignore`: bloquea `.env` (sin sufijo) y cualquier `.yaml` que NO termine en `.enc.yaml`; permite `.env.public` explícitamente
 - Root `.gitignore`: bloquea `**/*.key`, `**/*.pem`, `.envrc`
 
 ### Build con secrets

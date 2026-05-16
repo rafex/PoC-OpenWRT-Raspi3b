@@ -1,8 +1,11 @@
-# Solo permitir archivos encryptados y .env
-# NUNCA permitir .yaml o .yml sin encryptar
+# Solo permitir archivos encryptados y .env.public
+# NUNCA permitir .yaml o .yml sin encryptar, ni .env sin extensión .public
+
+# Bloquear .env sin sufijo (pueden contener secrets)
+.env
 
 # Permitir explícitamente
-!.env
+!.env.public
 !secrets.enc.yaml
 !secrets.enc.yml
 

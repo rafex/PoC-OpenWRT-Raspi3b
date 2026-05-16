@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# ============================================================================
+# .githooks/pre-commit — Dispatcher de hooks de pre-commit
+# ============================================================================
+# Ejecuta en orden todos los scripts en scripts/git/ que sean ejecutables.
+# Si alguno falla (exit != 0), el commit se bloquea.
+#
+# Para añadir un nuevo check:
+#   1. Crea scripts/git/mi-check.sh
+#   2. Dale permisos: chmod +x scripts/git/mi-check.sh
+#   3. El dispatcher lo ejecutará automáticamente en el próximo commit.
+# ============================================================================
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPTS_DIR="${REPO_ROOT}/scripts/git"
+FAILED=0
+
+if [ ! -d "$SCRIPTS_DIR" ]; then
+    exit 0
+fi
+
+# Ejecutar todos los scripts ejecutables en scripts/git/ en orden alfabético
+for script in "${SCRIPTS_DIR}"/*.sh; do
+    [ -x "$script" ] || continue
+
+    script_name="$(basename "$script")"
+    echo "▶ pre-commit: $script_name"
+
+    if ! bash "$script"; then
+        echo "✗ Falló: $script_name"
+        FAILED=1
+    fi
+done
+
+if [ "$FAILED" -eq 1 ]; then
+    echo ""
+    echo "Commit bloqueado por uno o más checks de pre-commit."
+    echo "Corrige los errores anteriores y vuelve a intentarlo."
+    exit 1
+fi
+
+exit 0

@@ -20,6 +20,12 @@ session-ses_*.md
 **/.age/keys*.txt
 .envrc
 
+# ── Archivos de entorno (solo .env.public puede subirse) ──
+.env
+**/.env
+**/.env.local
+**/.env.*.local
+
 # ── OpenWRT build artifacts ──
 openwrt-builder/
 *.img
