@@ -59,7 +59,8 @@ install-tools:
                            cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/latest/download/sops.linux.${ARCH}")
                            cmds+=("chmod +x ~/.local/bin/sops")
                            path_hint=true ;;
-                    age)   cmds+=("mkdir -p ~/.local/bin")
+                     age)   cmds+=("mkdir -p ~/.local/bin")
+                           cmds+=("rm -f ~/.local/bin/age ~/.local/bin/age-keygen")
                            cmds+=("AGE_VER=\$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
                            cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v\${AGE_VER}-linux-${ARCH}.tar.gz")
                            cmds+=("tar -xzf /tmp/age.tar.gz --strip-components=1 -C ~/.local/bin")
