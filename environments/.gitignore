@@ -19,3 +19,5 @@
 # Permitir solo los encryptados
 !*.enc.yaml
 !*.enc.yml
+
+*.tmp
