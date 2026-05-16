@@ -47,26 +47,33 @@ Esto descargará `openwrt-imagebuilder-25.12.2-ath79-generic.Linux-x86_64.tar.zs
 
 ### 3. Revisar configuración de paquetes
 
-El archivo `config/openwrt-packages.txt` contiene la lista de paquetes a incluir y excluir:
+La configuración de paquetes se define en **`config/openwrt-packages.toml`** (formato TOML, fuente de verdad).
+El archivo `config/openwrt-packages.txt` se genera automáticamente desde el TOML — **no se edita manualmente**.
 
 ```bash
-cat config/openwrt-packages.txt
+# Ver la config fuente (TOML)
+cat config/openwrt-packages.toml
+
+# Regenerar el .txt manualmente si es necesario
+scripts/build/convert-toml-packages.sh --output config/openwrt-packages.txt
 ```
 
 **Paquetes incluidos:**
 - `dropbear` — Servidor SSH
-- `dnsmasq` — DNS/DHCP
-- `firewall4` — Firewall nftables
+- `dnsmasq`, `firewall4` — DNS/DHCP + Firewall
+- `kmod-nft-core`, `kmod-nft-nat` — nftables backend
 - `wpad-basic-mbedtls` — Wi-Fi WPA2/3
 - `uclient-fetch`, `libustream-mbedtls`, `ca-bundle`, `ca-certificates` — TLS/HTTPS
-- `kmod-usb-*`, `kmod-scsi-*`, `block-mount`, `e2fsprogs` — USB storage
+- `kmod-usb-*`, `kmod-scsi-*`, `kmod-fs-ext4`, `kmod-nls-*`, `block-mount`, `e2fsprogs` — USB storage
 - `wireguard-tools`, `kmod-wireguard` — VPN WireGuard
-- `tor` — Cliente Tor
+- `rpcd`, `rpcd-mod-file`, `rpcd-mod-iwinfo` — RPC daemon (requerido por ubus/netifd)
+- `htop`, `usbutils`, `nano`, `logrotate` — Herramientas de sistema
 
 **Paquetes excluidos:**
-- `luci*` — Interfaz web
+- `luci*` — Interfaz web (administración solo por SSH)
 - `uhttpd*` — Servidor web
-- `rpcd*` — RPC daemon
+- `rpcd-mod-luci`, `rpcd-mod-rpcsys`, `rpcd-mod-rrdns`, `rpcd-mod-ucode` — Solo módulos LuCI de rpcd
+- `tor` — Consume 50-80 MB RAM en dispositivo de 64 MB (riesgo OOM)
 
 ### 4. Compilar la imagen
 

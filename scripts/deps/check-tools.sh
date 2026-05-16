@@ -14,7 +14,7 @@ check_all_tools() {
     log_step "Verifying required tools..."
 
     local missing=()
-    local tools=("just" "make" "sops" "age" "shellcheck" "wget" "yq")
+    local tools=("just" "make" "sops" "age" "shellcheck" "wget" "yq" "python3")
 
     for tool in "${tools[@]}"; do
         if command -v "${tool}" &>/dev/null; then

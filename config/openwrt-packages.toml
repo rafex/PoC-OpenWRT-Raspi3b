@@ -1,0 +1,116 @@
+# ============================================================================
+# OpenWRT 25.12.2 Package Configuration
+# ============================================================================
+# Profile: tplink_tl-wdr3600-v1
+# Target:  ath79/generic
+# RAM:     64 MB (WDR3600 hardware limit)
+#
+# This is the authoritative package list. The legacy config/openwrt-packages.txt
+# is auto-generated from this file — do NOT edit it manually.
+# ============================================================================
+
+[metadata]
+profile = "tplink_tl-wdr3600-v1"
+target = "ath79/generic"
+ram_mb = 64
+
+# ============================================================================
+# INCLUDED PACKAGES
+# ============================================================================
+
+[categories.ssh]
+"SSH Server" = ["dropbear"]
+
+[categories.network]
+"Core Networking" = ["dnsmasq", "firewall4"]
+
+[categories.wifi]
+"Wi-Fi Dual-Band" = ["wpad-basic-mbedtls"]
+
+[categories.tls]
+"TLS / HTTPS" = [
+  "uclient-fetch",
+  "libustream-mbedtls",
+  "ca-bundle",
+  "ca-certificates"
+]
+
+[categories.usb]
+"USB Storage" = [
+  "kmod-usb-core",
+  "kmod-usb2",
+  "kmod-usb-ehci",
+  "kmod-usb-storage",
+  "kmod-usb-storage-uas",
+  "kmod-scsi-core",
+  "kmod-scsi-generic",
+  "kmod-fs-ext4",
+  "kmod-nls-base",
+  "kmod-nls-cp437",
+  "kmod-nls-iso8859-1",
+  "block-mount",
+  "e2fsprogs"
+]
+
+[categories.vpn]
+"WireGuard VPN" = ["wireguard-tools", "kmod-wireguard"]
+
+[categories.firewall]
+"nftables Backend" = ["kmod-nft-core", "kmod-nft-nat"]
+
+[categories.tools]
+"System Tools" = [
+  "htop",
+  "usbutils",
+  "nano",
+  "logrotate"
+]
+
+[categories.rpcd]
+"RPC Daemon (base)" = [
+  "rpcd",
+  "rpcd-mod-file",
+  "rpcd-mod-iwinfo"
+]
+
+# ============================================================================
+# EXCLUDED PACKAGES
+# ============================================================================
+
+[exclusions]
+"LuCI Web Interface" = [
+  "luci",
+  "luci-base",
+  "luci-light",
+  "luci-theme-bootstrap",
+  "luci-app-firewall",
+  "luci-app-package-manager",
+  "luci-mod-admin-full",
+  "luci-mod-network",
+  "luci-mod-status",
+  "luci-mod-system",
+  "luci-proto-ipv6",
+  "luci-proto-ppp"
+]
+
+"uhttpd Web Server" = [
+  "uhttpd",
+  "uhttpd-mod-ubus"
+]
+
+"rpcd LuCI Modules" = [
+  "rpcd-mod-luci",
+  "rpcd-mod-rpcsys",
+  "rpcd-mod-rrdns",
+  "rpcd-mod-ucode"
+]
+
+# ============================================================================
+# NOTES & WARNINGS
+# ============================================================================
+
+[warnings]
+tor = "Consumes 50-80 MB RAM on 64 MB device. High OOM risk — removed from build."
+
+[notes]
+extroot = "USB extroot uses ext4 filesystem only. FAT32/exFAT support not required."

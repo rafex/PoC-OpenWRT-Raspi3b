@@ -8,15 +8,18 @@ Todos los scripts están organizados en `scripts/` por responsabilidad. Los mód
 scripts/
 ├── commons/          # Utilidades compartidas (sourceable)
 │   ├── logging.sh    # Funciones log_info, log_warn, log_error, log_step
-│   └── utils.sh      # find_builder, parse_packages, get_repo_root
+│   ├── utils.sh      # find_builder, parse_packages, get_repo_root
+│   ├── toml-parser.sh # parse_packages_toml, convert_toml_to_txt (wrapper Python)
+│   └── toml_parser.py # Parser TOML real (invocado por toml-parser.sh)
 ├── deps/             # Verificación de dependencias
-│   └── check-tools.sh # Verifica just, make, sops, age, yq, etc.
+│   └── check-tools.sh # Verifica just, make, sops, age, python3, yq, etc.
 ├── install/          # Preparación del entorno
 │   └── setup-env.sh  # Descarga y extrae el Image Builder
 ├── build/            # Compilación y verificación
 │   ├── openwrt.sh    # Orquestador principal de compilación
 │   ├── compile.sh    # Lógica de `make image`
-│   └── verify.sh     # Validación de imagen compilada
+│   ├── verify.sh     # Validación de imagen compilada
+│   └── convert-toml-packages.sh # Conversor TOML → TXT (standalone)
 └── templates/        # Generación de configuraciones
     └── generate.sh   # Reemplaza placeholders en templates con secrets
 ```
@@ -55,13 +58,27 @@ packages=$(parse_packages "config/openwrt-packages.txt")  # Parsea paquetes
 root=$(get_repo_root)                       # Raíz del repo
 ```
 
+### commons/toml-parser.sh
+
+Parser de configuración TOML de paquetes. Invoca `toml_parser.py` internamente:
+
+```bash
+source "${SCRIPT_DIR}/../commons/toml-parser.sh"
+
+# Parsear TOML y obtener lista de paquetes
+packages=$(parse_packages_toml "config/openwrt-packages.toml")
+
+# Convertir TOML → formato .txt heredado
+convert_toml_to_txt "config/openwrt-packages.toml" "config/openwrt-packages.txt"
+```
+
 ### deps/check-tools.sh
 
 Verifica herramientas requeridas. Útil para CI y setup:
 
 ```bash
 ./scripts/deps/check-tools.sh
-# ✓ just ✓ make ✓ sops ✓ age ✓ shellcheck ✓ wget ✓ yq
+# ✓ just ✓ make ✓ sops ✓ age ✓ shellcheck ✓ wget ✓ yq ✓ python3
 ```
 
 ### install/setup-env.sh
@@ -76,7 +93,7 @@ Descarga y extrae el Image Builder de OpenWRT:
 
 ### build/openwrt.sh
 
-Orquestador principal. Reemplaza al antiguo `build-openwrt.sh` monolítico:
+Orquestador principal. Detecta `config/openwrt-packages.toml` y auto-genera `.txt`. Reemplaza al antiguo `build-openwrt.sh` monolítico:
 
 ```bash
 ./scripts/build/openwrt.sh --builder openwrt-builder/*/
@@ -90,6 +107,18 @@ Lógica de compilación aislada — solo ejecuta `make image`:
 ```bash
 source "${SCRIPT_DIR}/../commons/logging.sh"
 compile_image "/path/to/builder" "dropbear dnsmasq ..." "tplink_tl-wdr3600-v1"
+```
+
+### build/convert-toml-packages.sh
+
+Conversor standalone: lee `config/openwrt-packages.toml` y genera el `.txt` heredado.
+
+```bash
+# Output a stdout (lista separada por espacios)
+./scripts/build/convert-toml-packages.sh
+
+# Generar archivo .txt
+./scripts/build/convert-toml-packages.sh --output config/openwrt-packages.txt
 ```
 
 ### build/verify.sh

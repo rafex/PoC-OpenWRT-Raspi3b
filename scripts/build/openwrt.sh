@@ -12,9 +12,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # Source commons and utilities
 source "${SCRIPT_DIR}/../commons/logging.sh"
 source "${SCRIPT_DIR}/../commons/utils.sh"
+source "${SCRIPT_DIR}/../commons/toml-parser.sh"
 
 PROFILE="${PROFILE:-tplink_tl-wdr3600-v1}"
 PACKAGES_FILE="${PACKAGES_FILE:-${REPO_ROOT}/config/openwrt-packages.txt}"
+TOML_FILE="${REPO_ROOT}/config/openwrt-packages.toml"
 BUILDER_DIR="${BUILDER_DIR:-}"
 OVERLAY_DIR="${OVERLAY_DIR:-}"
 
@@ -113,9 +115,17 @@ main() {
     }
     log_info "Found: ${builder}"
 
-    # Step 2: Parse packages
+    # Step 2: Parse packages (TOML preferred, fallback to legacy .txt)
     log_step "Parsing package configuration..."
     local packages
+
+    if [ -f "${TOML_FILE}" ]; then
+        log_info "Using TOML config: ${TOML_FILE}"
+        # Auto-generate .txt from TOML for compatibility
+        convert_toml_to_txt "${TOML_FILE}" "${PACKAGES_FILE}"
+        log_info "Generated: ${PACKAGES_FILE}"
+    fi
+
     packages=$(parse_packages "${PACKAGES_FILE}") || {
         log_error "Packages file not found: ${PACKAGES_FILE}"
         exit 1
