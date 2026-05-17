@@ -552,6 +552,19 @@ update-force ip="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/update.sh ${ARGS}
 
+# setup-extroot: Configurar USB como extroot en el router via SSH
+# Monta el USB, copia /overlay, configura fstab y reinicia.
+# Prerrequisito: USB formateado como ext4 antes de conectar al router.
+# Uso: just setup-extroot [ip=<IP>] [device=<dev>] [env=<env>]
+setup-extroot ip="" device="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }}"
+    if [ -n "{{ ip }}" ];     then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ device }}" ]; then ARGS="${ARGS} --device {{ device }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-extroot.sh ${ARGS}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
