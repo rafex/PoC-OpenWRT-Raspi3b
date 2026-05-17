@@ -524,8 +524,33 @@ validate:
     make validate
 
 # ─────────────────────────────────────────────────────
-# Flasheo
+# Update / Flasheo
 # ─────────────────────────────────────────────────────
+
+# update: Actualizar firmware del router via sysupgrade (mantiene configuración)
+# Uso: just update [ip=<IP>] [env=<dev|prod>]
+# La IP se infiere de environments/<env>/.env.public o usa 192.168.1.1 por defecto
+update ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }}"
+    if [ -n "{{ ip }}" ]; then
+        ARGS="${ARGS} --ip {{ ip }}"
+    fi
+    # shellcheck disable=SC2086
+    scripts/build/update.sh ${ARGS}
+
+# update-force: Actualizar firmware borrando la configuración del router
+# Uso: just update-force [ip=<IP>] [env=<dev|prod>]
+update-force ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }} --force"
+    if [ -n "{{ ip }}" ]; then
+        ARGS="${ARGS} --ip {{ ip }}"
+    fi
+    # shellcheck disable=SC2086
+    scripts/build/update.sh ${ARGS}
 
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
