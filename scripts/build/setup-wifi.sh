@@ -111,11 +111,11 @@ done
 # Normalizar alias de radio
 _normalize_radio() {
     case "$1" in
-        2g|2.4g|2ghz) echo "radio0" ;;
-        5g|5ghz)       echo "radio1" ;;
-        radio0|radio1) echo "$1" ;;
-        "")            echo "" ;;
-        *) log_error "Radio inválido: $1 (usa radio0, radio1, 2g o 5g)"; exit 1 ;;
+        2g|2.4g|2ghz|2.4ghz) echo "radio0" ;;
+        5g|5ghz)              echo "radio1" ;;
+        radio0|radio1)        echo "$1" ;;
+        "")                   echo "" ;;
+        *) log_error "Radio inválido: $1 (usa radio0, radio1, 2g, 5g, 2.4ghz, etc.)"; exit 1 ;;
     esac
 }
 _RADIO=$(_normalize_radio "${_RADIO}")
@@ -545,8 +545,18 @@ EOF
 # ---------------------------------------------------------------------------
 _scan() {
     _check_ssh
-    log_step "Escaneando redes WiFi..."
-    _do_scan "${_RADIO:-radio0}"
+    if [ -n "${_RADIO}" ]; then
+        log_step "Escaneando redes WiFi en ${_RADIO}..."
+        _do_scan "${_RADIO}"
+    else
+        log_step "Escaneando redes WiFi en ambos radios (2.4 GHz + 5 GHz)..."
+        echo ""
+        echo "── 2.4 GHz (radio0) ────────────────────────────────────────────────────"
+        _do_scan "radio0"
+        echo ""
+        echo "── 5 GHz (radio1) ──────────────────────────────────────────────────────"
+        _do_scan "radio1"
+    fi
     echo ""
 }
 

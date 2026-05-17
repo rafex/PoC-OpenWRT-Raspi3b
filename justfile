@@ -717,13 +717,14 @@ wifi-ap ssid="" password="" radio="radio0" channel="auto" ip="" env="prod":
     scripts/build/setup-wifi.sh ${ARGS}
 
 # wifi-client: Conecta el router como cliente a otra red WiFi
-# Sin argumentos: escanea redes y guía interactivamente (SSID, contraseña, BSSID)
+# Sin argumentos: escanea redes y guía interactivamente (SSID, banda, contraseña, BSSID)
 # Con ssid=: pide contraseña y BSSID de forma interactiva (nunca en CLI)
-# Uso: just wifi-client [ssid=OtraRed] [radio=5g] [bssid=AA:BB:CC:DD:EE:FF]
-wifi-client ssid="" radio="radio1" bssid="" ip="" env="prod":
+# Uso: just wifi-client [ssid=OtraRed] [use=2g|5g|radio0|radio1] [bssid=AA:BB:CC:DD:EE:FF]
+wifi-client ssid="" use="" bssid="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
-    ARGS="client --radio {{ radio }} --env {{ env }}"
+    ARGS="client --env {{ env }}"
+    if [ -n "{{ use }}" ];   then ARGS="${ARGS} --radio {{ use }}"; fi
     if [ -n "{{ ssid }}" ];  then ARGS="${ARGS} --ssid {{ ssid }}"; fi
     if [ -n "{{ bssid }}" ]; then ARGS="${ARGS} --bssid {{ bssid }}"; fi
     if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
@@ -743,13 +744,14 @@ wifi-disconnect radio="" ip="" env="prod":
     scripts/build/setup-wifi.sh ${ARGS}
 
 # wifi-scan: Escanea redes WiFi disponibles
-# Uso: just wifi-scan [radio=2g|5g] [ip=] [env=]
-wifi-scan radio="" ip="" env="prod":
+# Sin use=: escanea ambos radios (2.4 GHz y 5 GHz)
+# Uso: just wifi-scan [use=2g|5g|radio0|radio1] [ip=] [env=]
+wifi-scan use="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="scan --env {{ env }}"
-    if [ -n "{{ radio }}" ]; then ARGS="${ARGS} --radio {{ radio }}"; fi
-    if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ use }}" ]; then ARGS="${ARGS} --radio {{ use }}"; fi
+    if [ -n "{{ ip }}" ];  then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
     scripts/build/setup-wifi.sh ${ARGS}
 
