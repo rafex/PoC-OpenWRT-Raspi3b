@@ -178,18 +178,32 @@ _check_usb_files() {
     # Monta, lista, desmonta — todo en el router; salida capturada localmente
     _ssh sh - <<REMOTE
 set -eu
-mkdir -p /mnt
-if mountpoint -q /mnt 2>/dev/null; then umount /mnt; fi
-mount "${device}" /mnt
-COUNT=\$(find /mnt -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
+DEVICE="${device}"
+
+# Detectar si el dispositivo ya está montado (evita "Resource busy")
+EXISTING_MNT=\$(grep "^\${DEVICE} " /proc/mounts 2>/dev/null | awk '{print \$2}' | head -1)
+if [ -n "\${EXISTING_MNT}" ]; then
+    MNT="\${EXISTING_MNT}"
+    KEEP_MOUNTED=true
+else
+    MNT="/mnt"
+    KEEP_MOUNTED=false
+    mkdir -p "\${MNT}"
+    # Liberar /mnt si está ocupado por otro dispositivo
+    if mountpoint -q "\${MNT}" 2>/dev/null; then umount "\${MNT}"; fi
+    mount "\${DEVICE}" "\${MNT}"
+fi
+
+COUNT=\$(find "\${MNT}" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
 if [ "\${COUNT}" -gt 0 ]; then
-    TOTAL=\$(find /mnt -mindepth 1 2>/dev/null | wc -l)
+    TOTAL=\$(find "\${MNT}" -mindepth 1 2>/dev/null | wc -l)
     echo "NOTEMPTY \${TOTAL}"
-    find /mnt -mindepth 1 -maxdepth 2 2>/dev/null | head -20 | sed 's|^/mnt|  |'
+    find "\${MNT}" -mindepth 1 -maxdepth 2 2>/dev/null | head -20 | sed "s|^\${MNT}|  |"
 else
     echo "EMPTY"
 fi
-umount /mnt
+
+if [ "\${KEEP_MOUNTED}" = "false" ]; then umount "\${MNT}"; fi
 REMOTE
 }
 
@@ -212,12 +226,18 @@ echo "=== Configurando extroot en el router ==="
 echo "    Dispositivo: \${DEVICE}"
 echo ""
 
-# 1. Montar USB
-echo "[1/5] Montando \${DEVICE} en \${MNT}..."
-mkdir -p "\${MNT}"
-if mountpoint -q "\${MNT}" 2>/dev/null; then umount "\${MNT}"; fi
-mount "\${DEVICE}" "\${MNT}"
-echo "      ✅ Montado"
+# 1. Montar USB (o usar mount point existente si ya está montado)
+echo "[1/5] Montando \${DEVICE}..."
+EXISTING_MNT=\$(grep "^\${DEVICE} " /proc/mounts 2>/dev/null | awk '{print \$2}' | head -1)
+if [ -n "\${EXISTING_MNT}" ]; then
+    MNT="\${EXISTING_MNT}"
+    echo "      ℹ️  Ya montado en \${MNT}"
+else
+    mkdir -p "\${MNT}"
+    if mountpoint -q "\${MNT}" 2>/dev/null; then umount "\${MNT}"; fi
+    mount "\${DEVICE}" "\${MNT}"
+    echo "      ✅ Montado en \${MNT}"
+fi
 
 # 2. Limpiar si se confirmó localmente
 if [ "\${DO_CLEAN}" = "yes" ]; then
