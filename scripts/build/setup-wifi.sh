@@ -137,11 +137,18 @@ _ssh() {
 }
 
 _check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
+    local retries=3 delay=4
+    local i=1
+    while [ "${i}" -le "${retries}" ]; do
+        if ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
+                -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
+            return 0
+        fi
+        [ "${i}" -lt "${retries}" ] && { log_warn "SSH no disponible, reintentando en ${delay}s... (${i}/${retries})"; sleep "${delay}"; }
+        i=$((i + 1))
+    done
+    log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
+    exit 1
 }
 
 # ---------------------------------------------------------------------------
@@ -681,7 +688,7 @@ if [ "\$found" -eq 0 ]; then
     echo "  Sin interfaces cliente WiFi activas."
 else
     echo ""
-    wifi reload 2>/dev/null || wifi
+    wifi reload 2>/dev/null || true
     /etc/init.d/network restart 2>/dev/null || true
     echo "✅ Desconectado: \$found interfaz(ces) STA eliminada(s)"
 fi
