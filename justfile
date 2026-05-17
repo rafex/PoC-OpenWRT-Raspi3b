@@ -34,10 +34,10 @@ install-tools force="false":
     # Determinar qué instalar
     if [ "$FORCE" = "true" ]; then
         echo "(modo force: se reinstalarán todas las herramientas)"
-        missing=(just make sops age)
+        missing=(just make sops age yq)
     else
         missing=()
-        for tool in just make sops age; do
+        for tool in just make sops age yq; do
             if ! command -v "$tool" &>/dev/null; then
                 missing+=("$tool")
             fi
@@ -87,6 +87,14 @@ install-tools force="false":
                            cmds+=("tar -xzf /tmp/age.tar.gz --strip-components=1 -C ~/.local/bin")
                            cmds+=("chmod +x ~/.local/bin/age ~/.local/bin/age-keygen")
                            cmds+=("rm /tmp/age.tar.gz")
+                           path_hint=true ;;
+                      yq)  cmds+=("mkdir -p ~/.local/bin")
+                           if [ "$FORCE" = "true" ]; then
+                               cmds+=("rm -rf ~/.local/bin/yq")
+                           fi
+                           cmds+=("YQ_VER=\$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
+                           cmds+=("curl -Lo ~/.local/bin/yq https://github.com/mikefarah/yq/releases/download/v\${YQ_VER}/yq_linux_\${ARCH}")
+                           cmds+=("chmod +x ~/.local/bin/yq")
                            path_hint=true ;;
                 esac
             done

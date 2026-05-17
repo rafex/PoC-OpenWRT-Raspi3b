@@ -15,10 +15,8 @@ REQUIRED_TOOLS=("just" "make" "sops" "age" "shellcheck" "wget" "yq" "python3")
 # ---------------------------------------------------------------------------
 validate_tool() {
     local tool=$1
-    local installed=false
 
     if command -v "${tool}" &>/dev/null; then
-        installed=true
         case "${tool}" in
             just)
                 version=$(just --version 2>/dev/null | cut -d' ' -f2)
@@ -36,12 +34,11 @@ validate_tool() {
                 log_info "  ✅ ${tool}"
                 ;;
         esac
+        return 0
     else
-        installed=false
         log_warn "  ❌ ${tool} (NO INSTALADA)"
+        return 1
     fi
-
-    echo "${installed}"
 }
 
 # ---------------------------------------------------------------------------
