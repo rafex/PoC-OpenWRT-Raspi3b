@@ -390,38 +390,46 @@ _do_scan() {
 set -eu
 RADIO="${radio}"
 
-# Detectar interfaz física del radio
-# 1) Intentar leer ifname del UCI wifi-iface asociado al radio
-IFNAME=""
-IDX=0
-while true; do
-    DEV=\$(uci -q get wireless.@wifi-iface[\$IDX].device 2>/dev/null) || break
-    if [ "\$DEV" = "\$RADIO" ]; then
-        IFNAME=\$(uci -q get wireless.@wifi-iface[\$IDX].ifname 2>/dev/null || echo "")
-        break
-    fi
-    IDX=\$((IDX+1))
-done
-# 2) Fallback: listar por posición (radio0=primera, radio1=última)
-if [ -z "\${IFNAME}" ]; then
-    ALL_IFACES=\$(iw dev 2>/dev/null | awk '/Interface/{print \$2}')
-    if [ "\$RADIO" = "radio0" ]; then
-        IFNAME=\$(echo "\$ALL_IFACES" | head -1)
-    else
-        IFNAME=\$(echo "\$ALL_IFACES" | tail -1)
-    fi
+# Derivar número de radio (radio0→0, radio1→1)
+RNUM=\$(echo "\$RADIO" | sed 's/radio//')
+PHY="phy\${RNUM}"
+
+# Verificar que la phy existe
+if [ ! -d "/sys/class/ieee80211/\${PHY}" ]; then
+    echo "  ERROR: no se encontró \${PHY} para \${RADIO}"
+    exit 1
 fi
-IFNAME="\${IFNAME:-wlan0}"
+
+# Buscar interfaz existente en esta phy
+# iw dev muestra: phy#0\n\tInterface wlan0\n ...
+IFNAME=\$(iw dev 2>/dev/null | awk -v rn="\${RNUM}" '
+    /^phy#/ { cur = substr(\$0, 5) }
+    cur == rn && /Interface/ { print \$2; exit }
+')
+
+# Si no hay interfaz, crear una temporal para escanear
+TEMP_IF=""
+if [ -z "\${IFNAME}" ]; then
+    TEMP_IF="scan_tmp\${RNUM}"
+    iw phy "\${PHY}" interface add "\${TEMP_IF}" type managed 2>/dev/null || {
+        echo "  ERROR: no se pudo crear interfaz temporal en \${PHY}"
+        exit 1
+    }
+    ip link set "\${TEMP_IF}" up 2>/dev/null || true
+    sleep 1
+    IFNAME="\${TEMP_IF}"
+    echo "  (interfaz temporal creada: \${IFNAME})"
+fi
 
 echo ""
-echo "  Interfaz: \$IFNAME  (radio: \$RADIO)"
+echo "  Interfaz: \${IFNAME}  (radio: \${RADIO} / \${PHY})"
 echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 printf "  %-33s %-10s %-6s %-19s %s\n" "SSID" "Señal" "Canal" "BSSID" "Cifrado"
 echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Parsear con iwinfo (trabaja junto al AP activo) o con iw como fallback
+# Escanear: iwinfo si disponible, si no iw dev scan
 if command -v iwinfo >/dev/null 2>&1; then
-    iwinfo "\$IFNAME" scan 2>/dev/null | awk '
+    iwinfo "\${IFNAME}" scan 2>/dev/null | awk '
     /Cell [0-9]+ - Address:/ {
         if (ssid != "")
             printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc
@@ -433,7 +441,7 @@ if command -v iwinfo >/dev/null 2>&1; then
     }
     /Signal:/ { sig=\$2" "\$3 }
     /Encryption:/ {
-        rest=\$0; sub(/.*Encryption: */,"",rest); gsub(/[ \t]*$/,"",rest)
+        rest=\$0; sub(/.*Encryption: */,"",rest); gsub(/[ \t]*\$/,"",rest)
         if (rest~/none/ || rest=="") enc="abierta"
         else if (rest~/WPA2/) enc="WPA2"
         else if (rest~/WPA/)  enc="WPA"
@@ -442,8 +450,7 @@ if command -v iwinfo >/dev/null 2>&1; then
     END { if (ssid!="") printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc }
     ' 2>/dev/null
 else
-    # iw dev scan — corregido: flush del registro anterior al inicio de cada BSS
-    iw dev "\$IFNAME" scan 2>/dev/null | awk '
+    iw dev "\${IFNAME}" scan 2>/dev/null | awk '
     function flush_bss() {
         if (bssid=="" || ssid=="") return
         ch=""
@@ -455,7 +462,7 @@ else
     /^BSS /   { flush_bss(); bssid=substr(\$2,1,17); ssid=""; sig="?"; enc="abierta"; freq="" }
     /freq:/   { freq=\$2 }
     /signal:/ { sig=\$2" "\$3 }
-    /SSID:/   { ssid=substr(\$0,index(\$0,\$2)); gsub(/^ +| +$/,"",ssid) }
+    /SSID:/   { ssid=substr(\$0,index(\$0,\$2)); gsub(/^ +| +\$/,"",ssid) }
     /RSN:|WPA Vendor/ { enc="WPA2" }
     /capability:.*Privacy/ { if (enc=="abierta") enc="WEP" }
     END { flush_bss() }
@@ -463,6 +470,11 @@ else
 fi
 
 echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Limpiar interfaz temporal
+if [ -n "\${TEMP_IF}" ]; then
+    iw dev "\${TEMP_IF}" del 2>/dev/null || true
+fi
 EOF
 }
 
