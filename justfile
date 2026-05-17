@@ -730,6 +730,18 @@ wifi-client ssid="" radio="radio1" bssid="" ip="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/setup-wifi.sh ${ARGS}
 
+# wifi-disconnect: Desconecta el cliente WiFi (elimina STA y wwan)
+# Uso: just wifi-disconnect [radio=radio1] [ip=] [env=]
+#      Sin radio=: desconecta todos los clientes STA activos
+wifi-disconnect radio="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="disconnect --env {{ env }}"
+    if [ -n "{{ radio }}" ]; then ARGS="${ARGS} --radio {{ radio }}"; fi
+    if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
 # wifi-scan: Escanea redes WiFi disponibles
 # Uso: just wifi-scan [radio=2g|5g] [ip=] [env=]
 wifi-scan radio="" ip="" env="prod":

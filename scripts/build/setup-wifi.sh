@@ -53,13 +53,14 @@ _show_help() {
 Uso: setup-wifi.sh <subcomando> [opciones]
 
 Subcomandos:
-  ap       Configura Access Point
-  client   Conecta a una red WiFi externa (modo cliente/STA)
-  scan     Escanea redes disponibles
-  status   Estado de todos los radios e interfaces
-  list     Configuración UCI actual de wireless
-  enable   Habilita un radio
-  disable  Deshabilita un radio
+  ap          Configura Access Point
+  client      Conecta a una red WiFi externa (modo cliente/STA)
+  disconnect  Desconecta el cliente WiFi y elimina la interfaz wwan
+  scan        Escanea redes disponibles
+  status      Estado de todos los radios e interfaces
+  list        Configuración UCI actual de wireless
+  enable      Habilita un radio
+  disable     Deshabilita un radio
 
 Opciones:
   --radio <r>          radio0|radio1|2g|5g
@@ -86,7 +87,7 @@ HELP
 if [[ $# -eq 0 ]]; then _show_help; exit 1; fi
 
 case "$1" in
-    ap|client|scan|status|list|enable|disable) _SUBCMD="$1"; shift ;;
+    ap|client|disconnect|scan|status|list|enable|disable) _SUBCMD="$1"; shift ;;
     -h|--help) _show_help; exit 0 ;;
     *) log_error "Subcomando desconocido: $1"; exit 1 ;;
 esac
@@ -617,6 +618,77 @@ _list() {
 }
 
 # ---------------------------------------------------------------------------
+# Subcomando: disconnect
+# ---------------------------------------------------------------------------
+_disconnect() {
+    local radio="${_RADIO:-}"
+
+    _check_ssh
+
+    echo "============================================="
+    echo " Desconectar cliente WiFi"
+    echo "============================================="
+
+    _ssh sh - << EOF
+set -eu
+TARGET_RADIO="${radio}"
+
+# Buscar todas las interfaces STA (cliente)
+found=0
+I=0
+while true; do
+    DEV=\$(uci -q get wireless.@wifi-iface[\$I].device 2>/dev/null) || break
+    MODE=\$(uci -q get wireless.@wifi-iface[\$I].mode 2>/dev/null || echo "ap")
+    if [ "\$MODE" = "sta" ]; then
+        # Si se especificó radio, filtrar por él; si no, eliminar todos los STA
+        if [ -z "\$TARGET_RADIO" ] || [ "\$DEV" = "\$TARGET_RADIO" ]; then
+            SSID=\$(uci -q get wireless.@wifi-iface[\$I].ssid 2>/dev/null || echo "?")
+            echo "  Eliminando STA [\$I]: \$DEV → '\$SSID'"
+            uci delete wireless.@wifi-iface[\$I]
+            found=\$((found+1))
+            # No incrementar I: tras borrar, los índices se recorren
+            continue
+        fi
+    fi
+    I=\$((I+1))
+done
+uci commit wireless
+
+# Eliminar interfaz de red wwan
+if uci -q get network.wwan >/dev/null 2>&1; then
+    echo "  Eliminando interfaz de red wwan..."
+    uci delete network.wwan
+    uci commit network
+fi
+
+# Quitar wwan de la zona WAN del firewall
+Z=0
+while true; do
+    NAME=\$(uci -q get firewall.@zone[\$Z].name 2>/dev/null) || break
+    if [ "\$NAME" = "wan" ]; then
+        NETS=\$(uci -q get firewall.@zone[\$Z].network 2>/dev/null || echo "")
+        if echo "\$NETS" | grep -qw "wwan"; then
+            uci del_list firewall.@zone[\$Z].network='wwan' 2>/dev/null || true
+            uci commit firewall
+            echo "  Eliminado wwan de zona firewall wan"
+        fi
+        break
+    fi
+    Z=\$((Z+1))
+done
+
+if [ "\$found" -eq 0 ]; then
+    echo "  Sin interfaces cliente WiFi activas."
+else
+    echo ""
+    wifi reload 2>/dev/null || wifi
+    /etc/init.d/network restart 2>/dev/null || true
+    echo "✅ Desconectado: \$found interfaz(ces) STA eliminada(s)"
+fi
+EOF
+}
+
+# ---------------------------------------------------------------------------
 # Subcomando: enable / disable
 # ---------------------------------------------------------------------------
 _toggle() {
@@ -659,13 +731,14 @@ EOF
 # ---------------------------------------------------------------------------
 main() {
     case "${_SUBCMD}" in
-        ap)      _ap ;;
-        client)  _client ;;
-        scan)    _scan ;;
-        status)  _status ;;
-        list)    _list ;;
-        enable)  _toggle "enable" ;;
-        disable) _toggle "disable" ;;
+        ap)         _ap ;;
+        client)     _client ;;
+        disconnect) _disconnect ;;
+        scan)       _scan ;;
+        status)     _status ;;
+        list)       _list ;;
+        enable)     _toggle "enable" ;;
+        disable)    _toggle "disable" ;;
     esac
 }
 
