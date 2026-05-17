@@ -100,25 +100,24 @@ _read_password() {
     local password confirm
 
     while true; do
-        read -r -s -p "  Contraseña root: " password
-        echo ""
+        IFS= read -r -s -p "  Contraseña root: " password < /dev/tty
+        printf '\n' > /dev/tty
 
         if [ -z "$password" ]; then
-            echo "  ⚠️  La contraseña no puede estar vacía."
+            printf '  ⚠️  La contraseña no puede estar vacía.\n' > /dev/tty
             continue
         fi
 
         if [ "${#password}" -lt 8 ]; then
-            echo "  ⚠️  Mínimo 8 caracteres."
+            printf '  ⚠️  Mínimo 8 caracteres.\n' > /dev/tty
             continue
         fi
 
-        read -r -s -p "  Confirmar:       " confirm
-        echo ""
+        IFS= read -r -s -p "  Confirmar:       " confirm < /dev/tty
+        printf '\n' > /dev/tty
 
         if [ "$password" != "$confirm" ]; then
-            echo "  ❌ No coinciden. Intenta de nuevo."
-            echo ""
+            printf '  ❌ No coinciden. Intenta de nuevo.\n\n' > /dev/tty
             continue
         fi
 
