@@ -43,6 +43,7 @@ _CLI_IP=""
 _RADIO=""
 _SSID=""
 _PASSWORD=""
+_BSSID=""
 _CHANNEL="auto"
 _ENCRYPTION="psk2"
 _OPEN=false
@@ -99,6 +100,7 @@ while [[ $# -gt 0 ]]; do
         --password)   _PASSWORD="${2:?}"; shift 2 ;;
         --channel)    _CHANNEL="${2:?}"; shift 2 ;;
         --encryption) _ENCRYPTION="${2:?}"; shift 2 ;;
+        --bssid)      _BSSID="${2:?}"; shift 2 ;;
         --open)       _OPEN=true; _ENCRYPTION="none"; shift ;;
         -h|--help)    _show_help; exit 0 ;;
         *) log_error "Opción desconocida: $1"; exit 1 ;;
@@ -271,15 +273,26 @@ _client() {
         fi
     fi
 
-    if [ "${_ENCRYPTION}" != "none" ] && [ -z "${_PASSWORD}" ] && ! "${_OPEN}"; then
-        log_error "--password requerido (o usa --open si la red no tiene contraseña)"
-        exit 1
+    # Si no hay password, pedir interactivamente (nunca exponer en CLI)
+    if ! "${_OPEN}" && [ -z "${_PASSWORD}" ]; then
+        printf "\n  Contraseña para '%s' (Enter si la red es abierta): " "${_SSID}"
+        read -r -s _PASSWORD
+        echo ""
+        [ -z "${_PASSWORD}" ] && _OPEN=true
+    fi
+    [ "${_OPEN}" = "true" ] && _ENCRYPTION="none"
+
+    # Pedir BSSID opcionalmente si no fue especificado
+    if [ -z "${_BSSID}" ]; then
+        printf "  BSSID concreto (Enter para conectar al más fuerte): "
+        read -r _BSSID
     fi
 
     echo ""
     log_step "Configurando modo cliente WiFi:"
     echo "   Radio:   ${radio}"
     echo "   Red:     ${_SSID}"
+    [ -n "${_BSSID}" ] && echo "   BSSID:   ${_BSSID}"
     echo "   Cifrado: ${_ENCRYPTION}"
     echo ""
     log_warn "El router obtendrá una IP de '${_SSID}' via DHCP y la usará como WAN secundario."
@@ -290,6 +303,7 @@ _client() {
     local ssid="${_SSID}"
     local password="${_PASSWORD}"
     local encryption="${_ENCRYPTION}"
+    local bssid="${_BSSID}"
 
     _ssh sh - << EOF
 set -eu
@@ -297,6 +311,7 @@ RADIO="${radio}"
 SSID="${ssid}"
 PASSWORD="${password}"
 ENCRYPTION="${encryption}"
+BSSID="${bssid}"
 
 echo "Configurando interfaz de red 'wwan'..."
 uci -q delete network.wwan 2>/dev/null || true
@@ -349,6 +364,12 @@ fi
 uci set wireless.@wifi-iface[\$FOUND].network='wwan'
 uci set wireless.@wifi-iface[\$FOUND].ssid="\$SSID"
 uci set wireless.@wifi-iface[\$FOUND].disabled='0'
+
+if [ -n "\$BSSID" ]; then
+    uci set wireless.@wifi-iface[\$FOUND].bssid="\$BSSID"
+else
+    uci -q delete wireless.@wifi-iface[\$FOUND].bssid 2>/dev/null || true
+fi
 
 if [ "\$ENCRYPTION" = "none" ]; then
     uci set wireless.@wifi-iface[\$FOUND].encryption='none'

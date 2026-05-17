@@ -717,14 +717,16 @@ wifi-ap ssid="" password="" radio="radio0" channel="auto" ip="" env="prod":
     scripts/build/setup-wifi.sh ${ARGS}
 
 # wifi-client: Conecta el router como cliente a otra red WiFi
-# Uso: just wifi-client ssid=OtraRed password=clave [radio=5g]
-wifi-client ssid="" password="" radio="radio1" ip="" env="prod":
+# Sin argumentos: escanea redes y guía interactivamente (SSID, contraseña, BSSID)
+# Con ssid=: pide contraseña y BSSID de forma interactiva (nunca en CLI)
+# Uso: just wifi-client [ssid=OtraRed] [radio=5g] [bssid=AA:BB:CC:DD:EE:FF]
+wifi-client ssid="" radio="radio1" bssid="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -z "{{ ssid }}" ]; then echo "ERROR: especifica ssid=<nombre>"; exit 1; fi
-    ARGS="client --ssid {{ ssid }} --radio {{ radio }} --env {{ env }}"
-    if [ -n "{{ ip }}" ];       then ARGS="${ARGS} --ip {{ ip }}"; fi
-    if [ -n "{{ password }}" ]; then ARGS="${ARGS} --password {{ password }}"; fi
+    ARGS="client --radio {{ radio }} --env {{ env }}"
+    if [ -n "{{ ssid }}" ];  then ARGS="${ARGS} --ssid {{ ssid }}"; fi
+    if [ -n "{{ bssid }}" ]; then ARGS="${ARGS} --bssid {{ bssid }}"; fi
+    if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
     scripts/build/setup-wifi.sh ${ARGS}
 
