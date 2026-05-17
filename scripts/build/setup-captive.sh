@@ -731,7 +731,7 @@ _allow() {
 
     if [ -z "${target_ip}" ]; then
         log_error "Falta la IP a autorizar."
-        echo "   Uso: $0 allow <IP> [--timeout <min>]"
+        echo "   Uso: $0 allow <IP> [--timeout <min>]  (0 = sin límite)"
         exit 1
     fi
 
@@ -740,18 +740,34 @@ _allow() {
         exit 1
     fi
 
+    # Validar que timeout sea un entero no negativo
+    case "${_TIMEOUT}" in
+        ''|*[!0-9]*)
+            log_error "--timeout debe ser un número entero de minutos (0 = ilimitado)"
+            exit 1
+            ;;
+    esac
+
     _check_ssh
 
-    local timeout="${_TIMEOUT}m"
+    # timeout 0 en nftables = elemento permanente (sin expiración)
+    local nft_timeout timeout_label
+    if [ "${_TIMEOUT}" -eq 0 ]; then
+        nft_timeout="0"
+        timeout_label="ilimitado (permanente)"
+    else
+        nft_timeout="${_TIMEOUT}m"
+        timeout_label="${_TIMEOUT} min"
+    fi
 
-    # Verificar si ya está autorizada
+    # Si ya está en el set, eliminarlo primero para actualizar el timeout
     if _ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -qw '${target_ip}'"; then
-        log_warn "${target_ip} ya está en el set — actualizando timeout a ${timeout}..."
+        log_warn "${target_ip} ya autorizado — actualizando a: ${timeout_label}"
         _ssh "nft delete element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} }' 2>/dev/null || true"
     fi
 
-    _ssh "nft add element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} timeout ${timeout} }'"
-    log_info "✅ ${target_ip} autorizado (${timeout})"
+    _ssh "nft add element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} timeout ${nft_timeout} }'"
+    log_info "✅ ${target_ip} autorizado — sesión: ${timeout_label}"
 }
 
 # ---------------------------------------------------------------------------

@@ -631,7 +631,10 @@ remove-captive ip="" env="prod":
     scripts/build/setup-captive.sh ${ARGS}
 
 # captive-allow: Autoriza una IP manualmente en el portal cautivo
+# timeout en minutos (default: 30). 0 = sin límite (permanente).
 # Uso: just captive-allow client=192.168.1.50 [timeout=30] [ip=] [env=]
+#      just captive-allow client=192.168.1.50 timeout=0    # permanente
+#      just captive-allow client=192.168.1.50 timeout=120  # 2 horas
 captive-allow client="" ip="" env="prod" timeout="30":
     #!/usr/bin/env bash
     set -euo pipefail
