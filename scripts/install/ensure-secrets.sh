@@ -57,16 +57,16 @@ _ensure_age_key() {
     chmod 600 "${KEYFILE}"
 
     # Actualizar clave pública en el repo
-    grep "public key" "${KEYFILE}" | awk '{print $3}' > .age-pubkey.txt
+    grep -oE 'age1[a-z0-9]+' "${KEYFILE}" | head -1 > .age-pubkey.txt
     chmod 644 .age-pubkey.txt
 
     log_info "✅ Clave generada: ${KEYFILE}"
     log_info "✅ Clave pública actualizada: .age-pubkey.txt"
     echo ""
     log_warn "⚠️  Los secrets existentes fueron encriptados con otra clave."
-    echo "   Debes re-encriptar el archivo con tu nueva clave y llenar los datos:"
+    echo "   Re-encripta con tu nueva clave y llena los datos:"
     echo ""
-    echo "   just edit-secrets ${ENV}"
+    echo "   just reinit-secrets ${ENV}"
     echo ""
     echo "   Una vez llenados, vuelve a ejecutar el build."
     return 1

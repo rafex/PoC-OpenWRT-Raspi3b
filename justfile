@@ -212,7 +212,7 @@ generate-age-key:
     echo "✅ Clave privada generada: $KEYFILE"
     echo "⚠️  GUARDA ESTE ARCHIVO EN UN LUGAR SEGURO (NO en el repo)"
     # Extraer clave pública para el repo
-    grep "public key" "$KEYFILE" | awk '{print $3}' > .age-pubkey.txt
+    grep -oE 'age1[a-z0-9]+' "$KEYFILE" | head -1 > .age-pubkey.txt
     chmod 644 .age-pubkey.txt
     echo "✅ Clave pública guardada en .age-pubkey.txt (committeable)"
 
@@ -314,7 +314,7 @@ reinit-secrets ENV:
         exit 1
     fi
 
-    PUBKEY=$(grep "public key" "${KEYFILE}" | awk '{print $3}')
+    PUBKEY=$(grep -oE 'age1[a-z0-9]+' "${KEYFILE}" | head -1)
     if [ -z "${PUBKEY}" ]; then
         echo "❌ No se pudo extraer la clave pública de: ${KEYFILE}"
         exit 1
