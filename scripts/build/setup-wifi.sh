@@ -447,8 +447,13 @@ echo "--- Radios ---"
 I=0
 while true; do
     RADIO="radio${I}"
-    BAND=$(uci -q get wireless.${RADIO}.band 2>/dev/null || \
-           uci -q get wireless.${RADIO}.hwmode 2>/dev/null || echo "?")
+    RAW=$(uci -q get wireless.${RADIO}.band 2>/dev/null || \
+          uci -q get wireless.${RADIO}.hwmode 2>/dev/null || echo "?")
+    case "${RAW}" in
+        2g|11g|11b|11bg|11n) BAND="2.4 GHz" ;;
+        5g|11a|11ac|11n-5)   BAND="5 GHz"   ;;
+        *) BAND="${RAW}" ;;
+    esac
     DISABLED=$(uci -q get wireless.${RADIO}.disabled 2>/dev/null || echo "0")
     CHANNEL=$(uci -q get wireless.${RADIO}.channel 2>/dev/null || echo "auto")
     STATE="habilitado"
