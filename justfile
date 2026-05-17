@@ -718,18 +718,11 @@ wifi-ap ssid="" password="" radio="radio0" channel="auto" ip="" env="prod":
 
 # wifi-client: Conecta el router como cliente a otra red WiFi
 # Sin argumentos: escanea redes y guía interactivamente (SSID, banda, contraseña, BSSID)
-# Con ssid=: pide contraseña y BSSID de forma interactiva (nunca en CLI)
-# Uso: just wifi-client [ssid=OtraRed] [use=2g|5g|radio0|radio1] [bssid=AA:BB:CC:DD:EE:FF]
-wifi-client ssid="" use="" bssid="" ip="" env="prod":
+# Uso: just wifi-client [--radio 2g|5g|radio0|radio1] [--ssid OtraRed] [--env dev]
+wifi-client *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="client --env {{ env }}"
-    if [ -n "{{ use }}" ];   then ARGS="${ARGS} --radio {{ use }}"; fi
-    if [ -n "{{ ssid }}" ];  then ARGS="${ARGS} --ssid {{ ssid }}"; fi
-    if [ -n "{{ bssid }}" ]; then ARGS="${ARGS} --bssid {{ bssid }}"; fi
-    if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/setup-wifi.sh client {{args}}
 
 # wifi-disconnect: Desconecta el cliente WiFi (elimina STA y wwan)
 # Uso: just wifi-disconnect [radio=radio1] [ip=] [env=]
@@ -744,16 +737,12 @@ wifi-disconnect radio="" ip="" env="prod":
     scripts/build/setup-wifi.sh ${ARGS}
 
 # wifi-scan: Escanea redes WiFi disponibles
-# Sin use=: escanea ambos radios (2.4 GHz y 5 GHz)
-# Uso: just wifi-scan [use=2g|5g|radio0|radio1] [ip=] [env=]
-wifi-scan use="" ip="" env="prod":
+# Sin args: escanea ambos radios (2.4 GHz y 5 GHz)
+# Uso: just wifi-scan [--radio 2g|5g|radio0|radio1] [--env dev] [--ip 192.168.x.x]
+wifi-scan *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="scan --env {{ env }}"
-    if [ -n "{{ use }}" ]; then ARGS="${ARGS} --radio {{ use }}"; fi
-    if [ -n "{{ ip }}" ];  then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/setup-wifi.sh scan {{args}}
 
 # wifi-status: Muestra estado de todos los radios e interfaces WiFi
 # Uso: just wifi-status [ip=] [env=]
