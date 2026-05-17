@@ -251,14 +251,30 @@ EOF
 _client() {
     local radio="${_RADIO:-radio1}"
 
-    [ -z "${_SSID}" ] && { log_error "--ssid requerido (nombre de la red a conectar)"; exit 1; }
+    _check_ssh
+
+    # Modo interactivo: si no se pasó --ssid, escanear y preguntar
+    if [ -z "${_SSID}" ]; then
+        echo ""
+        log_step "Escaneando redes disponibles en ${radio}..."
+        _do_scan "${radio}"
+        echo ""
+        printf "  SSID de la red a conectar (Enter para cancelar): "
+        read -r _SSID
+        [ -z "${_SSID}" ] && { echo "  Cancelado."; exit 0; }
+
+        if ! "${_OPEN}" && [ -z "${_PASSWORD}" ]; then
+            printf "  Contraseña (Enter si la red es abierta): "
+            read -r -s _PASSWORD
+            echo ""
+            [ -z "${_PASSWORD}" ] && _OPEN=true
+        fi
+    fi
 
     if [ "${_ENCRYPTION}" != "none" ] && [ -z "${_PASSWORD}" ] && ! "${_OPEN}"; then
         log_error "--password requerido (o usa --open si la red no tiene contraseña)"
         exit 1
     fi
-
-    _check_ssh
 
     echo ""
     log_step "Configurando modo cliente WiFi:"
@@ -364,68 +380,100 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Subcomando: scan
+# _do_scan — escanea redes y muestra tabla (sin _check_ssh, sin encabezado)
+# Uso: _do_scan <radio>
 # ---------------------------------------------------------------------------
-_scan() {
-    _check_ssh
-
-    echo ""
-    log_step "Escaneando redes WiFi..."
-
-    # Detectar interfaz física para escanear
-    local radio="${_RADIO:-radio0}"
+_do_scan() {
+    local radio="$1"
 
     _ssh sh - << EOF
 set -eu
 RADIO="${radio}"
 
-# Obtener interfaz física del radio
-PHY=\$(uci -q get wireless.\$RADIO.path 2>/dev/null || echo "")
-# Buscar iface asociada al radio
-WLAN=\$(uci show wireless | grep "@wifi-iface" | grep "device='\$RADIO'" | head -1 | \
-        grep -o "@wifi-iface\[[0-9]*\]" | head -1)
-if [ -n "\$WLAN" ]; then
-    IFNAME=\$(uci -q get wireless.\$WLAN.ifname 2>/dev/null || true)
-fi
-
-# Fallback: usar iw para listar interfaces
-if [ -z "\${IFNAME:-}" ]; then
+# Detectar interfaz física del radio
+# 1) Intentar leer ifname del UCI wifi-iface asociado al radio
+IFNAME=""
+IDX=0
+while true; do
+    DEV=\$(uci -q get wireless.@wifi-iface[\$IDX].device 2>/dev/null) || break
+    if [ "\$DEV" = "\$RADIO" ]; then
+        IFNAME=\$(uci -q get wireless.@wifi-iface[\$IDX].ifname 2>/dev/null || echo "")
+        break
+    fi
+    IDX=\$((IDX+1))
+done
+# 2) Fallback: listar por posición (radio0=primera, radio1=última)
+if [ -z "\${IFNAME}" ]; then
+    ALL_IFACES=\$(iw dev 2>/dev/null | awk '/Interface/{print \$2}')
     if [ "\$RADIO" = "radio0" ]; then
-        IFNAME=\$(iw dev 2>/dev/null | awk '/Interface/{print \$2}' | head -1)
+        IFNAME=\$(echo "\$ALL_IFACES" | head -1)
     else
-        IFNAME=\$(iw dev 2>/dev/null | awk '/Interface/{print \$2}' | tail -1)
+        IFNAME=\$(echo "\$ALL_IFACES" | tail -1)
     fi
 fi
-
 IFNAME="\${IFNAME:-wlan0}"
 
-echo "Escaneando en interfaz: \$IFNAME (radio: \$RADIO)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-printf "%-35s %-8s %-10s %-18s %s\n" "SSID" "Señal" "Canal" "BSSID" "Cifrado"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  Interfaz: \$IFNAME  (radio: \$RADIO)"
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+printf "  %-33s %-10s %-6s %-19s %s\n" "SSID" "Señal" "Canal" "BSSID" "Cifrado"
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-iw dev "\$IFNAME" scan 2>/dev/null | awk '
-/^BSS / { bssid=substr(\$2,1,17); ssid=""; signal=""; freq=""; enc="open" }
-/freq:/  { freq=\$2 }
-/signal:/ { signal=\$2" "\$3 }
-/SSID:/  { ssid=substr(\$0, index(\$0,\$2)) }
-/RSN:|WPA:/ { enc="WPA2" }
-/WPA Vers/ { if(enc=="open") enc="WPA" }
-/^BSS / && bssid!="" && ssid!="" {
-    # canal aproximado desde frecuencia
-    ch=""
-    if(freq+0>=2412 && freq+0<=2484) ch=int((freq+0-2407)/5)
-    if(freq+0>=5170) ch=int((freq+0-5000)/5)
-    printf "%-35s %-8s %-10s %-18s %s\n", ssid, signal, ch, bssid, enc
-}
-END {
-    if(bssid!="" && ssid!="")
-        printf "%-35s %-8s %-10s %-18s %s\n", ssid, signal, "", bssid, enc
-}
-' 2>/dev/null || echo "  (sin resultados — el radio puede estar apagado)"
+# Parsear con iwinfo (trabaja junto al AP activo) o con iw como fallback
+if command -v iwinfo >/dev/null 2>&1; then
+    iwinfo "\$IFNAME" scan 2>/dev/null | awk '
+    /Cell [0-9]+ - Address:/ {
+        if (ssid != "")
+            printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc
+        bssid=\$NF; ssid=""; sig="?"; ch="?"; enc="abierta"
+    }
+    /ESSID:/ { ssid=\$2; gsub(/"/, "", ssid) }
+    /Channel:/ {
+        for (i=1; i<=NF; i++) if (\$i=="Channel:") { ch=\$(i+1); gsub(/[^0-9]/,"",ch) }
+    }
+    /Signal:/ { sig=\$2" "\$3 }
+    /Encryption:/ {
+        rest=\$0; sub(/.*Encryption: */,"",rest); gsub(/[ \t]*$/,"",rest)
+        if (rest~/none/ || rest=="") enc="abierta"
+        else if (rest~/WPA2/) enc="WPA2"
+        else if (rest~/WPA/)  enc="WPA"
+        else enc=rest
+    }
+    END { if (ssid!="") printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc }
+    ' 2>/dev/null
+else
+    # iw dev scan — corregido: flush del registro anterior al inicio de cada BSS
+    iw dev "\$IFNAME" scan 2>/dev/null | awk '
+    function flush_bss() {
+        if (bssid=="" || ssid=="") return
+        ch=""
+        if (freq+0>=2412 && freq+0<=2484) ch=int((freq+0-2407)/5)
+        else if (freq+0>=5000) ch=int((freq+0-5000)/5)
+        printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc
+    }
+    BEGIN { bssid=""; ssid=""; sig="?"; ch="?"; enc="abierta"; freq="" }
+    /^BSS /   { flush_bss(); bssid=substr(\$2,1,17); ssid=""; sig="?"; enc="abierta"; freq="" }
+    /freq:/   { freq=\$2 }
+    /signal:/ { sig=\$2" "\$3 }
+    /SSID:/   { ssid=substr(\$0,index(\$0,\$2)); gsub(/^ +| +$/,"",ssid) }
+    /RSN:|WPA Vendor/ { enc="WPA2" }
+    /capability:.*Privacy/ { if (enc=="abierta") enc="WEP" }
+    END { flush_bss() }
+    ' 2>/dev/null
+fi
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 EOF
+}
+
+# ---------------------------------------------------------------------------
+# Subcomando: scan
+# ---------------------------------------------------------------------------
+_scan() {
+    _check_ssh
+    log_step "Escaneando redes WiFi..."
+    _do_scan "${_RADIO:-radio0}"
+    echo ""
 }
 
 # ---------------------------------------------------------------------------
