@@ -9,81 +9,99 @@ Este proyecto usa **sops** (Secrets OPerationS) con **age** para encryptar secre
 .age-pubkey.txt                    ← Clave pública (committeada, no es secreta)
 .sops.yaml                         ← Config sops (mapea entornos → claves age)
 environments/{dev,prod}/
-├── .env.public                     ← Variables públicas (committeadas, sin secrets)
-└── secrets.enc.yaml                ← Secrets encryptados (committeados, solo sops puede leerlos)
+├── .env.public                    ← Variables públicas (committeadas, sin secrets)
+└── secrets.enc.yaml               ← Secrets encryptados (committeados, solo sops puede leerlos)
+```
+
+### Separación de datos públicos y privados
+
+| Archivo | Contiene | ¿Se commitea? |
+|---------|----------|---------------|
+| `.env.public` | Versión OpenWRT, target, IP del router, **nombres de red WiFi** | ✅ Sí |
+| `secrets.enc.yaml` | **Contraseñas WiFi**, clave WireGuard, hash root | ✅ Sí (encryptado) |
+| `~/.age/poc-openwrt-privkey.txt` | Clave privada age | ❌ Nunca |
+
+## Estructura de secrets
+
+`secrets.enc.yaml` contiene **solo contraseñas y claves privadas**:
+
+```yaml
+WIFI_KEY_24: ""           # Contraseña red 2.4 GHz
+WIFI_KEY_5: ""            # Contraseña red 5 GHz
+WIREGUARD_PRIVATE_KEY: "" # Clave privada WireGuard
+ROOT_PASSWORD_HASH: ""    # Hash SHA-512-crypt para /etc/shadow
+```
+
+Los **nombres de red** (SSID) van en `.env.public` — no son secretos:
+
+```bash
+WIFI_SSID_24=MiRed24
+WIFI_SSID_5=MiRed5G
 ```
 
 ## Setup inicial (una sola vez)
 
 ```bash
-# 1. Instalar herramientas
-brew install sops age just
+# Instalar herramientas
+# macOS:
+brew install just sops age yq shellcheck
 
-# 2. Generar clave age del proyecto
-mkdir -p ~/.age
-age-keygen -o ~/.age/poc-openwrt-privkey.txt
-chmod 600 ~/.age/poc-openwrt-privkey.txt
+# Linux (just install-tools descarga binarios automáticamente):
+just install-tools
 
-# 3. Extraer clave pública al repo
-grep "public key" ~/.age/poc-openwrt-privkey.txt | awk '{print $3}' > .age-pubkey.txt
-
-# O si ya ejecutaste el setup automático:
+# Setup completo (genera clave age + estructura de environments)
 just setup
 ```
 
-## Flujo diario
+## Primer uso en una máquina nueva (clonar el repo)
 
-### Ver secrets
+Cuando clonas el repo, los `secrets.enc.yaml` están encriptados con la clave de otra máquina. Debes re-encriptarlos con tu clave local:
 
 ```bash
-# Ver secrets de prod (solo lectura)
-sops environments/prod/secrets.enc.yaml
+just setup                   # Genera tu clave age local
 
-# Alternativa con just
-just decrypt-secrets prod
-cat /tmp/secrets-prod.yaml
+just reinit-secrets prod     # Actualiza .sops.yaml + recrea secrets.enc.yaml con tu clave
+just reinit-secrets dev      # Igual para dev
+
+just edit-secrets prod       # Llenar secrets (WiFi keys, WireGuard)
+just create-password prod    # Generar hash de root
+just build-prod
 ```
+
+`reinit-secrets` actualiza `.age-pubkey.txt` y `.sops.yaml` con tu clave pública, elimina el archivo anterior y crea uno nuevo vacío encriptado con tu clave.
+
+## Flujo diario
 
 ### Editar secrets
 
 ```bash
-# Editar secrets de prod
-just edit-secrets prod
-
-# O directamente
-sops environments/prod/secrets.enc.yaml
+just edit-secrets prod       # Abre $EDITOR con sops (re-encripta al guardar)
+just edit-secrets dev
 ```
 
-Los secrets de **prod** se estructuran así:
+### Generar hash de contraseña root
 
-```yaml
-# Secrets para el router de producción
-WIFI_SSID_24: MyWiFi24
-WIFI_KEY_24: super-secret-password
-WIFI_SSID_5: MyWiFi5G
-WIFI_KEY_5: super-secret-password-5g
-WIREGUARD_PRIVATE_KEY: AKE-SECRET-KEY-...
-ROOT_PASSWORD_HASH: $5$...
-DROPBEAR_RSA_HOST_KEY: -----BEGIN <RSA PRIVATE KEY HEADER>-----
-TOR_CONTROL_PASSWORD: tor-password
+```bash
+just create-password prod    # Pide contraseña en modo oculto, genera hash $6$ e inyecta en secrets
 ```
 
-### Commitear secrets
+El hash se inyecta directamente en `secrets.enc.yaml` sin mostrarse en pantalla ni quedar en historial.
 
-Los archivos `*.enc.yaml` son seguros de commitear porque están encryptados con age. El `.gitignore` multinivel asegura que:
+### Ver secrets (solo lectura)
 
-- `environments/.gitignore`: bloquea `.env` (sin sufijo) y cualquier `.yaml` que NO termine en `.enc.yaml`; permite `.env.public` explícitamente
-- Root `.gitignore`: bloquea `**/*.key`, `**/*.pem`, `.envrc`
+```bash
+just decrypt-secrets prod    # Desencripta a /tmp/secrets-prod.yaml
+cat /tmp/secrets-prod.yaml
+```
 
 ### Build con secrets
 
 ```bash
-# Build para producción (usa secrets reales)
-just build-prod
-
-# Build para desarrollo (valores dummy)
+just build-prod              # Verifica secrets → genera config → compila
 just build-dev
 ```
+
+Si los secrets no se pueden desencriptar (clave incorrecta), el build falla con instrucciones claras.
 
 ## Trade-offs de clave única por proyecto
 
@@ -93,35 +111,54 @@ just build-dev
 | Setup rápido (~30s) | Rotar clave = re-encryptar todo |
 | Sin key server externo | Sin audit trail de quién desencriptó |
 
-**Si el equipo crece a > 3 personas**, considerar migrar a claves por persona (agregar múltiples `age:`
-en `.sops.yaml`).
+**Si el equipo crece a > 3 personas**, considerar migrar a claves por persona (agregar múltiples `age:` en `.sops.yaml`).
 
 ## Preguntas frecuentes
+
+### ¿Cloné el repo y no puedo desencriptar?
+
+Los secrets están encriptados con la clave de quien inicializó el repo. Ejecuta:
+
+```bash
+just reinit-secrets prod
+just reinit-secrets dev
+```
+
+Esto regenera los archivos de secrets vacíos encriptados con tu clave local. Luego llénalos con `just edit-secrets` y `just create-password`.
 
 ### ¿Perdí la clave privada?
 
 Si pierdes `~/.age/poc-openwrt-privkey.txt`, no podrás desencriptar los secrets. Deberás:
-1. Generar nueva clave (`age-keygen`)
-2. Actualizar `.age-pubkey.txt`
-3. Re-crear `secrets.enc.yaml` con la nueva clave
-4. Re-ingresar todos los secretos manualmente
+
+```bash
+rm ~/.age/poc-openwrt-privkey.txt   # Eliminar la clave perdida
+just generate-age-key               # Generar nueva clave
+just reinit-secrets prod
+just reinit-secrets dev
+just edit-secrets prod              # Re-ingresar todos los secrets
+just create-password prod
+```
 
 ### ¿Alguien más necesita acceso?
 
 Agrega su clave pública a `.sops.yaml`:
+
 ```yaml
 creation_rules:
-  - path_regex: environments/prod/secrets\.enc\.yaml$
+  - path_regex: environments/(dev|prod)/secrets\.enc\.yaml$
     key_groups:
       - age:
-          - age150en7...  # Clave del proyecto (tú)
+          - age150en7...  # Tu clave
           - age1abc123... # Clave del nuevo miembro
 ```
-Luego re-encrypta:
+
+Luego re-encrypta para que ambos puedan acceder:
+
 ```bash
 sops updatekeys environments/prod/secrets.enc.yaml
+sops updatekeys environments/dev/secrets.enc.yaml
 ```
 
 ### ¿Qué hace `just generate-config`?
 
-Toma los templates en `templates/etc/` y reemplaza los placeholders `{{VARIABLE}}` con los valores de los secrets desencriptados. El resultado se guarda en `config/overlay/<env>/` (no committeado por `.gitignore`).
+Toma los templates en `templates/etc/` y reemplaza los placeholders `{{VARIABLE}}` con los valores de `.env.public` y los secrets desencriptados. El resultado se guarda en `config/overlay/<env>/` (no committeado por `.gitignore`).

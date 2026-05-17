@@ -14,24 +14,27 @@ just <recipe>                  # Ejecutar una recipe
 | Recipe | Descripción |
 |--------|-------------|
 | `just setup` | Setup inicial (tools + age key + environments). Usa `just setup force=true` para forzar reinstalación |
-| `just install-tools` | Verificar herramientas faltantes. Usa `just install-tools force=true` para reinstalar |
+| `just install-tools` | Verificar e instalar herramientas faltantes (`just`, `make`, `sops`, `age`, `yq`). Usa `force=true` para reinstalar |
+| `just validate-tools` | Validar que todas las herramientas requeridas están instaladas con sus versiones |
 | `just generate-age-key` | Generar clave age del proyecto en `~/.age/poc-openwrt-privkey.txt` |
-| `just create-environments` | Crear estructura `environments/{dev,prod}/` con secrets vacíos |
+| `just create-environments` | Crear estructura `environments/{dev,prod}/` con `.env.public` y secrets vacíos encriptados |
 
 ### Secrets
 
 | Recipe | Descripción |
 |--------|-------------|
+| `just reinit-secrets <env>` | Re-encriptar secrets con la clave age local. Usar al clonar el repo en una máquina nueva |
 | `just decrypt-secrets <env>` | Desencriptar `environments/<env>/secrets.enc.yaml` → `/tmp/secrets-<env>.yaml` |
-| `just edit-secrets <env>` | Abrir secrets en `$EDITOR` para editar |
+| `just edit-secrets <env>` | Abrir secrets en `$EDITOR` para editar (WiFi keys, WireGuard, etc.) |
+| `just create-password <env>` | Pedir contraseña root en modo oculto, generar hash SHA-512 e inyectarlo en secrets |
 
 ### Build
 
 | Recipe | Descripción |
 |--------|-------------|
 | `just build` | Compilar sin secrets (valores por defecto) |
-| `just build-dev` | Compilar para desarrollo (ENV=dev, sin secrets reales) |
-| `just build-prod` | Compilar para producción (desencripta secrets + genera config) |
+| `just build-dev` | Compilar para desarrollo (verifica secrets dev, genera config, compila) |
+| `just build-prod` | Compilar para producción (verifica secrets prod, genera config, compila) |
 | `just generate-config <env>` | Generar archivos de configuración desde templates + secrets |
 
 ### Validación
@@ -39,6 +42,7 @@ just <recipe>                  # Ejecutar una recipe
 | Recipe | Descripción |
 |--------|-------------|
 | `just validate` | Ejecutar `shellcheck` en todos los scripts |
+| `just validate-tools` | Verificar que todas las herramientas requeridas están instaladas |
 
 ### Flasheo
 
@@ -55,11 +59,18 @@ just <recipe>                  # Ejecutar una recipe
 
 ## Flujo de trabajo típico
 
-### Primera vez
+### Primera vez (o máquina nueva)
 
 ```bash
-just setup                              # Instala tools, genera clave age, crea environments
-just edit-secrets prod                  # Agrega secrets reales
+just install-tools                      # Linux: descarga binarios. macOS: indicaciones brew
+just setup                              # Genera clave age, crea environments
+
+# Si el repo ya tiene secrets de otra máquina, re-encriptar con clave local:
+just reinit-secrets prod
+just reinit-secrets dev
+
+just edit-secrets prod                  # Agrega WiFi keys, WireGuard, etc.
+just create-password prod               # Genera y guarda hash de root
 ```
 
 ### Compilar para producción
@@ -69,9 +80,11 @@ just build-prod
 ```
 
 Internamente ejecuta:
-1. `just decrypt-secrets prod` → desencripta secrets
+1. `scripts/install/ensure-secrets.sh prod` → verifica clave age y desencripta secrets
 2. `just generate-config prod` → genera configs desde templates
 3. `make build` → compila la imagen
+
+Si los secrets no se pueden desencriptar, el build falla con instrucciones claras.
 
 ### Compilar para desarrollo
 
@@ -79,7 +92,7 @@ Internamente ejecuta:
 just build-dev
 ```
 
-Usa valores dummy — no requiere secrets.
+Mismo flujo que prod pero con `environments/dev/`. Los campos vacíos en secrets se omiten (esa funcionalidad no se configura).
 
 ### Validar scripts
 

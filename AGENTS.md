@@ -60,11 +60,12 @@ Los scripts están organizados en `scripts/` por responsabilidad:
 
 | Directorio | Responsabilidad |
 |-----------|-----------------|
-| `commons/` | Utilidades compartidas: logging, utils, parsers |
-| `deps/` | Verificación de dependencias |
-| `install/` | Instalación y validación de herramientas |
+| `commons/` | Utilidades compartidas: logging, utils, parsers TOML |
+| `deps/` | Verificación de dependencias del sistema |
+| `git/` | Hooks de git y verificaciones pre-commit |
+| `install/` | Instalación, validación de herramientas, gestión de secrets |
 | `build/` | Compilación de OpenWRT |
-| `templates/` | Generación de configuraciones |
+| `templates/` | Generación de configuraciones desde templates + secrets |
 
 **Regla arquitectónica:** Just llama a scripts; Make llama a scripts; **Scripts NUNCA llaman a Just ni a Make**. No hay tareas duplicadas entre `justfile` y `Makefile`.
 
@@ -85,11 +86,13 @@ repo/
 │   └── openwrt-packages.txt       # Paquetes a incluir/excluir
 ├── environments/{dev,prod}/       # Secrets por entorno
 ├── scripts/
-│   ├── commons/{logging,utils,toml-parser}.sh # Utilidades compartidas
-│   ├── deps/check-tools.sh        # Verificación de dependencias
-│   ├── install/{setup-env,validate-tools}.sh  # Setup + validación
-│   ├── build/{openwrt,compile,verify}.sh      # Compilación
-│   └── templates/generate.sh      # Generación de configs
+│   ├── commons/{logging,utils,toml-parser}.sh       # Utilidades compartidas
+│   ├── deps/check-tools.sh                          # Verificación de dependencias
+│   ├── git/{check-secrets-encrypted,setup-hooks}.sh # Hooks pre-commit
+│   ├── install/{setup-env,validate-tools,           # Setup + validación
+│   │           ensure-secrets,generate-password-hash}.sh
+│   ├── build/{openwrt,compile,verify}.sh             # Compilación
+│   └── templates/generate.sh                        # Generación de configs
 ├── templates/etc/                 # Templates de config
 ├── docs/                          # Documentación
 └── .gitignore                     # NUNCA subir secrets/basura

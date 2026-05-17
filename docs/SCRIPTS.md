@@ -6,22 +6,28 @@ Todos los scripts están organizados en `scripts/` por responsabilidad. Los mód
 
 ```
 scripts/
-├── commons/          # Utilidades compartidas (sourceable)
-│   ├── logging.sh    # Funciones log_info, log_warn, log_error, log_step
-│   ├── utils.sh      # find_builder, parse_packages, get_repo_root
-│   ├── toml-parser.sh # parse_packages_toml, convert_toml_to_txt (wrapper Python)
-│   └── toml_parser.py # Parser TOML real (invocado por toml-parser.sh)
-├── deps/             # Verificación de dependencias
-│   └── check-tools.sh # Verifica just, make, sops, age, python3, yq, etc.
-├── install/          # Preparación del entorno
-│   └── setup-env.sh  # Descarga y extrae el Image Builder
-├── build/            # Compilación y verificación
-│   ├── openwrt.sh    # Orquestador principal de compilación
-│   ├── compile.sh    # Lógica de `make image`
-│   ├── verify.sh     # Validación de imagen compilada
+├── commons/                    # Utilidades compartidas (sourceable)
+│   ├── logging.sh              # log_info, log_warn, log_error, log_step
+│   ├── utils.sh                # find_builder, parse_packages, get_repo_root
+│   ├── toml-parser.sh          # parse_packages_toml, convert_toml_to_txt
+│   └── toml_parser.py          # Parser TOML (invocado por toml-parser.sh)
+├── deps/                       # Verificación de dependencias
+│   └── check-tools.sh          # Verifica just, make, sops, age, yq, python3, etc.
+├── git/                        # Hooks y verificaciones de git
+│   ├── check-secrets-encrypted.sh  # Pre-commit: bloquea secrets sin encriptar
+│   └── setup-hooks.sh          # Configura .githooks como directorio de hooks
+├── install/                    # Preparación del entorno
+│   ├── setup-env.sh            # Descarga y extrae el Image Builder
+│   ├── validate-tools.sh       # Valida herramientas requeridas con versiones
+│   ├── ensure-secrets.sh       # Verifica/desencripta secrets para el build
+│   └── generate-password-hash.sh # Genera hash SHA-512 e inyecta en secrets
+├── build/                      # Compilación y verificación
+│   ├── openwrt.sh              # Orquestador principal de compilación
+│   ├── compile.sh              # Lógica de `make image`
+│   ├── verify.sh               # Validación de imagen compilada
 │   └── convert-toml-packages.sh # Conversor TOML → TXT (standalone)
-└── templates/        # Generación de configuraciones
-    └── generate.sh   # Reemplaza placeholders en templates con secrets
+└── templates/                  # Generación de configuraciones
+    └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
 
 ## Wrapper raíz
@@ -80,6 +86,53 @@ Verifica herramientas requeridas. Útil para CI y setup:
 ./scripts/deps/check-tools.sh
 # ✓ just ✓ make ✓ sops ✓ age ✓ shellcheck ✓ wget ✓ yq ✓ python3
 ```
+
+### git/check-secrets-encrypted.sh
+
+Hook pre-commit que bloquea el commit si hay `secrets.enc.yaml` sin encriptar (sin metadata sops). Configurado automáticamente por `just setup-hooks`.
+
+### git/setup-hooks.sh
+
+Configura `.githooks/` como directorio de hooks de git:
+
+```bash
+just setup-hooks    # Equivalente a git config core.hooksPath .githooks
+```
+
+### install/validate-tools.sh
+
+Valida todas las herramientas requeridas e imprime sus versiones:
+
+```bash
+just validate-tools
+# ✅ just 1.36.0
+# ✅ sops — sops 3.9.4
+# ✅ age — age v1.2.1
+# ✅ yq — yq (https://github.com/mikefarah/yq/) version v4.44.3
+# ❌ shellcheck (NO INSTALADA)
+```
+
+### install/ensure-secrets.sh
+
+Verifica disponibilidad de secrets para el build. Llamado por `build-dev` y `build-prod`:
+
+- Si no existe clave age → la crea y guía al usuario
+- Si existe pero no puede desencriptar → indica `just reinit-secrets <ENV>`
+- Si desencripta exitosamente → reporta campos vacíos y exporta variables
+
+```bash
+source scripts/install/ensure-secrets.sh prod   # Sourced o ejecutado
+```
+
+### install/generate-password-hash.sh
+
+Pide contraseña root en modo oculto, genera hash SHA-512-crypt (`$6$...`) e inyecta directamente en `secrets.enc.yaml` sin mostrar el hash en pantalla:
+
+```bash
+just create-password prod   # Llamado por la recipe
+```
+
+Detecta automáticamente el método disponible: `openssl passwd -6` (macOS con Homebrew OpenSSL, Linux) o `python3 crypt`.
 
 ### install/setup-env.sh
 
