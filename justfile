@@ -589,6 +589,99 @@ setup-auth ip="" env="prod" key="":
     # shellcheck disable=SC2086
     scripts/build/setup-auth.sh ${ARGS}
 
+# post-install: Instala paquetes adicionales en el router via opkg (post-flash)
+# Lee config/openwrt-post-install-packages.toml
+# Uso: just post-install [group=<grupo>] [ip=<IP>] [env=<env>]
+#      just post-install group=captive_portal
+#      just post-install --list  → muestra grupos disponibles
+post-install group="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ group }}" ]; then ARGS="${ARGS} --group {{ group }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/post-install.sh ${ARGS}
+
+# ---------------------------------------------------------------------------
+# Portal cautivo (nftables + uhttpd, sin OpenNDS)
+# Flujo: just post-install group=captive_portal → just setup-captive
+# ---------------------------------------------------------------------------
+
+# setup-captive: Instala el portal cautivo en el router
+# Uso: just setup-captive [ip=] [env=] [timeout=30] [portal-url=] [token=]
+setup-captive ip="" env="prod" timeout="30" portal-url="" token="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="install --env {{ env }} --timeout {{ timeout }}"
+    if [ -n "{{ ip }}" ];         then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ portal-url }}" ]; then ARGS="${ARGS} --portal-url {{ portal-url }}"; fi
+    if [ -n "{{ token }}" ];      then ARGS="${ARGS} --token {{ token }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
+# remove-captive: Desinstala el portal cautivo del router
+# Uso: just remove-captive [ip=] [env=]
+remove-captive ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="uninstall --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
+# captive-allow: Autoriza una IP manualmente en el portal cautivo
+# Uso: just captive-allow client=192.168.1.50 [timeout=30] [ip=] [env=]
+captive-allow client="" ip="" env="prod" timeout="30":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ client }}" ]; then echo "ERROR: especifica client=<IP>"; exit 1; fi
+    ARGS="allow {{ client }} --env {{ env }} --timeout {{ timeout }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
+# captive-block: Revoca autorización de una IP del portal cautivo
+# Uso: just captive-block client=192.168.1.50 [ip=] [env=]
+captive-block client="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ client }}" ]; then echo "ERROR: especifica client=<IP>"; exit 1; fi
+    ARGS="block {{ client }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
+# captive-flush: Limpia todos los clientes autorizados del portal
+# Uso: just captive-flush [ip=] [env=]
+captive-flush ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="flush --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
+# captive-list: Muestra clientes autorizados y estado del portal
+# Uso: just captive-list [ip=] [env=]
+captive-list ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="list --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
+# captive-status: Diagnóstico del portal cautivo
+# Uso: just captive-status [ip=] [env=]
+captive-status ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="status --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-captive.sh ${ARGS}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="

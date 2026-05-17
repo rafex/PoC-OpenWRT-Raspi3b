@@ -1,0 +1,24 @@
+# ============================================================================
+# openwrt-post-install-packages.toml
+#
+# Paquetes instalados en el router post-flash via opkg.
+# NO se compilan en la imagen firmware — se instalan según necesidad.
+#
+# Uso:
+#   just post-install group=captive_portal   # instala un grupo
+#   just post-install                        # instala todos los grupos
+#
+# Requiere conectividad a internet en el router (repositorios opkg activos).
+# ============================================================================
+
+[captive_portal]
+description = "Portal cautivo ligero sin OpenNDS — nftables + servidor web"
+packages = ["uhttpd"]
+
+[diagnostico]
+description = "Herramientas de diagnóstico de red y tráfico"
+packages = ["tcpdump", "bind-dig"]
+
+[utilidades]
+description = "Utilidades generales de administración"
+packages = ["htop", "nano", "diffutils"]
