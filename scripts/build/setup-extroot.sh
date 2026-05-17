@@ -189,7 +189,7 @@ echo "    Dispositivo: \${DEVICE}"
 echo ""
 
 # 1. Montar USB temporalmente
-echo "[1/5] Montando \${DEVICE} en \${MNT}..."
+echo "[1/6] Montando \${DEVICE} en \${MNT}..."
 mkdir -p "\${MNT}"
 if mountpoint -q "\${MNT}" 2>/dev/null; then
     umount "\${MNT}"
@@ -197,13 +197,40 @@ fi
 mount "\${DEVICE}" "\${MNT}"
 echo "      ✅ Montado"
 
-# 2. Copiar overlay actual al USB (preservando atributos y permisos)
-echo "[2/5] Copiando /overlay al USB..."
+# 2. Verificar y limpiar contenido existente
+echo "[2/6] Verificando contenido existente en el USB..."
+EXISTING=\$(find "\${MNT}" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
+if [ "\${EXISTING}" -gt 0 ]; then
+    echo ""
+    echo "      ⚠️  El USB contiene archivos de una instalación anterior:"
+    find "\${MNT}" -mindepth 1 -maxdepth 2 2>/dev/null | head -20 | sed 's|^|         |'
+    TOTAL=\$(find "\${MNT}" -mindepth 1 2>/dev/null | wc -l)
+    if [ "\${TOTAL}" -gt 20 ]; then
+        echo "         ... (\${TOTAL} archivos en total)"
+    fi
+    echo ""
+    echo "      Se eliminarán todos antes de copiar el overlay actual."
+    echo ""
+    read -r -p "      ¿Continuar y borrar? (s/N) " confirm < /dev/tty
+    if [ "\${confirm,,}" != "s" ] && [ "\${confirm,,}" != "si" ]; then
+        umount "\${MNT}"
+        echo "Cancelado."
+        exit 0
+    fi
+    echo "      Limpiando USB..."
+    find "\${MNT}" -mindepth 1 -delete
+    echo "      ✅ USB limpiado"
+else
+    echo "      ✅ USB vacío — sin archivos previos"
+fi
+
+# 3. Copiar overlay actual al USB (preservando atributos y permisos)
+echo "[3/6] Copiando /overlay al USB..."
 tar -C /overlay -czf - . | tar -C "\${MNT}" -xzf -
 echo "      ✅ Overlay copiado"
 
-# 3. Obtener UUID del dispositivo
-echo "[3/5] Obteniendo UUID del dispositivo..."
+# 4. Obtener UUID del dispositivo
+echo "[4/6] Obteniendo UUID del dispositivo..."
 UUID=\$(block info "\${DEVICE}" | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
 if [ -z "\${UUID}" ]; then
     echo "      ⚠️  No se encontró UUID — usando ruta del dispositivo"
@@ -213,8 +240,8 @@ else
     TARGET_OPTION="option uuid \${UUID}"
 fi
 
-# 4. Configurar fstab para automontaje de /overlay
-echo "[4/5] Configurando fstab para extroot..."
+# 5. Configurar fstab para automontaje de /overlay
+echo "[5/6] Configurando fstab para extroot..."
 uci -q delete fstab.extroot 2>/dev/null || true
 uci set fstab.extroot=mount
 uci set fstab.extroot.target=/overlay
@@ -228,8 +255,8 @@ uci set fstab.extroot.enabled=1
 uci commit fstab
 echo "      ✅ fstab configurado"
 
-# 5. Verificar configuración
-echo "[5/5] Configuración guardada:"
+# 6. Verificar configuración
+echo "[6/6] Configuración guardada:"
 uci show fstab.extroot
 
 # Desmontar
