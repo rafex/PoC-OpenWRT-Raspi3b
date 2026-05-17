@@ -364,7 +364,6 @@ echo "Configurando interfaz de red 'wwan'..."
 uci -q delete network.wwan 2>/dev/null || true
 uci set network.wwan=interface
 uci set network.wwan.proto='dhcp'
-uci set network.wwan.peerdns='0'
 uci commit network
 
 echo "Añadiendo 'wwan' a zona firewall WAN..."
