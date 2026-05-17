@@ -176,9 +176,9 @@ _check_ext4() {
 _setup_extroot_on_router() {
     local device="$1"
 
-    # Script que se ejecuta completamente en el router
-    _ssh bash <<REMOTE
-set -euo pipefail
+    # Script que se ejecuta en el router — OpenWRT usa busybox sh (ash)
+    _ssh sh - <<REMOTE
+set -eu
 
 DEVICE="${device}"
 MNT="/mnt"
@@ -211,8 +211,10 @@ if [ "\${EXISTING}" -gt 0 ]; then
     echo ""
     echo "      Se eliminarán todos antes de copiar el overlay actual."
     echo ""
-    read -r -p "      ¿Continuar y borrar? (s/N) " confirm < /dev/tty
-    if [ "\${confirm,,}" != "s" ] && [ "\${confirm,,}" != "si" ]; then
+    printf "      ¿Continuar y borrar? (s/N) "
+    read -r confirm < /dev/tty
+    confirm=\$(echo "\${confirm}" | tr '[:upper:]' '[:lower:]')
+    if [ "\${confirm}" != "s" ] && [ "\${confirm}" != "si" ]; then
         umount "\${MNT}"
         echo "Cancelado."
         exit 0

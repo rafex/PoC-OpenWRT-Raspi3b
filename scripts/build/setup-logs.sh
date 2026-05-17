@@ -134,8 +134,9 @@ _check_extroot() {
 # Configurar logs en el router via SSH
 # ---------------------------------------------------------------------------
 _setup_logs_on_router() {
-    _ssh bash <<'REMOTE'
-set -euo pipefail
+    # OpenWRT usa busybox sh (ash), no bash
+    _ssh sh - <<'REMOTE'
+set -eu
 
 LOG_DIR="/overlay/log"
 LOG_FILE="${LOG_DIR}/messages"
