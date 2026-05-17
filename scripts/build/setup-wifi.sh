@@ -251,29 +251,57 @@ EOF
 # Subcomando: client (STA mode)
 # ---------------------------------------------------------------------------
 _client() {
-    local radio="${_RADIO:-radio1}"
+    local radio="${_RADIO:-}"   # vacío si el usuario no especificó --radio
 
     _check_ssh
 
-    # Modo interactivo: si no se pasó --ssid, escanear y preguntar
+    # Modo interactivo: si no se pasó --ssid, guiar paso a paso
     if [ -z "${_SSID}" ]; then
+
+        # Paso 1: elegir banda si no se especificó --radio
+        if [ -z "${radio}" ]; then
+            echo ""
+            echo "  ¿Qué banda usar para conectarte?"
+            echo "    [1] 2.4 GHz (radio0) — mayor alcance"
+            echo "    [2] 5 GHz  (radio1) — mayor velocidad (default)"
+            printf "  Banda [1/2]: "
+            read -r _band_choice
+            case "${_band_choice}" in
+                1) radio="radio0" ;;
+                *) radio="radio1" ;;
+            esac
+        fi
+
+        # Paso 2: escanear
         echo ""
-        log_step "Escaneando redes disponibles en ${radio}..."
+        log_step "Escaneando redes en ${radio}..."
         _do_scan "${radio}"
         echo ""
+
+        # Paso 3: elegir SSID
         printf "  SSID de la red a conectar (Enter para cancelar): "
         read -r _SSID
         [ -z "${_SSID}" ] && { echo "  Cancelado."; exit 0; }
 
+        # Paso 4: contraseña
         if ! "${_OPEN}" && [ -z "${_PASSWORD}" ]; then
-            printf "  Contraseña (Enter si la red es abierta): "
+            printf "  Contraseña para '%s' (Enter si es red abierta): " "${_SSID}"
             read -r -s _PASSWORD
             echo ""
             [ -z "${_PASSWORD}" ] && _OPEN=true
         fi
+
+        # Paso 5: BSSID
+        if [ -z "${_BSSID}" ]; then
+            printf "  BSSID concreto (Enter para conectar al AP más fuerte): "
+            read -r _BSSID
+        fi
     fi
 
-    # Si no hay password, pedir interactivamente (nunca exponer en CLI)
+    # Aplicar default de radio si llegamos aquí sin haberlo definido (--radio explícito)
+    [ -z "${radio}" ] && radio="radio1"
+
+    # Si llegamos aquí con ssid ya dado (no interactivo) y falta password, pedir ahora
     if ! "${_OPEN}" && [ -z "${_PASSWORD}" ]; then
         printf "\n  Contraseña para '%s' (Enter si la red es abierta): " "${_SSID}"
         read -r -s _PASSWORD
@@ -282,9 +310,9 @@ _client() {
     fi
     [ "${_OPEN}" = "true" ] && _ENCRYPTION="none"
 
-    # Pedir BSSID opcionalmente si no fue especificado
+    # BSSID: pedir solo si no vino del modo interactivo ni de --bssid
     if [ -z "${_BSSID}" ]; then
-        printf "  BSSID concreto (Enter para conectar al más fuerte): "
+        printf "  BSSID concreto (Enter para conectar al AP más fuerte): "
         read -r _BSSID
     fi
 
@@ -444,16 +472,20 @@ fi
 
 echo ""
 echo "  Interfaz: \${IFNAME}  (radio: \${RADIO} / \${PHY})"
-echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-printf "  %-33s %-10s %-6s %-19s %s\n" "SSID" "Señal" "Canal" "BSSID" "Cifrado"
-echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+printf "  %-30s %-5s %-10s %-6s %-19s %s\n" "SSID" "Banda" "Señal" "Canal" "BSSID" "Cifrado"
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Función awk común para derivar banda desde canal
+AWK_BAND='function band_of(c) { return (c+0 > 14) ? "5G" : "2.4G" }'
 
 # Escanear: iwinfo si disponible, si no iw dev scan
 if command -v iwinfo >/dev/null 2>&1; then
     iwinfo "\${IFNAME}" scan 2>/dev/null | awk '
+    function band_of(c) { return (c+0 > 14) ? "5G" : "2.4G" }
     /Cell [0-9]+ - Address:/ {
         if (ssid != "")
-            printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc
+            printf "  %-30s %-5s %-10s %-6s %-19s %s\n", ssid, band_of(ch), sig, ch, bssid, enc
         bssid=\$NF; ssid=""; sig="?"; ch="?"; enc="abierta"
     }
     /ESSID:/ { ssid=\$2; gsub(/"/, "", ssid) }
@@ -468,16 +500,17 @@ if command -v iwinfo >/dev/null 2>&1; then
         else if (rest~/WPA/)  enc="WPA"
         else enc=rest
     }
-    END { if (ssid!="") printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc }
+    END { if (ssid!="") printf "  %-30s %-5s %-10s %-6s %-19s %s\n", ssid, band_of(ch), sig, ch, bssid, enc }
     ' 2>/dev/null
 else
     iw dev "\${IFNAME}" scan 2>/dev/null | awk '
+    function band_of(c) { return (c+0 > 14) ? "5G" : "2.4G" }
     function flush_bss() {
         if (bssid=="" || ssid=="") return
         ch=""
         if (freq+0>=2412 && freq+0<=2484) ch=int((freq+0-2407)/5)
         else if (freq+0>=5000) ch=int((freq+0-5000)/5)
-        printf "  %-33s %-10s %-6s %-19s %s\n", ssid, sig, ch, bssid, enc
+        printf "  %-30s %-5s %-10s %-6s %-19s %s\n", ssid, band_of(ch), sig, ch, bssid, enc
     }
     BEGIN { bssid=""; ssid=""; sig="?"; ch="?"; enc="abierta"; freq="" }
     /^BSS /   { flush_bss(); bssid=substr(\$2,1,17); ssid=""; sig="?"; enc="abierta"; freq="" }
