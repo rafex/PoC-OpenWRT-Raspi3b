@@ -152,31 +152,138 @@ _check_ssh() {
 }
 
 # ---------------------------------------------------------------------------
+# _fetch_radio_info — Consulta al router qué radios existen y cuáles están libres
+# Salida: una línea por radio → "radio0 2.4GHz libre" o "radio1 5GHz sta"
+# ---------------------------------------------------------------------------
+_fetch_radio_info() {
+    _ssh sh - << 'REMOTE'
+set -eu
+STA=""
+I=0
+while true; do
+    DEV=$(uci -q get wireless.@wifi-iface[$I].device 2>/dev/null) || break
+    MODE=$(uci -q get wireless.@wifi-iface[$I].mode 2>/dev/null || echo "ap")
+    DIS=$(uci -q get wireless.@wifi-iface[$I].disabled 2>/dev/null || echo "0")
+    [ "$MODE" = "sta" ] && [ "$DIS" != "1" ] && STA="${STA} ${DEV}"
+    I=$((I+1))
+done
+R=0
+while true; do
+    uci -q get wireless.radio${R} >/dev/null 2>&1 || break
+    RAW=$(uci -q get wireless.radio${R}.band 2>/dev/null || \
+          uci -q get wireless.radio${R}.hwmode 2>/dev/null || echo "?")
+    case "$RAW" in
+        2g|11g|11b|11bg|11n) BAND="2.4GHz" ;;
+        5g|11a|11ac|11n-5)   BAND="5GHz"   ;;
+        *)                    BAND="?"      ;;
+    esac
+    STATUS="libre"
+    for S in $STA; do [ "$S" = "radio${R}" ] && STATUS="sta" && break; done
+    printf "%s %s %s\n" "radio${R}" "${BAND}" "${STATUS}"
+    R=$((R+1))
+done
+REMOTE
+}
+
+# ---------------------------------------------------------------------------
 # Subcomando: ap
 # ---------------------------------------------------------------------------
 _ap() {
-    local radio="${_RADIO:-radio0}"
-
-    [ -z "${_SSID}" ] && { log_error "--ssid requerido"; exit 1; }
-
-    if [ "${_ENCRYPTION}" != "none" ] && [ -z "${_PASSWORD}" ]; then
-        log_error "--password requerido (o usa --open para red sin contraseña)"
-        exit 1
-    fi
-
-    if [ "${_ENCRYPTION}" != "none" ] && [ "${#_PASSWORD}" -lt 8 ]; then
-        log_error "La contraseña debe tener al menos 8 caracteres"
-        exit 1
-    fi
+    local radio="${_RADIO:-}"
+    local _fully_interactive=false
+    [ -z "${_SSID}" ] && _fully_interactive=true
 
     _check_ssh
 
+    # --- Paso 1: Radio ---
+    if [ -z "${radio}" ]; then
+        echo ""
+        log_step "Consultando radios disponibles..."
+        local radio_info
+        radio_info=$(_fetch_radio_info)
+
+        echo ""
+        echo "  ¿En qué radio configurar el Access Point?"
+        local idx=1 free_radios=""
+        while IFS=' ' read -r rname band status; do
+            [ -z "${rname}" ] && continue
+            if [ "${status}" = "sta" ]; then
+                printf "    %-8s (%s) — en uso como cliente WiFi\n" "${rname}" "${band}"
+            else
+                printf "    [%d] %s (%s)\n" "${idx}" "${rname}" "${band}"
+                free_radios="${free_radios} ${rname}"
+                idx=$((idx + 1))
+            fi
+        done <<< "${radio_info}"
+
+        local free_count=0
+        for r in ${free_radios}; do free_count=$((free_count + 1)); done
+
+        if [ "${free_count}" -eq 0 ]; then
+            log_error "Sin radios disponibles para AP (todos en uso como cliente WiFi)"
+            exit 1
+        elif [ "${free_count}" -eq 1 ]; then
+            radio="${free_radios## }"
+            printf "    → %s seleccionado automáticamente\n" "${radio}"
+        else
+            printf "  Radio [1-%d]: " "$((idx - 1))"
+            read -r _choice
+            local ci=1
+            for r in ${free_radios}; do
+                [ "${ci}" = "${_choice}" ] && { radio="${r}"; break; }
+                ci=$((ci + 1))
+            done
+            [ -z "${radio}" ] && radio="${free_radios## }"
+        fi
+    fi
+
+    # --- Paso 2: SSID ---
+    if [ -z "${_SSID}" ]; then
+        echo ""
+        printf "  Nombre de la red (SSID): "
+        read -r _SSID
+        [ -z "${_SSID}" ] && { echo "  Cancelado."; exit 0; }
+    fi
+
+    # --- Paso 3: Contraseña ---
+    if ! "${_OPEN}" && [ -z "${_PASSWORD}" ]; then
+        echo ""
+        printf "  ¿Con contraseña WPA2? (S/n): "
+        read -r _pw_yn
+        case "${_pw_yn}" in
+            n|N)
+                _OPEN=true
+                _ENCRYPTION="none"
+                ;;
+            *)
+                printf "  Contraseña (mínimo 8 caracteres): "
+                read -r -s _PASSWORD
+                echo ""
+                if [ "${#_PASSWORD}" -lt 8 ]; then
+                    log_error "La contraseña debe tener al menos 8 caracteres"
+                    exit 1
+                fi
+                ;;
+        esac
+    fi
+
+    # --- Paso 4: Canal (solo en modo totalmente interactivo) ---
+    if "${_fully_interactive}"; then
+        echo ""
+        printf "  Canal WiFi (Enter para auto): "
+        read -r _chan
+        [ -n "${_chan}" ] && _CHANNEL="${_chan}"
+    fi
+
+    [ "${_OPEN}" = "true" ] && _ENCRYPTION="none"
+
+    # --- Resumen y confirmación ---
     echo ""
     log_step "Configurando Access Point:"
-    echo "   Radio:      ${radio}"
-    echo "   SSID:       ${_SSID}"
-    echo "   Cifrado:    ${_ENCRYPTION}"
-    echo "   Canal:      ${_CHANNEL}"
+    echo "   Radio:   ${radio}"
+    echo "   SSID:    ${_SSID}"
+    echo "   Cifrado: ${_ENCRYPTION}"
+    echo "   Canal:   ${_CHANNEL}"
     echo ""
     read -r -p "¿Continuar? (s/N) " ans
     [ "$(echo "${ans}" | tr '[:upper:]' '[:lower:]')" != "s" ] && { echo "Cancelado."; exit 0; }
@@ -196,7 +303,6 @@ CHANNEL="${channel}"
 
 echo "Buscando interfaz AP en \${RADIO}..."
 
-# Buscar interfaz AP existente en este radio
 FOUND=""
 I=0
 while true; do
@@ -231,7 +337,6 @@ else
     uci set wireless.@wifi-iface[\$FOUND].key="\$PASSWORD"
 fi
 
-# Canal
 if [ "\$CHANNEL" != "auto" ] && [ "\$CHANNEL" != "" ]; then
     uci set wireless.\$RADIO.channel="\$CHANNEL"
 else

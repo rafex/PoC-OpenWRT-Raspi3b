@@ -704,17 +704,13 @@ setup-wifi subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" op
     # shellcheck disable=SC2086
     scripts/build/setup-wifi.sh ${ARGS}
 
-# wifi-ap: Configura un Access Point (SSID + contraseña)
-# Uso: just wifi-ap ssid=MiRed password=clave123 [radio=2g|5g] [channel=auto]
-wifi-ap ssid="" password="" radio="radio0" channel="auto" ip="" env="prod":
+# wifi-ap: Configura un Access Point (completamente interactivo)
+# Sin args: pregunta radio disponible → SSID → contraseña → canal
+# Uso: just wifi-ap [--radio 5g|radio1] [--ssid MiRed] [--channel 6] [--open] [--env dev]
+wifi-ap *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ ssid }}" ]; then echo "ERROR: especifica ssid=<nombre>"; exit 1; fi
-    ARGS="ap --ssid {{ ssid }} --radio {{ radio }} --channel {{ channel }} --env {{ env }}"
-    if [ -n "{{ ip }}" ];       then ARGS="${ARGS} --ip {{ ip }}"; fi
-    if [ -n "{{ password }}" ]; then ARGS="${ARGS} --password {{ password }}"; else ARGS="${ARGS} --open"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/setup-wifi.sh ap {{args}}
 
 # wifi-client: Conecta el router como cliente a otra red WiFi
 # Sin argumentos: escanea redes y guía interactivamente (SSID, banda, contraseña, BSSID)
