@@ -565,6 +565,18 @@ setup-extroot ip="" device="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/setup-extroot.sh ${ARGS}
 
+# setup-logs: Configurar logs persistentes en USB (extroot) via SSH
+# ⚠️  Prerrequisito: just setup-extroot debe haberse ejecutado y el router
+#    debe haber reiniciado con el USB montado como /overlay.
+# Uso: just setup-logs [ip=<IP>] [env=<env>]
+setup-logs ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-logs.sh ${ARGS}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
