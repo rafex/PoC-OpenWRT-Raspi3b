@@ -685,6 +685,227 @@ captive-status ip="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/setup-captive.sh ${ARGS}
 
+# ---------------------------------------------------------------------------
+# WiFi (APs y modo cliente)
+# ---------------------------------------------------------------------------
+
+# setup-wifi: Configura WiFi en el router (AP o cliente)
+# Ver subcomandos con: just setup-wifi help
+setup-wifi subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" open="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="{{ subcmd }} --env {{ env }}"
+    if [ -n "{{ ip }}" ];       then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ ssid }}" ];     then ARGS="${ARGS} --ssid {{ ssid }}"; fi
+    if [ -n "{{ password }}" ]; then ARGS="${ARGS} --password {{ password }}"; fi
+    if [ -n "{{ radio }}" ];    then ARGS="${ARGS} --radio {{ radio }}"; fi
+    if [ -n "{{ channel }}" ];  then ARGS="${ARGS} --channel {{ channel }}"; fi
+    if [ "{{ open }}" = "true" ]; then ARGS="${ARGS} --open"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# wifi-ap: Configura un Access Point (SSID + contraseña)
+# Uso: just wifi-ap ssid=MiRed password=clave123 [radio=2g|5g] [channel=auto]
+wifi-ap ssid="" password="" radio="radio0" channel="auto" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ ssid }}" ]; then echo "ERROR: especifica ssid=<nombre>"; exit 1; fi
+    ARGS="ap --ssid {{ ssid }} --radio {{ radio }} --channel {{ channel }} --env {{ env }}"
+    if [ -n "{{ ip }}" ];       then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ password }}" ]; then ARGS="${ARGS} --password {{ password }}"; else ARGS="${ARGS} --open"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# wifi-client: Conecta el router como cliente a otra red WiFi
+# Uso: just wifi-client ssid=OtraRed password=clave [radio=5g]
+wifi-client ssid="" password="" radio="radio1" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ ssid }}" ]; then echo "ERROR: especifica ssid=<nombre>"; exit 1; fi
+    ARGS="client --ssid {{ ssid }} --radio {{ radio }} --env {{ env }}"
+    if [ -n "{{ ip }}" ];       then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ password }}" ]; then ARGS="${ARGS} --password {{ password }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# wifi-scan: Escanea redes WiFi disponibles
+# Uso: just wifi-scan [radio=2g|5g] [ip=] [env=]
+wifi-scan radio="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="scan --env {{ env }}"
+    if [ -n "{{ radio }}" ]; then ARGS="${ARGS} --radio {{ radio }}"; fi
+    if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# wifi-status: Muestra estado de todos los radios e interfaces WiFi
+# Uso: just wifi-status [ip=] [env=]
+wifi-status ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="status --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# wifi-enable: Habilita un radio WiFi
+# Uso: just wifi-enable radio=radio0|2g|radio1|5g [ip=] [env=]
+wifi-enable radio="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ radio }}" ]; then echo "ERROR: especifica radio=<radio0|radio1|2g|5g>"; exit 1; fi
+    ARGS="enable --radio {{ radio }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# wifi-disable: Deshabilita un radio WiFi
+# Uso: just wifi-disable radio=radio0|2g|radio1|5g [ip=] [env=]
+wifi-disable radio="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ radio }}" ]; then echo "ERROR: especifica radio=<radio0|radio1|2g|5g>"; exit 1; fi
+    ARGS="disable --radio {{ radio }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-wifi.sh ${ARGS}
+
+# ---------------------------------------------------------------------------
+# Routing (prioridad WAN vs WiFi cliente y source-based routing)
+# ---------------------------------------------------------------------------
+
+# routing-status: Muestra rutas, gateways y métricas actuales
+# Uso: just routing-status [ip=] [env=]
+routing-status ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="status --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-routing.sh ${ARGS}
+
+# routing-priority: Define qué interfaz es la salida preferida
+# Uso: just routing-priority mode=wan|wifi|equal [ip=] [env=]
+#      wan   → WAN físico preferido (default)
+#      wifi  → Cliente WiFi (wwan) preferido
+#      equal → Ambas con misma métrica, kernel decide
+routing-priority mode="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ mode }}" ]; then echo "ERROR: especifica mode=wan|wifi|equal"; exit 1; fi
+    ARGS="priority {{ mode }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-routing.sh ${ARGS}
+
+# routing-pin: Fija el tráfico de una IP LAN a una interfaz concreta
+# Uso: just routing-pin from=192.168.1.50 via=wifi [ip=] [env=]
+routing-pin from="" via="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ from }}" ]; then echo "ERROR: especifica from=<IP_LAN>"; exit 1; fi
+    if [ -z "{{ via }}" ];  then echo "ERROR: especifica via=<wan|wifi>"; exit 1; fi
+    ARGS="pin --from {{ from }} --via {{ via }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-routing.sh ${ARGS}
+
+# routing-unpin: Elimina el pin de enrutamiento para una IP LAN
+# Uso: just routing-unpin from=192.168.1.50 [ip=] [env=]
+routing-unpin from="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ from }}" ]; then echo "ERROR: especifica from=<IP_LAN>"; exit 1; fi
+    ARGS="unpin --from {{ from }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-routing.sh ${ARGS}
+
+# routing-pins: Lista todos los pins de enrutamiento activos
+# Uso: just routing-pins [ip=] [env=]
+routing-pins ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="pins --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-routing.sh ${ARGS}
+
+# routing-reset: Elimina todos los pins y restaura prioridad a WAN
+# Uso: just routing-reset [ip=] [env=]
+routing-reset ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="reset --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-routing.sh ${ARGS}
+
+# ---------------------------------------------------------------------------
+# IPs Estáticas (DHCP leases por MAC address)
+# ---------------------------------------------------------------------------
+
+# static-ip-add: Asigna IP estática a un MAC address
+# Uso: just static-ip-add mac=AA:BB:CC:DD:EE:FF assign=192.168.1.100 [name=servidor]
+static-ip-add mac="" assign="" name="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ mac }}" ];    then echo "ERROR: especifica mac=<AA:BB:CC:DD:EE:FF>"; exit 1; fi
+    if [ -z "{{ assign }}" ]; then echo "ERROR: especifica assign=<IP>"; exit 1; fi
+    ARGS="add --mac {{ mac }} --assign {{ assign }} --env {{ env }}"
+    if [ -n "{{ name }}" ]; then ARGS="${ARGS} --name {{ name }}"; fi
+    if [ -n "{{ ip }}" ];   then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-static-ip.sh ${ARGS}
+
+# static-ip-remove: Elimina asignación de IP estática (por MAC o por IP)
+# Uso: just static-ip-remove mac=AA:BB:CC:DD:EE:FF
+#      just static-ip-remove assign=192.168.1.100
+static-ip-remove mac="" assign="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ mac }}" ] && [ -z "{{ assign }}" ]; then
+        echo "ERROR: especifica mac=<MAC> o assign=<IP>"; exit 1
+    fi
+    ARGS="remove --env {{ env }}"
+    if [ -n "{{ mac }}" ];    then ARGS="${ARGS} --mac {{ mac }}"; fi
+    if [ -n "{{ assign }}" ]; then ARGS="${ARGS} --assign {{ assign }}"; fi
+    if [ -n "{{ ip }}" ];     then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-static-ip.sh ${ARGS}
+
+# static-ip-list: Muestra todas las asignaciones de IP estática
+# Uso: just static-ip-list [ip=] [env=]
+static-ip-list ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="list --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-static-ip.sh ${ARGS}
+
+# static-ip-clear: Elimina TODAS las asignaciones de IP estática
+# Uso: just static-ip-clear [ip=] [env=]
+static-ip-clear ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="clear --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-static-ip.sh ${ARGS}
+
+# static-ip-import: Importa asignaciones desde CSV (MAC,IP,nombre)
+# Uso: just static-ip-import file=hosts.csv [ip=] [env=]
+static-ip-import file="" ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ file }}" ]; then echo "ERROR: especifica file=<ruta.csv>"; exit 1; fi
+    ARGS="import --file {{ file }} --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-static-ip.sh ${ARGS}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
