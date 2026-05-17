@@ -54,10 +54,12 @@ just build-prod
 | `just setup-logs` | Logs persistentes en USB |
 | `just post-install` | Instala paquetes adicionales via `opkg` |
 | `just setup-captive` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
-| `just wifi-ap` / `just wifi-client` | Configura APs o conecta como cliente WiFi |
-| `just wifi-scan` / `just wifi-status` | Escanea y muestra estado de la WiFi |
+| `just wifi-ap` | Configura AP interactivo (detecta radios libres) |
+| `just wifi-client` | Conecta como cliente WiFi (selección de banda interactiva) |
+| `just wifi-scan` / `just wifi-status` | Escanea ambos radios y muestra estado |
 | `just routing-priority` / `just routing-pin` | Prioridad WAN vs WiFi + source-based routing |
 | `just static-ip-add` / `just static-ip-list` | DHCP leases estáticos por MAC address |
+| `just dns-set` / `just dns-show` / `just dns-reset` | Servidores DNS upstream de dnsmasq |
 
 ## Licencia
 

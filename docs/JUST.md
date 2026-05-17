@@ -108,25 +108,40 @@ just captive-allow client=192.168.1.50 timeout=0       # Sin límite
 
 ### WiFi
 
+Todas las recipes pasan argumentos directamente al script (`--flag valor`).
+
 | Recipe | Descripción |
 |--------|-------------|
-| `just wifi-ap ssid=<nombre> [password=] [radio=radio0] [channel=auto] [ip=] [env=]` | Configura un Access Point |
-| `just wifi-client ssid=<nombre> [password=] [radio=radio1] [ip=] [env=]` | Conecta el router como cliente WiFi (crea interfaz `wwan`) |
-| `just wifi-scan [radio=] [ip=] [env=]` | Escanea redes WiFi disponibles |
-| `just wifi-status [ip=] [env=]` | Muestra estado de radios e interfaces (banda, canal, SSID, clientes) |
-| `just wifi-enable radio=<r> [ip=] [env=]` | Habilita un radio |
-| `just wifi-disable radio=<r> [ip=] [env=]` | Deshabilita un radio |
+| `just wifi-ap` | AP interactivo: detecta radios libres → SSID → contraseña → canal |
+| `just wifi-client` | Cliente interactivo: selecciona banda → escanea → SSID → contraseña |
+| `just wifi-disconnect` | Desconecta todos los clientes STA y elimina interfaz `wwan` |
+| `just wifi-scan` | Escanea 2.4 GHz y 5 GHz; con `--radio` solo esa banda |
+| `just wifi-status` | Estado de radios e interfaces (banda, canal, SSID, clientes) |
+| `just wifi-enable --radio <r>` | Habilita un radio |
+| `just wifi-disable --radio <r>` | Deshabilita un radio |
 
-Valores válidos de radio: `radio0`, `radio1`, `2g`, `5g`.
+Alias de radio válidos: `radio0`, `radio1`, `2g`, `5g`, `2.4ghz`, `5ghz`.
 
 Ejemplos:
 ```bash
-just wifi-ap ssid="MiRed" password="clave1234"          # AP en 2.4 GHz
-just wifi-ap ssid="MiRed5G" radio=5g channel=36         # AP en 5 GHz sin contraseña
-just wifi-client ssid="RedExterna" password="supass"    # Cliente en 5 GHz (radio1)
-just wifi-scan radio=5g
+just wifi-ap                                       # AP completamente interactivo
+just wifi-ap --ssid MiRed --radio 5g              # Pre-selecciona radio y SSID
+just wifi-ap --ssid MiRed --channel 36 --open     # Sin contraseña, canal fijo
+
+just wifi-client                                   # Interactivo: elige banda → escanea
+just wifi-client --radio 2.4ghz                   # Fuerza 2.4 GHz, luego interactivo
+just wifi-client --radio 5g --ssid RedExterna     # Fuerza radio y SSID
+
+just wifi-disconnect                               # Desconecta todos los clientes
+just wifi-disconnect --radio radio0               # Solo desconecta radio0
+
+just wifi-scan                                     # Escanea 2.4 GHz y 5 GHz
+just wifi-scan --radio 5g                         # Solo 5 GHz
+just wifi-scan --radio radio0                     # Solo 2.4 GHz
+
 just wifi-status
-just wifi-disable radio=radio1
+just wifi-disable --radio radio1
+just wifi-enable --radio radio0
 ```
 
 ### Routing
@@ -135,12 +150,12 @@ Gestiona qué interfaz usa el router como salida a internet y permite fijar IPs 
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just routing-status [ip=] [env=]` | Muestra rutas, gateways, métricas y pins activos |
-| `just routing-priority mode=<wan\|wifi\|equal> [ip=] [env=]` | Define la interfaz de salida preferida |
-| `just routing-pin from=<IP> via=<wan\|wifi> [ip=] [env=]` | Fija tráfico de una IP LAN a una interfaz concreta |
-| `just routing-unpin from=<IP> [ip=] [env=]` | Elimina el pin de una IP LAN |
-| `just routing-pins [ip=] [env=]` | Lista todos los pins activos |
-| `just routing-reset [ip=] [env=]` | Elimina todos los pins y restaura prioridad a WAN |
+| `just routing-status` | Muestra rutas, gateways, métricas y pins activos |
+| `just routing-priority <wan\|wifi\|equal>` | Define la interfaz de salida preferida |
+| `just routing-pin --from <IP> --via <wan\|wifi>` | Fija tráfico de una IP LAN a una interfaz concreta |
+| `just routing-unpin --from <IP>` | Elimina el pin de una IP LAN |
+| `just routing-pins` | Lista todos los pins activos |
+| `just routing-reset` | Elimina todos los pins y restaura prioridad a WAN |
 
 Modos de prioridad:
 - `wan` — WAN físico como gateway preferido (métrica más baja)
@@ -151,10 +166,11 @@ Los pins de enrutamiento persisten entre reinicios vía `/etc/routing-pins.conf`
 
 Ejemplos:
 ```bash
-just routing-priority mode=wifi                          # Preferir WiFi cliente
-just routing-pin from=192.168.1.50 via=wifi             # Laptop siempre por WiFi
-just routing-pin from=192.168.1.51 via=wan              # Servidor siempre por WAN
-just routing-unpin from=192.168.1.50
+just routing-priority wifi                               # Preferir WiFi cliente
+just routing-priority wan                                # Preferir WAN físico
+just routing-pin --from 192.168.1.50 --via wifi         # Laptop siempre por WiFi
+just routing-pin --from 192.168.1.51 --via wan          # Servidor siempre por WAN
+just routing-unpin --from 192.168.1.50
 just routing-reset
 ```
 
@@ -164,19 +180,39 @@ Gestiona DHCP static leases: asigna IPs fijas a dispositivos por MAC address.
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just static-ip-add mac=<MAC> assign=<IP> [name=] [ip=] [env=]` | Asigna IP estática a un dispositivo |
-| `just static-ip-remove mac=<MAC> \| assign=<IP> [ip=] [env=]` | Elimina asignación por MAC o por IP |
-| `just static-ip-list [ip=] [env=]` | Muestra todas las asignaciones + leases activos |
-| `just static-ip-clear [ip=] [env=]` | Elimina todas las asignaciones |
-| `just static-ip-import file=<csv> [ip=] [env=]` | Importa desde CSV (formato: `MAC,IP,nombre`) |
+| `just static-ip-add --mac <MAC> --assign <IP> [--name <nombre>]` | Asigna IP estática a un dispositivo |
+| `just static-ip-remove --mac <MAC>` o `--assign <IP>` | Elimina asignación por MAC o por IP |
+| `just static-ip-list` | Muestra todas las asignaciones + leases activos |
+| `just static-ip-clear` | Elimina todas las asignaciones |
+| `just static-ip-import --file <csv>` | Importa desde CSV (formato: `MAC,IP,nombre`) |
 
 Ejemplos:
 ```bash
-just static-ip-add mac=AA:BB:CC:DD:EE:FF assign=192.168.1.100 name=servidor
-just static-ip-remove mac=AA:BB:CC:DD:EE:FF
-just static-ip-remove assign=192.168.1.100
+just static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 --name servidor
+just static-ip-remove --mac AA:BB:CC:DD:EE:FF
+just static-ip-remove --assign 192.168.1.100
 just static-ip-list
-just static-ip-import file=hosts.csv
+just static-ip-import --file hosts.csv
+```
+
+### DNS
+
+Configura los servidores DNS upstream que usa dnsmasq para resolver nombres.
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just dns-set` | Configura DNS (default: 1.1.1.1 Cloudflare + 8.8.8.8 Google) |
+| `just dns-show` | Muestra la configuración DNS actual |
+| `just dns-reset` | Restaura DNS por defecto (1.1.1.1 + 8.8.8.8) |
+
+Ejemplos:
+```bash
+just dns-set                                              # Cloudflare + Google
+just dns-set --primary 9.9.9.9                           # Quad9 + Google
+just dns-set --primary 9.9.9.9 --secondary 149.112.112.112  # Quad9 solo
+just dns-set --primary 208.67.222.222 --secondary 208.67.220.220  # OpenDNS
+just dns-show
+just dns-reset
 ```
 
 ### Limpieza
@@ -220,9 +256,18 @@ just setup-logs                 # Logs persistentes (tras reinicio con extroot)
 
 ```bash
 just wifi-status                                         # Ver estado actual
-just wifi-ap ssid="MiRed" password="clave1234"           # Configurar AP 2.4 GHz
-just wifi-ap ssid="MiRed5G" radio=5g password="clave5g" # Configurar AP 5 GHz
-just wifi-client ssid="RedExterna" password="supass"     # Conectar como cliente WiFi
+
+just wifi-ap                                             # AP interactivo (detecta radios libres)
+just wifi-ap --ssid MiRed --radio 5g                    # Pre-selecciona radio
+
+just wifi-client                                         # Interactivo: banda → escanea → SSID
+just wifi-client --radio 2.4ghz                         # Fuerza 2.4 GHz, resto interactivo
+
+just wifi-scan                                           # Escanea 2.4 GHz y 5 GHz
+just wifi-scan --radio 5g                               # Solo 5 GHz
+
+just dns-set                                             # DNS Cloudflare + Google
+just dns-set --primary 9.9.9.9                          # Cambiar DNS primario
 ```
 
 ### Instalar portal cautivo
@@ -237,19 +282,22 @@ just captive-allow client=192.168.1.50  # Autorizar dispositivo manualmente
 ### Gestionar routing
 
 ```bash
-# Router con WAN físico + cliente WiFi (setup-wifi.sh client):
-just routing-status                                      # Ver configuración actual
-just routing-priority mode=wifi                          # Preferir WiFi como salida
-just routing-pin from=192.168.1.100 via=wan             # Servidor NAS siempre por WAN
-just routing-pin from=192.168.1.50  via=wifi            # Laptop siempre por WiFi
+# Router con WAN físico + cliente WiFi (wifi-client):
+just routing-status                                               # Ver configuración actual
+just routing-priority wifi                                        # Preferir WiFi como salida
+just routing-pin --from 192.168.1.100 --via wan                  # NAS siempre por WAN
+just routing-pin --from 192.168.1.50  --via wifi                 # Laptop siempre por WiFi
+just routing-unpin --from 192.168.1.50
+just routing-reset
 ```
 
 ### Asignar IPs fijas
 
 ```bash
-just static-ip-add mac=AA:BB:CC:DD:EE:FF assign=192.168.1.10 name=nas
-just static-ip-add mac=BB:CC:DD:EE:FF:00 assign=192.168.1.11 name=impresora
+just static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.10 --name nas
+just static-ip-add --mac BB:CC:DD:EE:FF:00 --assign 192.168.1.11 --name impresora
 just static-ip-list
+just static-ip-remove --mac AA:BB:CC:DD:EE:FF
 ```
 
 ---

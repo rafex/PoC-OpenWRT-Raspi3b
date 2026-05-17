@@ -787,125 +787,79 @@ routing-status ip="" env="prod":
     scripts/build/setup-routing.sh ${ARGS}
 
 # routing-priority: Define qué interfaz es la salida preferida
-# Uso: just routing-priority mode=wan|wifi|equal [ip=] [env=]
-#      wan   → WAN físico preferido (default)
-#      wifi  → Cliente WiFi (wwan) preferido
-#      equal → Ambas con misma métrica, kernel decide
-routing-priority mode="" ip="" env="prod":
+# Uso: just routing-priority <wan|wifi|equal> [--env dev] [--ip 192.168.x.x]
+routing-priority *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ mode }}" ]; then echo "ERROR: especifica mode=wan|wifi|equal"; exit 1; fi
-    ARGS="priority {{ mode }} --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-routing.sh ${ARGS}
+    scripts/build/setup-routing.sh priority {{args}}
 
 # routing-pin: Fija el tráfico de una IP LAN a una interfaz concreta
-# Uso: just routing-pin from=192.168.1.50 via=wifi [ip=] [env=]
-routing-pin from="" via="" ip="" env="prod":
+# Uso: just routing-pin --from 192.168.1.50 --via wifi [--env dev]
+routing-pin *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ from }}" ]; then echo "ERROR: especifica from=<IP_LAN>"; exit 1; fi
-    if [ -z "{{ via }}" ];  then echo "ERROR: especifica via=<wan|wifi>"; exit 1; fi
-    ARGS="pin --from {{ from }} --via {{ via }} --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-routing.sh ${ARGS}
+    scripts/build/setup-routing.sh pin {{args}}
 
 # routing-unpin: Elimina el pin de enrutamiento para una IP LAN
-# Uso: just routing-unpin from=192.168.1.50 [ip=] [env=]
-routing-unpin from="" ip="" env="prod":
+# Uso: just routing-unpin --from 192.168.1.50 [--env dev]
+routing-unpin *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ from }}" ]; then echo "ERROR: especifica from=<IP_LAN>"; exit 1; fi
-    ARGS="unpin --from {{ from }} --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-routing.sh ${ARGS}
+    scripts/build/setup-routing.sh unpin {{args}}
 
 # routing-pins: Lista todos los pins de enrutamiento activos
-# Uso: just routing-pins [ip=] [env=]
-routing-pins ip="" env="prod":
+# Uso: just routing-pins [--env dev] [--ip 192.168.x.x]
+routing-pins *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="pins --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-routing.sh ${ARGS}
+    scripts/build/setup-routing.sh pins {{args}}
 
 # routing-reset: Elimina todos los pins y restaura prioridad a WAN
-# Uso: just routing-reset [ip=] [env=]
-routing-reset ip="" env="prod":
+# Uso: just routing-reset [--env dev] [--ip 192.168.x.x]
+routing-reset *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="reset --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-routing.sh ${ARGS}
+    scripts/build/setup-routing.sh reset {{args}}
 
 # ---------------------------------------------------------------------------
 # IPs Estáticas (DHCP leases por MAC address)
 # ---------------------------------------------------------------------------
 
 # static-ip-add: Asigna IP estática a un MAC address
-# Uso: just static-ip-add mac=AA:BB:CC:DD:EE:FF assign=192.168.1.100 [name=servidor]
-static-ip-add mac="" assign="" name="" ip="" env="prod":
+# Uso: just static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 [--name servidor]
+static-ip-add *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ mac }}" ];    then echo "ERROR: especifica mac=<AA:BB:CC:DD:EE:FF>"; exit 1; fi
-    if [ -z "{{ assign }}" ]; then echo "ERROR: especifica assign=<IP>"; exit 1; fi
-    ARGS="add --mac {{ mac }} --assign {{ assign }} --env {{ env }}"
-    if [ -n "{{ name }}" ]; then ARGS="${ARGS} --name {{ name }}"; fi
-    if [ -n "{{ ip }}" ];   then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-static-ip.sh ${ARGS}
+    scripts/build/setup-static-ip.sh add {{args}}
 
 # static-ip-remove: Elimina asignación de IP estática (por MAC o por IP)
-# Uso: just static-ip-remove mac=AA:BB:CC:DD:EE:FF
-#      just static-ip-remove assign=192.168.1.100
-static-ip-remove mac="" assign="" ip="" env="prod":
+# Uso: just static-ip-remove --mac AA:BB:CC:DD:EE:FF
+#      just static-ip-remove --assign 192.168.1.100
+static-ip-remove *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ mac }}" ] && [ -z "{{ assign }}" ]; then
-        echo "ERROR: especifica mac=<MAC> o assign=<IP>"; exit 1
-    fi
-    ARGS="remove --env {{ env }}"
-    if [ -n "{{ mac }}" ];    then ARGS="${ARGS} --mac {{ mac }}"; fi
-    if [ -n "{{ assign }}" ]; then ARGS="${ARGS} --assign {{ assign }}"; fi
-    if [ -n "{{ ip }}" ];     then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-static-ip.sh ${ARGS}
+    scripts/build/setup-static-ip.sh remove {{args}}
 
 # static-ip-list: Muestra todas las asignaciones de IP estática
-# Uso: just static-ip-list [ip=] [env=]
-static-ip-list ip="" env="prod":
+# Uso: just static-ip-list [--env dev] [--ip 192.168.x.x]
+static-ip-list *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="list --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-static-ip.sh ${ARGS}
+    scripts/build/setup-static-ip.sh list {{args}}
 
 # static-ip-clear: Elimina TODAS las asignaciones de IP estática
-# Uso: just static-ip-clear [ip=] [env=]
-static-ip-clear ip="" env="prod":
+# Uso: just static-ip-clear [--env dev] [--ip 192.168.x.x]
+static-ip-clear *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="clear --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-static-ip.sh ${ARGS}
+    scripts/build/setup-static-ip.sh clear {{args}}
 
 # static-ip-import: Importa asignaciones desde CSV (MAC,IP,nombre)
-# Uso: just static-ip-import file=hosts.csv [ip=] [env=]
-static-ip-import file="" ip="" env="prod":
+# Uso: just static-ip-import --file hosts.csv [--env dev]
+static-ip-import *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ file }}" ]; then echo "ERROR: especifica file=<ruta.csv>"; exit 1; fi
-    ARGS="import --file {{ file }} --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-static-ip.sh ${ARGS}
+    scripts/build/setup-static-ip.sh import {{args}}
 
 # ---------------------------------------------------------------------------
 # DNS

@@ -32,9 +32,10 @@ scripts/
 │   ├── setup-logs.sh           # Logs persistentes en USB (extroot)
 │   ├── setup-auth.sh           # Copia clave SSH pública + contraseña root
 │   ├── setup-captive.sh        # Portal cautivo nftables + uhttpd
-│   ├── setup-wifi.sh           # Gestión WiFi (AP, cliente, scan, enable/disable)
+│   ├── setup-wifi.sh           # Gestión WiFi (AP interactivo, cliente, scan, disconnect)
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
-│   └── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
+│   ├── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
+│   └── setup-dns.sh            # Servidores DNS upstream de dnsmasq
 └── templates/                  # Generación de configuraciones
     └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
@@ -175,16 +176,23 @@ Prerrequisito: `just post-install group=captive_portal` (instala `uhttpd`).
 Gestión completa de la configuración WiFi del router via UCI.
 
 ```bash
-# Access Points
-scripts/build/setup-wifi.sh ap --ssid "MiRed" --password "clave1234"
-scripts/build/setup-wifi.sh ap --ssid "MiRed5G" --radio 5g --channel 36
+# Access Point — completamente interactivo
+scripts/build/setup-wifi.sh ap                           # detecta radios libres → SSID → pass → canal
+scripts/build/setup-wifi.sh ap --ssid MiRed --radio 5g  # pre-selecciona radio y SSID
+scripts/build/setup-wifi.sh ap --ssid Libre --open       # sin contraseña
 
-# Cliente WiFi (conectar el router a otra red)
-scripts/build/setup-wifi.sh client --ssid "RedExterna" --radio radio1 --password "supass"
+# Cliente WiFi — interactivo o con flags
+scripts/build/setup-wifi.sh client                        # elige banda → escanea → SSID → pass
+scripts/build/setup-wifi.sh client --radio 2.4ghz         # fuerza 2.4 GHz, luego interactivo
+scripts/build/setup-wifi.sh client --ssid RedExterna      # SSID fijo, pide contraseña
 
-# Escanear redes disponibles
-scripts/build/setup-wifi.sh scan
-scripts/build/setup-wifi.sh scan --radio 5g
+# Desconectar cliente
+scripts/build/setup-wifi.sh disconnect                    # elimina todas las interfaces STA
+scripts/build/setup-wifi.sh disconnect --radio radio0     # solo esa radio
+
+# Escanear redes
+scripts/build/setup-wifi.sh scan                          # ambos radios (2.4 GHz + 5 GHz)
+scripts/build/setup-wifi.sh scan --radio 5g               # solo 5 GHz
 
 # Estado y listado
 scripts/build/setup-wifi.sh status
@@ -195,11 +203,37 @@ scripts/build/setup-wifi.sh enable  --radio radio0
 scripts/build/setup-wifi.sh disable --radio radio1
 ```
 
-Subcomandos: `ap`, `client`, `scan`, `status`, `list`, `enable`, `disable`.
+Subcomandos: `ap`, `client`, `disconnect`, `scan`, `status`, `list`, `enable`, `disable`.
 
-Opciones de radio: `radio0`, `radio1`, `2g`, `5g` (alias normalizados).
+Alias de radio: `radio0`, `radio1`, `2g`, `5g`, `2.4ghz`, `5ghz`.
 
-Modo cliente crea la interfaz `wwan` (protocolo DHCP) y la añade a la zona WAN del firewall. El escaneo parsea la salida de `iw dev scan` y presenta una tabla SSID/señal/canal/cifrado.
+**Comportamiento interactivo:**
+- `ap` sin `--ssid`: detecta qué radios están libres (no en uso como cliente STA) y muestra menú; si solo hay uno libre lo elige automáticamente.
+- `client` sin `--radio`: pregunta banda (2.4 GHz / 5 GHz), escanea esa radio y muestra tabla de redes.
+- Contraseña siempre se pide con `read -s` (nunca visible en terminal).
+- BSSID: pregunta `¿Especificar BSSID? (s/N)` — solo pide el valor si responde `s`.
+
+Modo cliente crea la interfaz `wwan` (protocolo DHCP), la añade a la zona WAN del firewall y acepta DNS del upstream (`peerdns=1`).
+
+### build/setup-dns.sh
+
+Configura los servidores DNS upstream que usa dnsmasq para resolver nombres externos. Por defecto usa Cloudflare (1.1.1.1) y Google (8.8.8.8).
+
+```bash
+# Configurar DNS
+scripts/build/setup-dns.sh set                                         # 1.1.1.1 + 8.8.8.8
+scripts/build/setup-dns.sh set --primary 9.9.9.9                       # Quad9 + Google
+scripts/build/setup-dns.sh set --primary 9.9.9.9 --secondary 149.112.112.112
+scripts/build/setup-dns.sh set --primary 208.67.222.222 --secondary 208.67.220.220  # OpenDNS
+
+# Ver configuración actual
+scripts/build/setup-dns.sh show
+
+# Restaurar valores por defecto
+scripts/build/setup-dns.sh reset
+```
+
+Subcomandos: `set`, `show`, `reset`. El `show` verifica también la resolución con `nslookup`.
 
 ### build/setup-routing.sh
 
