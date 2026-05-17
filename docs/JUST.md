@@ -215,6 +215,21 @@ just dns-show
 just dns-reset
 ```
 
+### Clientes DHCP
+
+Lista los dispositivos conectados al router: leases DHCP activos y tabla ARP.
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just clients` | Lista dispositivos conectados (leases DHCP + tabla ARP) |
+
+Ejemplos:
+```bash
+just clients                        # Red por defecto (prod)
+just clients --env dev              # Entorno dev
+just clients --ip 192.168.0.1      # IP del router explícita
+```
+
 ### Limpieza
 
 | Recipe | Descripción |

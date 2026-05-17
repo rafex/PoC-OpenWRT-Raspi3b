@@ -60,6 +60,7 @@ just build-prod
 | `just routing-priority` / `just routing-pin` | Prioridad WAN vs WiFi + source-based routing |
 | `just static-ip-add` / `just static-ip-list` | DHCP leases estáticos por MAC address |
 | `just dns-set` / `just dns-show` / `just dns-reset` | Servidores DNS upstream de dnsmasq |
+| `just clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
 
 ## Licencia
 

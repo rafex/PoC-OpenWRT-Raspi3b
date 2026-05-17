@@ -35,7 +35,8 @@ scripts/
 │   ├── setup-wifi.sh           # Gestión WiFi (AP interactivo, cliente, scan, disconnect)
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
 │   ├── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
-│   └── setup-dns.sh            # Servidores DNS upstream de dnsmasq
+│   ├── setup-dns.sh            # Servidores DNS upstream de dnsmasq
+│   └── show-clients.sh         # Lista dispositivos conectados (leases DHCP + ARP)
 └── templates/                  # Generación de configuraciones
     └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
@@ -287,6 +288,20 @@ MAC,IP,nombre
 AA:BB:CC:DD:EE:FF,192.168.1.100,servidor
 BB:CC:DD:EE:FF:00,192.168.1.101,laptop
 ```
+
+### build/show-clients.sh
+
+Lista todos los dispositivos conectados al router. Lee `/tmp/dhcp.leases` para los leases DHCP activos y `/proc/net/arp` para la tabla ARP. Muestra el tiempo restante de cada lease y si el dispositivo responde en la red.
+
+```bash
+scripts/build/show-clients.sh                  # Usa entorno prod
+scripts/build/show-clients.sh --env dev        # Otro entorno
+scripts/build/show-clients.sh --ip 192.168.0.1  # IP del router explícita
+```
+
+Salida:
+- **LEASES DHCP**: IP, MAC, hostname, tiempo restante (`23h 45m`, `permanente`, `expirado`) y si aparece en ARP (`[en red]` / `[sin ARP]`).
+- **TABLA ARP**: todos los dispositivos con tráfico reciente, incluyendo los que tienen IP estática (no gestionada por DHCP).
 
 ---
 

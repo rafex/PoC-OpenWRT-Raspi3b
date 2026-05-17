@@ -887,6 +887,17 @@ dns-reset *args='':
     # shellcheck disable=SC2086
     scripts/build/setup-dns.sh reset {{args}}
 
+# ---------------------------------------------------------------------------
+# Clientes DHCP
+# ---------------------------------------------------------------------------
+
+# clients: Lista los dispositivos conectados al router (leases DHCP + tabla ARP)
+# Uso: just clients [--ip 192.168.x.x] [--env dev]
+clients *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/show-clients.sh {{args}}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
