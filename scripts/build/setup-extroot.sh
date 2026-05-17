@@ -186,11 +186,9 @@ if [ -n "\${EXISTING_MNT}" ]; then
     MNT="\${EXISTING_MNT}"
     KEEP_MOUNTED=true
 else
-    MNT="/mnt"
+    MNT="/mnt/usb-extroot"
     KEEP_MOUNTED=false
     mkdir -p "\${MNT}"
-    # Liberar /mnt si está ocupado por otro dispositivo
-    if mountpoint -q "\${MNT}" 2>/dev/null; then umount "\${MNT}"; fi
     mount "\${DEVICE}" "\${MNT}"
 fi
 
@@ -219,7 +217,7 @@ set -eu
 
 DEVICE="${device}"
 DO_CLEAN="${do_clean}"
-MNT="/mnt"
+MNT="/mnt/usb-extroot"
 
 echo ""
 echo "=== Configurando extroot en el router ==="
@@ -234,7 +232,6 @@ if [ -n "\${EXISTING_MNT}" ]; then
     echo "      ℹ️  Ya montado en \${MNT}"
 else
     mkdir -p "\${MNT}"
-    if mountpoint -q "\${MNT}" 2>/dev/null; then umount "\${MNT}"; fi
     mount "\${DEVICE}" "\${MNT}"
     echo "      ✅ Montado en \${MNT}"
 fi
@@ -242,7 +239,7 @@ fi
 # 2. Limpiar si se confirmó localmente
 if [ "\${DO_CLEAN}" = "yes" ]; then
     echo "[2/5] Limpiando archivos anteriores del USB..."
-    find "\${MNT}" -mindepth 1 -delete
+    find "\${MNT}" -mindepth 1 -maxdepth 1 -exec rm -rf '{}'  ';'
     echo "      ✅ USB limpiado"
 else
     echo "[2/5] USB vacío — sin limpieza necesaria"
@@ -256,9 +253,18 @@ echo "      ✅ Overlay copiado"
 # 4. Obtener UUID y configurar fstab
 echo "[4/5] Configurando fstab para extroot..."
 UUID=\$(block info "\${DEVICE}" | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
+# Configurar sección global del fstab
+uci -q set fstab.@global[0].auto_mount=1 2>/dev/null || true
+uci -q set fstab.@global[0].delay_root=15 2>/dev/null || true
+uci -q set fstab.@global[0].check_fs=0 2>/dev/null || true
+# Configurar mount de extroot
 uci -q delete fstab.extroot 2>/dev/null || true
 uci set fstab.extroot=mount
 uci set fstab.extroot.target=/overlay
+uci set fstab.extroot.fstype=ext4
+uci set fstab.extroot.options='rw,sync'
+uci set fstab.extroot.enabled=1
+uci set fstab.extroot.enabled_fsck=0
 if [ -n "\${UUID}" ]; then
     uci set fstab.extroot.uuid="\${UUID}"
     echo "      UUID: \${UUID}"
@@ -266,8 +272,6 @@ else
     uci set fstab.extroot.device="\${DEVICE}"
     echo "      ⚠️  Sin UUID — usando ruta del dispositivo"
 fi
-uci set fstab.extroot.options='rw,noatime'
-uci set fstab.extroot.enabled=1
 uci commit fstab
 echo "      ✅ fstab configurado"
 
