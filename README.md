@@ -43,7 +43,21 @@ just build-prod
 - ✅ USB Storage (`ext4`, `block-mount`)
 - ✅ VPN WireGuard · Wi-Fi Dual-Band (2.4/5 GHz)
 - ✅ Cliente Tor
-- ❌ LuCi, uhttpd, rpcd (excluidos)
+- ❌ LuCi, uhttpd, rpcd (excluidos — uhttpd disponible via post-install)
+
+## Scripts de gestión del router
+
+| Script | Descripción |
+|--------|-------------|
+| `just setup-auth` | Copia clave SSH pública + contraseña root |
+| `just setup-extroot` | Configura USB como extroot (`/overlay`) |
+| `just setup-logs` | Logs persistentes en USB |
+| `just post-install` | Instala paquetes adicionales via `opkg` |
+| `just setup-captive` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
+| `just wifi-ap` / `just wifi-client` | Configura APs o conecta como cliente WiFi |
+| `just wifi-scan` / `just wifi-status` | Escanea y muestra estado de la WiFi |
+| `just routing-priority` / `just routing-pin` | Prioridad WAN vs WiFi + source-based routing |
+| `just static-ip-add` / `just static-ip-list` | DHCP leases estáticos por MAC address |
 
 ## Licencia
 
