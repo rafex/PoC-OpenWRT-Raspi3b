@@ -7,9 +7,9 @@
 # ============================================================================
 set -euo pipefail
 
-# Get script directory regardless of where it's sourced from
+# Usar nombre privado para no sobreescribir SCRIPT_DIR del script que hace source
 # shellcheck disable=SC2128
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_TOML_PARSER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
 # parse_packages_toml <toml_file>
@@ -30,7 +30,7 @@ parse_packages_toml() {
     fi
 
     # Parse TOML using Python helper
-    local parser="${SCRIPT_DIR}/toml_parser.py"
+    local parser="${_TOML_PARSER_DIR}/toml_parser.py"
     if [ ! -f "${parser}" ]; then
         echo "ERROR: TOML parser not found at ${parser}" >&2
         return 1
