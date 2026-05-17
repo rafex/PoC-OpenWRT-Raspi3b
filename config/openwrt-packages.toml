@@ -31,8 +31,7 @@ ram_mb = 64
 "TLS / HTTPS" = [
   "uclient-fetch",
   "libustream-mbedtls",
-  "ca-bundle",
-  "ca-certificates"
+  "ca-bundle"
 ]
 
 [categories.usb]
@@ -43,13 +42,8 @@ ram_mb = 64
   "kmod-usb-storage",
   "kmod-usb-storage-uas",
   "kmod-scsi-core",
-  "kmod-scsi-generic",
   "kmod-fs-ext4",
-  "kmod-nls-base",
-  "kmod-nls-cp437",
-  "kmod-nls-iso8859-1",
-  "block-mount",
-  "e2fsprogs"
+  "block-mount"
 ]
 
 [categories.vpn]
@@ -61,9 +55,7 @@ ram_mb = 64
 [categories.tools]
 "System Tools" = [
   "htop",
-  "usbutils",
-  "nano",
-  "logrotate"
+  "nano"
 ]
 
 [categories.rpcd]
@@ -111,6 +103,12 @@ ram_mb = 64
 
 [warnings]
 tor = "Consumes 50-80 MB RAM on 64 MB device. High OOM risk — removed from build."
+flash_limit = "TL-WDR3600 has 8 MB flash. Keep total squashfs < 5.5 MB compressed."
 
 [notes]
 extroot = "USB extroot uses ext4 filesystem only. FAT32/exFAT support not required."
+ca_certificates = "Removed: redundant with ca-bundle. Saves ~300 KB."
+kmod_nls = "Removed kmod-nls-* and kmod-scsi-generic: only needed for FAT32/exFAT."
+e2fsprogs = "Removed: format ext4 USB drives on another machine before use."
+usbutils = "Removed: lsusb debug tool not needed in production."
+logrotate = "Removed: flash space too limited; use standard syslog rotation."
