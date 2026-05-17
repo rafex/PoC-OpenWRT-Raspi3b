@@ -258,8 +258,20 @@ EOF
 # ---------------------------------------------------------------------------
 # Subcomando: client (STA mode)
 # ---------------------------------------------------------------------------
+_ask_bssid() {
+    printf "  ¿Especificar BSSID concreto? (s/N): "
+    read -r _bssid_yn
+    case "${_bssid_yn}" in
+        s|S|si|SI|sí|SÍ)
+            printf "  BSSID: "
+            read -r _BSSID
+            ;;
+    esac
+}
+
 _client() {
     local radio="${_RADIO:-}"   # vacío si el usuario no especificó --radio
+    local _bssid_asked=false
 
     _check_ssh
 
@@ -299,10 +311,10 @@ _client() {
             [ -z "${_PASSWORD}" ] && _OPEN=true
         fi
 
-        # Paso 5: BSSID
+        # Paso 5: BSSID (preguntar sí/no primero)
         if [ -z "${_BSSID}" ]; then
-            printf "  BSSID concreto (Enter para conectar al AP más fuerte): "
-            read -r _BSSID
+            _ask_bssid
+            _bssid_asked=true
         fi
     fi
 
@@ -318,10 +330,9 @@ _client() {
     fi
     [ "${_OPEN}" = "true" ] && _ENCRYPTION="none"
 
-    # BSSID: pedir solo si no vino del modo interactivo ni de --bssid
-    if [ -z "${_BSSID}" ]; then
-        printf "  BSSID concreto (Enter para conectar al AP más fuerte): "
-        read -r _BSSID
+    # BSSID: preguntar solo en modo no-interactivo (--ssid pasado, --bssid no)
+    if ! "${_bssid_asked}" && [ -z "${_BSSID}" ]; then
+        _ask_bssid
     fi
 
     echo ""
