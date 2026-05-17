@@ -157,7 +157,8 @@ main() {
 
     echo ""
     log_step "Transfiriendo imagen al router..."
-    scp -P "${SSH_PORT}" "${sysupgrade_bin}" "root@${ROUTER_IP}:/tmp/${bin_name}"
+    # -O fuerza protocolo SCP legacy: dropbear no tiene servidor SFTP
+    scp -O -P "${SSH_PORT}" "${sysupgrade_bin}" "root@${ROUTER_IP}:/tmp/${bin_name}"
     log_info "✅ Imagen transferida: /tmp/${bin_name}"
 
     echo ""
