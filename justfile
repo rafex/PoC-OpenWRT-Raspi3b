@@ -898,6 +898,32 @@ clients *args='':
     # shellcheck disable=SC2086
     scripts/build/show-clients.sh {{args}}
 
+# ---------------------------------------------------------------------------
+# SOCKS Forward (Raspi3b / Tor)
+# ---------------------------------------------------------------------------
+
+# socks-enable: Activa el port forwarding del proxy SOCKS de la Raspi3b (Tor)
+# Pide la IP de la Raspi interactivamente, asigna IP estática en DHCP y crea la regla DNAT
+# Uso: just socks-enable [--raspi-ip 192.168.1.x] [--port 9050]
+socks-enable *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-socks-forward.sh enable {{args}}
+
+# socks-disable: Desactiva el port forwarding del proxy SOCKS
+# Uso: just socks-disable [--ip 192.168.x.x] [--env dev]
+socks-disable *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-socks-forward.sh disable {{args}}
+
+# socks-status: Muestra el estado del port forwarding SOCKS y la IP estática de la Raspi
+# Uso: just socks-status [--ip 192.168.x.x] [--env dev]
+socks-status *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-socks-forward.sh status {{args}}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="

@@ -215,6 +215,32 @@ just dns-show
 just dns-reset
 ```
 
+### SOCKS Forward (Raspi3b / Tor)
+
+Activa o desactiva el port forwarding del proxy SOCKS de la Raspberry Pi 3b para que dispositivos en la red upstream puedan usarlo.
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just socks-enable` | Activa el forwarding: pide IP de la Raspi, fija IP estática en DHCP y crea la regla DNAT |
+| `just socks-disable` | Desactiva el forwarding y elimina la regla del firewall |
+| `just socks-status` | Muestra el estado de la regla y la IP estática de la Raspi |
+
+Ejemplos:
+```bash
+just socks-enable                                 # Interactivo: pide IP de la Raspi
+just socks-enable --raspi-ip 192.168.1.100        # Con IP predefinida (puerto default 9050)
+just socks-enable --raspi-ip 192.168.1.100 --port 9050
+just socks-disable
+just socks-status
+```
+
+Flujo de `socks-enable`:
+1. Pide la IP actual de la Raspi3b (si no se pasa con `--raspi-ip`)
+2. Detecta la MAC de la Raspi en la tabla ARP del router
+3. Llama a `setup-static-ip.sh add` para fijar la IP en DHCP como `raspi-tor`
+4. Crea la regla DNAT `wan:<port> → raspi:<port>` en el firewall UCI
+5. Muestra el comando `curl --socks5` para verificar desde el Mac
+
 ### Clientes DHCP
 
 Lista los dispositivos conectados al router: leases DHCP activos y tabla ARP.

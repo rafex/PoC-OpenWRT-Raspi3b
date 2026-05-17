@@ -36,7 +36,8 @@ scripts/
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
 │   ├── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
 │   ├── setup-dns.sh            # Servidores DNS upstream de dnsmasq
-│   └── show-clients.sh         # Lista dispositivos conectados (leases DHCP + ARP)
+│   ├── show-clients.sh         # Lista dispositivos conectados (leases DHCP + ARP)
+│   └── setup-socks-forward.sh  # Port forwarding del proxy SOCKS de Raspi3b/Tor
 └── templates/                  # Generación de configuraciones
     └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
@@ -288,6 +289,26 @@ MAC,IP,nombre
 AA:BB:CC:DD:EE:FF,192.168.1.100,servidor
 BB:CC:DD:EE:FF:00,192.168.1.101,laptop
 ```
+
+### build/setup-socks-forward.sh
+
+Activa o desactiva el reenvío de puertos del proxy SOCKS de la Raspberry Pi 3b al exterior del router. Al activar, detecta automáticamente la MAC de la Raspi en el ARP, llama a `setup-static-ip.sh` para fijar la IP, y crea la regla DNAT en el firewall UCI.
+
+```bash
+# Activar (interactivo: pide IP de la Raspi si no se indica)
+scripts/build/setup-socks-forward.sh enable
+scripts/build/setup-socks-forward.sh enable --raspi-ip 192.168.1.100 --port 9050
+
+# Desactivar (elimina la regla DNAT y recarga el firewall)
+scripts/build/setup-socks-forward.sh disable
+
+# Estado
+scripts/build/setup-socks-forward.sh status
+```
+
+La regla UCI se llama `tor_socks_fwd` (nombre fijo), lo que permite encontrarla y eliminarla con precisión sin afectar otras reglas. La IP estática en DHCP se guarda con el nombre `raspi-tor`.
+
+---
 
 ### build/show-clients.sh
 
