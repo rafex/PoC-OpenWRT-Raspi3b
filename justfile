@@ -577,6 +577,18 @@ setup-logs ip="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/setup-logs.sh ${ARGS}
 
+# setup-auth: Copia clave SSH pública al router y establece contraseña root
+# Orden recomendado: primero copia la clave, luego pide contraseña (evita bloqueos)
+# Uso: just setup-auth [ip=<IP>] [env=<env>] [key=<path>]
+setup-auth ip="" env="prod" key="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    if [ -n "{{ key }}" ]; then ARGS="${ARGS} --key {{ key }}"; fi
+    # shellcheck disable=SC2086
+    scripts/build/setup-auth.sh ${ARGS}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
