@@ -911,6 +911,32 @@ static-ip-import file="" ip="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/setup-static-ip.sh ${ARGS}
 
+# ---------------------------------------------------------------------------
+# DNS
+# ---------------------------------------------------------------------------
+
+# dns-set: Configura los servidores DNS upstream del router
+# Sin args: usa Cloudflare (1.1.1.1) + Google (8.8.8.8)
+# Uso: just dns-set [--primary 9.9.9.9] [--secondary 149.112.112.112] [--env dev]
+dns-set *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-dns.sh set {{args}}
+
+# dns-show: Muestra la configuración DNS actual del router
+# Uso: just dns-show [--ip 192.168.x.x] [--env dev]
+dns-show *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-dns.sh show {{args}}
+
+# dns-reset: Restaura los DNS por defecto (1.1.1.1 + 8.8.8.8)
+# Uso: just dns-reset [--ip 192.168.x.x] [--env dev]
+dns-reset *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-dns.sh reset {{args}}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
