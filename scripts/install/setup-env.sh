@@ -42,6 +42,25 @@ check_deps() {
 
 # ---------------------------------------------------------------------------
 download() {
+    local host_arch
+    host_arch=$(uname -m)
+    if [ "${host_arch}" != "x86_64" ]; then
+        log_warn "Arquitectura del host: ${host_arch}"
+        log_warn "El Image Builder de OpenWRT solo está disponible para x86_64."
+        echo ""
+        echo "  En ARM (Raspberry Pi) puedes usar emulación x86_64 con QEMU:"
+        echo "    sudo apt-get install qemu-user-static binfmt-support"
+        echo "    sudo update-binfmts --enable"
+        echo ""
+        echo "  O compilar desde una máquina x86_64 y transferir la imagen."
+        echo ""
+        read -r -p "¿Intentar de todas formas con el builder x86_64? (s/N) " answer
+        if [ "${answer,,}" != "s" ] && [ "${answer,,}" != "si" ]; then
+            echo "Cancelado."
+            exit 1
+        fi
+    fi
+
     local url="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/openwrt-imagebuilder-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}.Linux-x86_64.tar.zst"
     local filename
     filename=$(basename "${url}")

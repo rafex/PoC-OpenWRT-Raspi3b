@@ -297,6 +297,28 @@ create-environments:
         fi
     done
 
+# setup-env: Descargar y extraer el OpenWRT Image Builder
+# Lee OPENWRT_VERSION, TARGET y SUBTARGET desde environments/<ENV>/.env.public
+setup-env ENV="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ENV_FILE="environments/{{ ENV }}/.env.public"
+    if [ ! -f "${ENV_FILE}" ]; then
+        echo "❌ No se encontró: ${ENV_FILE}"
+        echo "   Solución: just create-environments"
+        exit 1
+    fi
+    # Cargar variables del entorno
+    set -a; source "${ENV_FILE}"; set +a
+    OPENWRT_VERSION="${OPENWRT_VERSION:-25.12.2}"
+    TARGET="${TARGET:-ath79}"
+    SUBTARGET="${SUBTARGET:-generic}"
+    export OPENWRT_VERSION TARGET SUBTARGET
+    echo "=== Descargando Image Builder ==="
+    echo "   Versión: ${OPENWRT_VERSION} — Target: ${TARGET}/${SUBTARGET}"
+    echo ""
+    scripts/install/setup-env.sh
+
 # ─────────────────────────────────────────────────────
 # Secrets
 # ─────────────────────────────────────────────────────
