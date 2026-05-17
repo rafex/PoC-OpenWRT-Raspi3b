@@ -24,6 +24,7 @@ scripts/
 ├── build/                      # Compilación y verificación
 │   ├── openwrt.sh              # Orquestador principal de compilación
 │   ├── compile.sh              # Lógica de `make image`
+│   ├── update.sh               # Actualiza firmware via SSH + sysupgrade
 │   ├── verify.sh               # Validación de imagen compilada
 │   └── convert-toml-packages.sh # Conversor TOML → TXT (standalone)
 └── templates/                  # Generación de configuraciones
@@ -152,6 +153,26 @@ Orquestador principal. Detecta `config/openwrt-packages.toml` y auto-genera `.tx
 ./scripts/build/openwrt.sh --builder openwrt-builder/*/
 ./scripts/build/openwrt.sh --profile tplink_tl-wdr3600-v1 --packages config/openwrt-packages.txt
 ```
+
+### build/update.sh
+
+Actualiza el firmware del router via SSH y `sysupgrade`. Llamado por `just update` y `just update-force`:
+
+```bash
+# Actualizar manteniendo configuración (IP desde .env.public)
+scripts/build/update.sh --env prod
+
+# Actualizar con IP distinta
+scripts/build/update.sh --ip 192.168.0.1
+
+# Borrar configuración del router al actualizar
+scripts/build/update.sh --force
+
+# Ver todas las opciones
+scripts/build/update.sh --help
+```
+
+Flujo interno: verifica SSH → transfiere `.bin` via SCP → ejecuta `sysupgrade -v` (o `-n -v` con `--force`).
 
 ### build/compile.sh
 

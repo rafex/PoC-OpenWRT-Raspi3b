@@ -44,11 +44,15 @@ just <recipe>                  # Ejecutar una recipe
 | `just validate` | Ejecutar `shellcheck` en todos los scripts |
 | `just validate-tools` | Verificar que todas las herramientas requeridas están instaladas |
 
-### Flasheo
+### Update / Flasheo
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just flash <env>` | Compilar y preparar para flashear (default: prod) |
+| `just update [ip=<IP>] [env=<env>]` | Actualizar firmware via sysupgrade **manteniendo** la configuración del router |
+| `just update-force [ip=<IP>] [env=<env>]` | Actualizar firmware **borrando** la configuración del router |
+| `just flash <env>` | Compilar y preparar para flashear (no ejecuta el flasheo) |
+
+La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto `192.168.1.1`.
 
 ### Limpieza
 
@@ -101,6 +105,29 @@ just validate
 ```
 
 Equivalente a `make validate` → `shellcheck scripts/**/*.sh build-openwrt.sh`.
+
+### Actualizar firmware del router
+
+```bash
+# Actualizar manteniendo configuración (IP desde .env.public → 192.168.1.1)
+just update
+
+# Actualizar con IP distinta
+just update ip=192.168.0.1
+
+# Borrar configuración del router al actualizar
+just update-force
+
+# Borrar configuración con IP distinta y entorno dev
+just update-force ip=192.168.0.1 env=dev
+```
+
+Internamente:
+1. Busca el `.bin` más reciente en `openwrt-builder/`
+2. Lee `ROUTER_IP` y `SSH_PORT` de `.env.public` (el parámetro `ip=` tiene precedencia)
+3. Verifica conectividad SSH antes de continuar
+4. Transfiere via SCP a `/tmp/` del router
+5. Ejecuta `sysupgrade -v` (o `sysupgrade -n -v` con `update-force`)
 
 ### Flashear router
 

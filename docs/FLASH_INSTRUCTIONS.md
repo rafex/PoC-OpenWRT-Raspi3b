@@ -68,15 +68,30 @@ El TL-WDR3600 tiene un servidor TFTP integrado en el bootloader para recuperaci�
 
 ### Método 3: Sysupgrade (desde OpenWRT existente)
 
-Si ya tienes OpenWRT instalado y solo actualizas:
+Si ya tienes OpenWRT instalado y solo actualizas, usa `just update`:
+
+```bash
+# Actualizar manteniendo configuración (IP desde environments/prod/.env.public)
+just update
+
+# Actualizar con IP distinta
+just update ip=192.168.0.1
+
+# Actualizar borrando configuración del router (vuelve a defaults de OpenWRT)
+just update-force
+```
+
+O manualmente:
 
 ```bash
 # Copiar la imagen al router
-scp *-sysupgrade.bin root@192.168.1.1:/tmp/
+scp openwrt-*-sysupgrade.bin root@192.168.1.1:/tmp/
 
-# Conectarse por SSH y flashear
-ssh root@192.168.1.1
-sysupgrade -v /tmp/*-sysupgrade.bin
+# Conectarse por SSH y flashear (mantiene configuración)
+ssh root@192.168.1.1 "sysupgrade -v /tmp/openwrt-*-sysupgrade.bin"
+
+# O borrar configuración
+ssh root@192.168.1.1 "sysupgrade -n -v /tmp/openwrt-*-sysupgrade.bin"
 ```
 
 ## Configuración inicial post-flasheo
