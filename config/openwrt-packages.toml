@@ -53,10 +53,7 @@ ram_mb = 64
 "nftables Backend" = ["kmod-nft-core", "kmod-nft-nat"]
 
 [categories.tools]
-"System Tools" = [
-  "htop",
-  "nano"
-]
+"System Tools" = []
 
 [categories.rpcd]
 "RPC Daemon (base)" = [
@@ -112,3 +109,4 @@ kmod_nls = "Removed kmod-nls-* and kmod-scsi-generic: only needed for FAT32/exFA
 e2fsprogs = "Removed: format ext4 USB drives on another machine before use."
 usbutils = "Removed: lsusb debug tool not needed in production."
 logrotate = "Removed: flash space too limited; use standard syslog rotation."
+htop_nano = "Removed: busybox ya incluye top y vi como editor."
