@@ -171,16 +171,40 @@ _check_ext4() {
 }
 
 # ---------------------------------------------------------------------------
-# Configurar extroot via SSH
+# Verificar archivos existentes en USB (llamada SSH separada, retorna localmente)
+# ---------------------------------------------------------------------------
+_check_usb_files() {
+    local device="$1"
+    # Monta, lista, desmonta — todo en el router; salida capturada localmente
+    _ssh sh - <<REMOTE
+set -eu
+mkdir -p /mnt
+if mountpoint -q /mnt 2>/dev/null; then umount /mnt; fi
+mount "${device}" /mnt
+COUNT=\$(find /mnt -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
+if [ "\${COUNT}" -gt 0 ]; then
+    TOTAL=\$(find /mnt -mindepth 1 2>/dev/null | wc -l)
+    echo "NOTEMPTY \${TOTAL}"
+    find /mnt -mindepth 1 -maxdepth 2 2>/dev/null | head -20 | sed 's|^/mnt|  |'
+else
+    echo "EMPTY"
+fi
+umount /mnt
+REMOTE
+}
+
+# ---------------------------------------------------------------------------
+# Configurar extroot via SSH (limpieza y copia controladas por flag local)
 # ---------------------------------------------------------------------------
 _setup_extroot_on_router() {
     local device="$1"
+    local do_clean="$2"   # "yes" o "no"
 
-    # Script que se ejecuta en el router — OpenWRT usa busybox sh (ash)
     _ssh sh - <<REMOTE
 set -eu
 
 DEVICE="${device}"
+DO_CLEAN="${do_clean}"
 MNT="/mnt"
 
 echo ""
@@ -188,80 +212,48 @@ echo "=== Configurando extroot en el router ==="
 echo "    Dispositivo: \${DEVICE}"
 echo ""
 
-# 1. Montar USB temporalmente
-echo "[1/6] Montando \${DEVICE} en \${MNT}..."
+# 1. Montar USB
+echo "[1/5] Montando \${DEVICE} en \${MNT}..."
 mkdir -p "\${MNT}"
-if mountpoint -q "\${MNT}" 2>/dev/null; then
-    umount "\${MNT}"
-fi
+if mountpoint -q "\${MNT}" 2>/dev/null; then umount "\${MNT}"; fi
 mount "\${DEVICE}" "\${MNT}"
 echo "      ✅ Montado"
 
-# 2. Verificar y limpiar contenido existente
-echo "[2/6] Verificando contenido existente en el USB..."
-EXISTING=\$(find "\${MNT}" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
-if [ "\${EXISTING}" -gt 0 ]; then
-    echo ""
-    echo "      ⚠️  El USB contiene archivos de una instalación anterior:"
-    find "\${MNT}" -mindepth 1 -maxdepth 2 2>/dev/null | head -20 | sed 's|^|         |'
-    TOTAL=\$(find "\${MNT}" -mindepth 1 2>/dev/null | wc -l)
-    if [ "\${TOTAL}" -gt 20 ]; then
-        echo "         ... (\${TOTAL} archivos en total)"
-    fi
-    echo ""
-    echo "      Se eliminarán todos antes de copiar el overlay actual."
-    echo ""
-    printf "      ¿Continuar y borrar? (s/N) "
-    read -r confirm < /dev/tty
-    confirm=\$(echo "\${confirm}" | tr '[:upper:]' '[:lower:]')
-    if [ "\${confirm}" != "s" ] && [ "\${confirm}" != "si" ]; then
-        umount "\${MNT}"
-        echo "Cancelado."
-        exit 0
-    fi
-    echo "      Limpiando USB..."
+# 2. Limpiar si se confirmó localmente
+if [ "\${DO_CLEAN}" = "yes" ]; then
+    echo "[2/5] Limpiando archivos anteriores del USB..."
     find "\${MNT}" -mindepth 1 -delete
     echo "      ✅ USB limpiado"
 else
-    echo "      ✅ USB vacío — sin archivos previos"
+    echo "[2/5] USB vacío — sin limpieza necesaria"
 fi
 
 # 3. Copiar overlay actual al USB (preservando atributos y permisos)
-echo "[3/6] Copiando /overlay al USB..."
+echo "[3/5] Copiando /overlay al USB..."
 tar -C /overlay -czf - . | tar -C "\${MNT}" -xzf -
 echo "      ✅ Overlay copiado"
 
-# 4. Obtener UUID del dispositivo
-echo "[4/6] Obteniendo UUID del dispositivo..."
+# 4. Obtener UUID y configurar fstab
+echo "[4/5] Configurando fstab para extroot..."
 UUID=\$(block info "\${DEVICE}" | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
-if [ -z "\${UUID}" ]; then
-    echo "      ⚠️  No se encontró UUID — usando ruta del dispositivo"
-    TARGET_OPTION="option device \${DEVICE}"
-else
-    echo "      UUID: \${UUID}"
-    TARGET_OPTION="option uuid \${UUID}"
-fi
-
-# 5. Configurar fstab para automontaje de /overlay
-echo "[5/6] Configurando fstab para extroot..."
 uci -q delete fstab.extroot 2>/dev/null || true
 uci set fstab.extroot=mount
 uci set fstab.extroot.target=/overlay
 if [ -n "\${UUID}" ]; then
     uci set fstab.extroot.uuid="\${UUID}"
+    echo "      UUID: \${UUID}"
 else
     uci set fstab.extroot.device="\${DEVICE}"
+    echo "      ⚠️  Sin UUID — usando ruta del dispositivo"
 fi
 uci set fstab.extroot.options='rw,noatime'
 uci set fstab.extroot.enabled=1
 uci commit fstab
 echo "      ✅ fstab configurado"
 
-# 6. Verificar configuración
-echo "[6/6] Configuración guardada:"
+# 5. Verificar y desmontar
+echo "[5/5] Configuración guardada:"
 uci show fstab.extroot
-
-# Desmontar
 umount "\${MNT}"
 echo ""
 echo "✅ Extroot configurado correctamente"
@@ -293,22 +285,47 @@ main() {
     _check_ext4 "${device}"
     log_info "✅ Formato ext4 confirmado"
 
+    # Verificar contenido existente en el USB (SSH → resultado local)
+    echo ""
+    log_step "Verificando contenido existente en el USB..."
+    local usb_info do_clean="no"
+    usb_info=$(_check_usb_files "${device}")
+
+    if echo "${usb_info}" | grep -q "^NOTEMPTY"; then
+        local total
+        total=$(echo "${usb_info}" | head -1 | awk '{print $2}')
+        echo ""
+        log_warn "El USB contiene archivos de una instalación anterior (${total} archivos):"
+        echo "${usb_info}" | tail -n +2 | head -20 | sed 's/^/   /'
+        [ "${total}" -gt 20 ] && echo "   ... (${total} en total)"
+        echo ""
+        read -r -p "   ¿Borrar todos los archivos del USB y continuar? (s/N) " answer
+        answer=$(echo "${answer}" | tr '[:upper:]' '[:lower:]')
+        if [ "${answer}" != "s" ] && [ "${answer}" != "si" ]; then
+            echo "Cancelado."
+            exit 0
+        fi
+        do_clean="yes"
+    else
+        log_info "USB vacío — sin archivos previos"
+    fi
+
     echo ""
     log_step "Resumen:"
     echo "   Router:      root@${ROUTER_IP}:${SSH_PORT}"
     echo "   Dispositivo: ${device}"
+    echo "   Limpiar USB: ${do_clean}"
     echo "   Acción:      Copiar /overlay → USB, configurar fstab, $([ "${_NO_REBOOT}" = true ] && echo "sin reinicio" || echo "reiniciar")"
     echo ""
-    echo "   ⚠️  Esto sobreescribirá el contenido del USB con el overlay actual."
-    echo ""
     read -r -p "¿Continuar? (s/N) " answer
-    if [ "${answer,,}" != "s" ] && [ "${answer,,}" != "si" ]; then
+    answer=$(echo "${answer}" | tr '[:upper:]' '[:lower:]')
+    if [ "${answer}" != "s" ] && [ "${answer}" != "si" ]; then
         echo "Cancelado."
         exit 0
     fi
 
     echo ""
-    _setup_extroot_on_router "${device}"
+    _setup_extroot_on_router "${device}" "${do_clean}"
 
     echo ""
     if [ "${_NO_REBOOT}" = true ]; then
