@@ -16,21 +16,23 @@ scripts/
 ├── git/                        # Hooks y verificaciones de git
 │   ├── check-secrets-encrypted.sh  # Pre-commit: bloquea secrets sin encriptar
 │   └── setup-hooks.sh          # Configura .githooks como directorio de hooks
-├── install/                    # Preparación del entorno
+├── install/                    # Preparación del entorno local
 │   ├── setup-env.sh            # Descarga y extrae el Image Builder
 │   ├── validate-tools.sh       # Valida herramientas requeridas con versiones
 │   ├── ensure-secrets.sh       # Verifica/desencripta secrets para el build
 │   └── generate-password-hash.sh # Genera hash SHA-512 e inyecta en secrets
-├── build/                      # Compilación y configuración del router
+├── build/                      # Compilación local del firmware (no conectan al router)
 │   ├── openwrt.sh              # Orquestador principal de compilación
 │   ├── compile.sh              # Lógica de `make image`
-│   ├── update.sh               # Actualiza firmware via SSH + sysupgrade
 │   ├── verify.sh               # Validación de imagen compilada
 │   ├── convert-toml-packages.sh # Conversor TOML → TXT (standalone)
+│   └── show-packages.sh        # Muestra paquetes configurados agrupados
+├── router/                     # Administración del router via SSH
+│   ├── update.sh               # Actualiza firmware via sysupgrade
 │   ├── post-install.sh         # Instala paquetes adicionales via opkg
+│   ├── setup-auth.sh           # Copia clave SSH pública + contraseña root
 │   ├── setup-extroot.sh        # Configura USB como extroot (/overlay)
 │   ├── setup-logs.sh           # Logs persistentes en USB (extroot)
-│   ├── setup-auth.sh           # Copia clave SSH pública + contraseña root
 │   ├── setup-captive.sh        # Portal cautivo nftables + uhttpd
 │   ├── setup-wifi.sh           # Gestión WiFi (AP interactivo, cliente, scan, disconnect)
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
@@ -65,14 +67,14 @@ Orquestador principal. Detecta `config/openwrt-packages.toml` y auto-genera `.tx
 ./scripts/build/openwrt.sh --profile tplink_tl-wdr3600-v1 --packages config/openwrt-packages.txt
 ```
 
-### build/update.sh
+### router/update.sh
 
 Actualiza el firmware del router via SSH y `sysupgrade`:
 
 ```bash
-scripts/build/update.sh --env prod          # Mantiene configuración
-scripts/build/update.sh --ip 192.168.0.1   # IP distinta
-scripts/build/update.sh --force             # Borra configuración
+scripts/router/update.sh --env prod          # Mantiene configuración
+scripts/router/update.sh --ip 192.168.0.1   # IP distinta
+scripts/router/update.sh --force             # Borra configuración
 ```
 
 Flujo: verifica SSH → transfiere `.bin` via SCP → ejecuta `sysupgrade -v`.
@@ -98,71 +100,71 @@ Valida la imagen compilada (tamaño, checksums):
 ./scripts/build/verify.sh openwrt-builder/*/bin/targets/ath79/generic
 ```
 
-### build/post-install.sh
+### router/post-install.sh
 
 Instala paquetes adicionales en el router vía `opkg` post-flash. Lee `config/openwrt-post-install-packages.toml`, que agrupa los paquetes por funcionalidad.
 
 ```bash
-scripts/build/post-install.sh                          # Instala todos los grupos
-scripts/build/post-install.sh --group captive_portal   # Solo un grupo
-scripts/build/post-install.sh --list                   # Lista grupos sin instalar
+scripts/router/post-install.sh                          # Instala todos los grupos
+scripts/router/post-install.sh --group captive_portal   # Solo un grupo
+scripts/router/post-install.sh --list                   # Lista grupos sin instalar
 ```
 
 Opciones: `--group <nombre>`, `--ip <IP>`, `--env <env>`, `--list`.
 
 ---
 
-## Scripts de configuración del router (build/)
+## Scripts de administración del router (router/)
 
 Todos estos scripts se conectan al router via SSH. Leen `ROUTER_IP` y `SSH_PORT` de `environments/<env>/.env.public`.
 
-### build/setup-extroot.sh
+### router/setup-extroot.sh
 
 Configura un USB como extroot — monta `/dev/sda1` como `/overlay` para ampliar el espacio de almacenamiento del router. Copia el overlay actual, configura UCI fstab y reinicia.
 
 ```bash
-scripts/build/setup-extroot.sh --env prod
-scripts/build/setup-extroot.sh --ip 192.168.1.1 --device /dev/sdb1
+scripts/router/setup-extroot.sh --env prod
+scripts/router/setup-extroot.sh --ip 192.168.1.1 --device /dev/sdb1
 ```
 
 Prerrequisito: formatear el USB como ext4 antes de conectarlo al router.
 
-### build/setup-logs.sh
+### router/setup-logs.sh
 
 Configura logs persistentes en el USB (extroot). Crea `/overlay/var/log` con link simbólico desde `/var/log`.
 
 ```bash
-scripts/build/setup-logs.sh --env prod
+scripts/router/setup-logs.sh --env prod
 ```
 
 Prerrequisito: `setup-extroot.sh` debe haberse ejecutado y el router reiniciado con el USB activo.
 
-### build/setup-auth.sh
+### router/setup-auth.sh
 
 Copia la clave SSH pública al router (`/etc/dropbear/authorized_keys`) y establece la contraseña de root de forma interactiva.
 
 ```bash
-scripts/build/setup-auth.sh --env prod
-scripts/build/setup-auth.sh --key ~/.ssh/id_ed25519.pub  # Clave explícita
+scripts/router/setup-auth.sh --env prod
+scripts/router/setup-auth.sh --key ~/.ssh/id_ed25519.pub  # Clave explícita
 ```
 
 Auto-detecta la clave pública local en orden: `id_ed25519.pub` > `id_ecdsa.pub` > `id_rsa.pub`. Previene duplicados con `grep -qF`.
 
-### build/setup-captive.sh
+### router/setup-captive.sh
 
 Instala y gestiona un portal cautivo usando únicamente **nftables + uhttpd** (sin OpenNDS). Redirige peticiones HTTP de clientes no autorizados al portal, que presenta una página con botón de aceptar. Al aceptar, añade la IP del cliente al set `allowed_clients` de nftables con timeout configurable.
 
 ```bash
-scripts/build/setup-captive.sh install                      # Instala el portal
-scripts/build/setup-captive.sh install --portal-url <URL>   # Modo portal externo
-scripts/build/setup-captive.sh uninstall                    # Desinstala
-scripts/build/setup-captive.sh allow 192.168.1.50           # Autoriza IP manualmente
-scripts/build/setup-captive.sh allow 192.168.1.50 --timeout 0    # Permanente
-scripts/build/setup-captive.sh allow 192.168.1.50 --timeout 120  # 2 horas
-scripts/build/setup-captive.sh block 192.168.1.50           # Revoca acceso
-scripts/build/setup-captive.sh flush                        # Limpia todos los clientes
-scripts/build/setup-captive.sh list                         # Lista clientes autorizados
-scripts/build/setup-captive.sh status                       # Diagnóstico del portal
+scripts/router/setup-captive.sh install                      # Instala el portal
+scripts/router/setup-captive.sh install --portal-url <URL>   # Modo portal externo
+scripts/router/setup-captive.sh uninstall                    # Desinstala
+scripts/router/setup-captive.sh allow 192.168.1.50           # Autoriza IP manualmente
+scripts/router/setup-captive.sh allow 192.168.1.50 --timeout 0    # Permanente
+scripts/router/setup-captive.sh allow 192.168.1.50 --timeout 120  # 2 horas
+scripts/router/setup-captive.sh block 192.168.1.50           # Revoca acceso
+scripts/router/setup-captive.sh flush                        # Limpia todos los clientes
+scripts/router/setup-captive.sh list                         # Lista clientes autorizados
+scripts/router/setup-captive.sh status                       # Diagnóstico del portal
 ```
 
 Características:
@@ -174,36 +176,36 @@ Características:
 
 Prerrequisito: `just router-post-install group=captive_portal` (instala `uhttpd`).
 
-### build/setup-wifi.sh
+### router/setup-wifi.sh
 
 Gestión completa de la configuración WiFi del router via UCI.
 
 ```bash
 # Access Point — completamente interactivo
-scripts/build/setup-wifi.sh ap                           # detecta radios libres → SSID → pass → canal
-scripts/build/setup-wifi.sh ap --ssid MiRed --radio 5g  # pre-selecciona radio y SSID
-scripts/build/setup-wifi.sh ap --ssid Libre --open       # sin contraseña
+scripts/router/setup-wifi.sh ap                           # detecta radios libres → SSID → pass → canal
+scripts/router/setup-wifi.sh ap --ssid MiRed --radio 5g  # pre-selecciona radio y SSID
+scripts/router/setup-wifi.sh ap --ssid Libre --open       # sin contraseña
 
 # Cliente WiFi — interactivo o con flags
-scripts/build/setup-wifi.sh client                        # elige banda → escanea → SSID → pass
-scripts/build/setup-wifi.sh client --radio 2.4ghz         # fuerza 2.4 GHz, luego interactivo
-scripts/build/setup-wifi.sh client --ssid RedExterna      # SSID fijo, pide contraseña
+scripts/router/setup-wifi.sh client                        # elige banda → escanea → SSID → pass
+scripts/router/setup-wifi.sh client --radio 2.4ghz         # fuerza 2.4 GHz, luego interactivo
+scripts/router/setup-wifi.sh client --ssid RedExterna      # SSID fijo, pide contraseña
 
 # Desconectar cliente
-scripts/build/setup-wifi.sh disconnect                    # elimina todas las interfaces STA
-scripts/build/setup-wifi.sh disconnect --radio radio0     # solo esa radio
+scripts/router/setup-wifi.sh disconnect                    # elimina todas las interfaces STA
+scripts/router/setup-wifi.sh disconnect --radio radio0     # solo esa radio
 
 # Escanear redes
-scripts/build/setup-wifi.sh scan                          # ambos radios (2.4 GHz + 5 GHz)
-scripts/build/setup-wifi.sh scan --radio 5g               # solo 5 GHz
+scripts/router/setup-wifi.sh scan                          # ambos radios (2.4 GHz + 5 GHz)
+scripts/router/setup-wifi.sh scan --radio 5g               # solo 5 GHz
 
 # Estado y listado
-scripts/build/setup-wifi.sh status
-scripts/build/setup-wifi.sh list
+scripts/router/setup-wifi.sh status
+scripts/router/setup-wifi.sh list
 
 # Habilitar / deshabilitar radio
-scripts/build/setup-wifi.sh enable  --radio radio0
-scripts/build/setup-wifi.sh disable --radio radio1
+scripts/router/setup-wifi.sh enable  --radio radio0
+scripts/router/setup-wifi.sh disable --radio radio1
 ```
 
 Subcomandos: `ap`, `client`, `disconnect`, `scan`, `status`, `list`, `enable`, `disable`.
@@ -218,70 +220,70 @@ Alias de radio: `radio0`, `radio1`, `2g`, `5g`, `2.4ghz`, `5ghz`.
 
 Modo cliente crea la interfaz `wwan` (protocolo DHCP), la añade a la zona WAN del firewall y acepta DNS del upstream (`peerdns=1`).
 
-### build/setup-dns.sh
+### router/setup-dns.sh
 
 Configura los servidores DNS upstream que usa dnsmasq para resolver nombres externos. Por defecto usa Cloudflare (1.1.1.1) y Google (8.8.8.8).
 
 ```bash
 # Configurar DNS
-scripts/build/setup-dns.sh set                                         # 1.1.1.1 + 8.8.8.8
-scripts/build/setup-dns.sh set --primary 9.9.9.9                       # Quad9 + Google
-scripts/build/setup-dns.sh set --primary 9.9.9.9 --secondary 149.112.112.112
-scripts/build/setup-dns.sh set --primary 208.67.222.222 --secondary 208.67.220.220  # OpenDNS
+scripts/router/setup-dns.sh set                                         # 1.1.1.1 + 8.8.8.8
+scripts/router/setup-dns.sh set --primary 9.9.9.9                       # Quad9 + Google
+scripts/router/setup-dns.sh set --primary 9.9.9.9 --secondary 149.112.112.112
+scripts/router/setup-dns.sh set --primary 208.67.222.222 --secondary 208.67.220.220  # OpenDNS
 
 # Ver configuración actual
-scripts/build/setup-dns.sh show
+scripts/router/setup-dns.sh show
 
 # Restaurar valores por defecto
-scripts/build/setup-dns.sh reset
+scripts/router/setup-dns.sh reset
 ```
 
 Subcomandos: `set`, `show`, `reset`. El `show` verifica también la resolución con `nslookup`.
 
-### build/setup-routing.sh
+### router/setup-routing.sh
 
 Gestiona la prioridad de salida a internet (WAN físico vs cliente WiFi `wwan`) y permite fijar IPs LAN a interfaces concretas mediante source-based routing (`ip rule` + tablas de routing dedicadas).
 
 ```bash
 # Ver estado actual
-scripts/build/setup-routing.sh status
+scripts/router/setup-routing.sh status
 
 # Definir interfaz preferida
-scripts/build/setup-routing.sh priority wan    # WAN físico preferido (default)
-scripts/build/setup-routing.sh priority wifi   # Cliente WiFi preferido
-scripts/build/setup-routing.sh priority equal  # Misma métrica, kernel decide
+scripts/router/setup-routing.sh priority wan    # WAN físico preferido (default)
+scripts/router/setup-routing.sh priority wifi   # Cliente WiFi preferido
+scripts/router/setup-routing.sh priority equal  # Misma métrica, kernel decide
 
 # Fijar IP LAN a una interfaz (persiste entre reinicios)
-scripts/build/setup-routing.sh pin --from 192.168.1.50 --via wifi
-scripts/build/setup-routing.sh pin --from 192.168.1.51 --via wan
+scripts/router/setup-routing.sh pin --from 192.168.1.50 --via wifi
+scripts/router/setup-routing.sh pin --from 192.168.1.51 --via wan
 
 # Gestionar pins
-scripts/build/setup-routing.sh unpin --from 192.168.1.50
-scripts/build/setup-routing.sh pins
-scripts/build/setup-routing.sh reset
+scripts/router/setup-routing.sh unpin --from 192.168.1.50
+scripts/router/setup-routing.sh pins
+scripts/router/setup-routing.sh reset
 ```
 
 Los pins se almacenan en `/etc/routing-pins.conf` y se restauran en cada boot mediante un hotplug script en `/etc/hotplug.d/iface/50-routing-pins`. Las tablas de routing usadas son `100` (wan) y `200` (wifi/wwan).
 
-### build/setup-static-ip.sh
+### router/setup-static-ip.sh
 
 Gestiona DHCP static leases: asigna IPs fijas a dispositivos por su MAC address usando entradas UCI `dhcp host`. dnsmasq sirve siempre la misma IP al mismo dispositivo.
 
 ```bash
 # Asignar IP estática
-scripts/build/setup-static-ip.sh add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 --name servidor
-scripts/build/setup-static-ip.sh add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100
+scripts/router/setup-static-ip.sh add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 --name servidor
+scripts/router/setup-static-ip.sh add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100
 
 # Eliminar asignación
-scripts/build/setup-static-ip.sh remove --mac AA:BB:CC:DD:EE:FF
-scripts/build/setup-static-ip.sh remove --assign 192.168.1.100
+scripts/router/setup-static-ip.sh remove --mac AA:BB:CC:DD:EE:FF
+scripts/router/setup-static-ip.sh remove --assign 192.168.1.100
 
 # Listar, limpiar
-scripts/build/setup-static-ip.sh list
-scripts/build/setup-static-ip.sh clear
+scripts/router/setup-static-ip.sh list
+scripts/router/setup-static-ip.sh clear
 
 # Importar desde CSV local
-scripts/build/setup-static-ip.sh import --file hosts.csv
+scripts/router/setup-static-ip.sh import --file hosts.csv
 ```
 
 Formato CSV para import:
@@ -291,30 +293,30 @@ AA:BB:CC:DD:EE:FF,192.168.1.100,servidor
 BB:CC:DD:EE:FF:00,192.168.1.101,laptop
 ```
 
-### build/setup-socks-forward.sh
+### router/setup-socks-forward.sh
 
 Activa o desactiva el reenvío de puertos del proxy SOCKS de la Raspberry Pi 3b al exterior del router. Al activar, detecta automáticamente la MAC de la Raspi en el ARP, llama a `setup-static-ip.sh` para fijar la IP, y crea la regla DNAT en el firewall UCI.
 
 ```bash
 # Activar (interactivo: pide IP de la Raspi si no se indica)
-scripts/build/setup-socks-forward.sh enable
-scripts/build/setup-socks-forward.sh enable --raspi-ip 192.168.1.100 --port 9050
+scripts/router/setup-socks-forward.sh enable
+scripts/router/setup-socks-forward.sh enable --raspi-ip 192.168.1.100 --port 9050
 
 # Desactivar (elimina solo la regla DNAT; la IP estática en DHCP se conserva)
-scripts/build/setup-socks-forward.sh disable
+scripts/router/setup-socks-forward.sh disable
 
 # Desinstalar completamente (regla DNAT + IP estática raspi-tor)
-scripts/build/setup-socks-forward.sh uninstall
+scripts/router/setup-socks-forward.sh uninstall
 
 # Estado
-scripts/build/setup-socks-forward.sh status
+scripts/router/setup-socks-forward.sh status
 ```
 
 La regla UCI se llama `tor_socks_fwd` (nombre fijo), lo que permite encontrarla y eliminarla con precisión sin afectar otras reglas. La IP estática en DHCP se guarda con el nombre `raspi-tor`.
 
 `uninstall` elimina ambas cosas y recarga firewall + dnsmasq. Deja el router en el estado previo a `enable`.
 
-### build/setup-tor-onion.sh
+### router/setup-tor-onion.sh
 
 Configura OpenWRT para que los clientes LAN/WiFi accedan a dominios `.onion` sin configurar ningún proxy en sus dispositivos (transparent proxy).
 
@@ -327,21 +329,21 @@ Lo que configura en OpenWRT:
 
 ```bash
 # Activar (auto-detecta IP de raspi-tor desde DHCP)
-scripts/build/setup-tor-onion.sh enable
-scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100
-scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100 --dns-port 5300 --trans-port 9040
+scripts/router/setup-tor-onion.sh enable
+scripts/router/setup-tor-onion.sh enable --raspi-ip 192.168.1.100
+scripts/router/setup-tor-onion.sh enable --raspi-ip 192.168.1.100 --dns-port 5300 --trans-port 9040
 
 # Desactivar (solo quita el DNAT; la entrada dnsmasq se conserva)
-scripts/build/setup-tor-onion.sh disable
+scripts/router/setup-tor-onion.sh disable
 
 # Desinstalar (DNAT + entrada dnsmasq)
-scripts/build/setup-tor-onion.sh uninstall
+scripts/router/setup-tor-onion.sh uninstall
 
 # Estado
-scripts/build/setup-tor-onion.sh status
+scripts/router/setup-tor-onion.sh status
 
 # Diagnóstico capa por capa
-scripts/build/setup-tor-onion.sh doctor
+scripts/router/setup-tor-onion.sh doctor
 ```
 
 El include UCI se registra con el nombre fijo `tor_onion_nft` y el archivo nftables en `/etc/nftables.d/tor-onion.nft`.
@@ -375,14 +377,14 @@ curl http://dominio.onion
 
 ---
 
-### build/show-clients.sh
+### router/show-clients.sh
 
 Lista todos los dispositivos conectados al router. Lee `/tmp/dhcp.leases` para los leases DHCP activos y `/proc/net/arp` para la tabla ARP. Muestra el tiempo restante de cada lease y si el dispositivo responde en la red.
 
 ```bash
-scripts/build/show-clients.sh                  # Usa entorno prod
-scripts/build/show-clients.sh --env dev        # Otro entorno
-scripts/build/show-clients.sh --ip 192.168.0.1  # IP del router explícita
+scripts/router/show-clients.sh                  # Usa entorno prod
+scripts/router/show-clients.sh --env dev        # Otro entorno
+scripts/router/show-clients.sh --ip 192.168.0.1  # IP del router explícita
 ```
 
 Salida:

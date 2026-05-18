@@ -83,7 +83,7 @@ Ejemplo:
 ```bash
 just router-post-install                          # Instala todos los grupos
 just router-post-install group=captive_portal     # Solo el grupo captive_portal (uhttpd)
-scripts/build/post-install.sh --list              # Ver grupos disponibles
+scripts/router/post-install.sh --list             # Ver grupos disponibles
 ```
 
 ### Portal cautivo
