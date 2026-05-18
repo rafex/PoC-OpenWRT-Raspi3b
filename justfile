@@ -2,6 +2,11 @@
 # Orquesta todo: setup, secrets, build, flash.
 # Las tareas de build están en Makefile; just las llama, nunca al revés.
 
+# Garantiza que ~/.local/bin esté en PATH en todas las recetas.
+# Necesario cuando sops/age/yq se acaban de instalar en esa ruta
+# y la shell no ha recargado el perfil todavía.
+export PATH := env_var('HOME') + '/.local/bin:' + env_var('PATH')
+
 # Variables de entorno definidas por recipes (ENV=dev por defecto)
 
 # ─────────────────────────────────────────────────────
