@@ -299,14 +299,19 @@ Activa o desactiva el reenvío de puertos del proxy SOCKS de la Raspberry Pi 3b 
 scripts/build/setup-socks-forward.sh enable
 scripts/build/setup-socks-forward.sh enable --raspi-ip 192.168.1.100 --port 9050
 
-# Desactivar (elimina la regla DNAT y recarga el firewall)
+# Desactivar (elimina solo la regla DNAT; la IP estática en DHCP se conserva)
 scripts/build/setup-socks-forward.sh disable
+
+# Desinstalar completamente (regla DNAT + IP estática raspi-tor)
+scripts/build/setup-socks-forward.sh uninstall
 
 # Estado
 scripts/build/setup-socks-forward.sh status
 ```
 
 La regla UCI se llama `tor_socks_fwd` (nombre fijo), lo que permite encontrarla y eliminarla con precisión sin afectar otras reglas. La IP estática en DHCP se guarda con el nombre `raspi-tor`.
+
+`uninstall` elimina ambas cosas y recarga firewall + dnsmasq. Deja el router en el estado previo a `enable`.
 
 ---
 

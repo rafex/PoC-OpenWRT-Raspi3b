@@ -222,15 +222,21 @@ Activa o desactiva el port forwarding del proxy SOCKS de la Raspberry Pi 3b para
 | Recipe | Descripción |
 |--------|-------------|
 | `just socks-enable` | Activa el forwarding: pide IP de la Raspi, fija IP estática en DHCP y crea la regla DNAT |
-| `just socks-disable` | Desactiva el forwarding y elimina la regla del firewall |
+| `just socks-disable` | Elimina la regla DNAT del firewall |
+| `just socks-uninstall` | Elimina la regla DNAT **y** la IP estática de la Raspi en DHCP |
 | `just socks-status` | Muestra el estado de la regla y la IP estática de la Raspi |
+
+Diferencia entre `disable` y `uninstall`:
+- `disable` — solo elimina la regla de port forwarding. La IP estática de la Raspi queda en DHCP.
+- `uninstall` — limpieza completa: elimina la regla DNAT y la entrada DHCP `raspi-tor`. Deja el router como si nunca se hubiera configurado.
 
 Ejemplos:
 ```bash
 just socks-enable                                 # Interactivo: pide IP de la Raspi
 just socks-enable --raspi-ip 192.168.1.100        # Con IP predefinida (puerto default 9050)
 just socks-enable --raspi-ip 192.168.1.100 --port 9050
-just socks-disable
+just socks-disable                                # Quita el forwarding, conserva IP estática
+just socks-uninstall                              # Limpieza total
 just socks-status
 ```
 

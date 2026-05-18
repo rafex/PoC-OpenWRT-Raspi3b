@@ -13,14 +13,16 @@
 #   4. Crea regla DNAT en el firewall (wan:<port> → raspi:<port>)
 #
 # Subcomandos:
-#   enable   Activa el port forwarding
-#   disable  Desactiva el port forwarding y elimina la regla
-#   status   Muestra el estado actual
+#   enable    Activa el port forwarding
+#   disable   Desactiva el port forwarding (elimina la regla DNAT)
+#   uninstall Elimina la regla DNAT Y la IP estática de la Raspi en DHCP
+#   status    Muestra el estado actual
 #
 # Uso:
-#   setup-socks-forward.sh enable  [--raspi-ip <IP>] [--port 9050]
-#   setup-socks-forward.sh disable [--ip <router>] [--env <env>]
-#   setup-socks-forward.sh status  [--ip <router>] [--env <env>]
+#   setup-socks-forward.sh enable    [--raspi-ip <IP>] [--port 9050]
+#   setup-socks-forward.sh disable   [--ip <router>] [--env <env>]
+#   setup-socks-forward.sh uninstall [--ip <router>] [--env <env>]
+#   setup-socks-forward.sh status    [--ip <router>] [--env <env>]
 # ============================================================================
 set -euo pipefail
 
@@ -47,9 +49,10 @@ _show_help() {
 Uso: $(basename "$0") <subcomando> [opciones]
 
 Subcomandos:
-  enable   Activa el port forwarding del proxy SOCKS
-  disable  Desactiva el port forwarding
-  status   Muestra el estado actual
+  enable     Activa el port forwarding del proxy SOCKS
+  disable    Elimina la regla DNAT del firewall
+  uninstall  Elimina la regla DNAT + la IP estática de la Raspi en DHCP
+  status     Muestra el estado actual
 
 Opciones:
   --raspi-ip <IP>  IP actual de la Raspi3b (solo en enable; se pedirá si no se indica)
@@ -62,6 +65,7 @@ Ejemplos:
   $(basename "$0") enable
   $(basename "$0") enable --raspi-ip 192.168.1.100 --port 9050
   $(basename "$0") disable
+  $(basename "$0") uninstall
   $(basename "$0") status
 HELP
 }
@@ -276,6 +280,80 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# uninstall — elimina la regla DNAT y la IP estática de la Raspi en DHCP
+# ---------------------------------------------------------------------------
+_uninstall() {
+    _check_ssh
+
+    echo ""
+    echo "============================================="
+    echo " Desinstalar SOCKS Forward"
+    echo "============================================="
+    echo ""
+    echo "  Se eliminarán:"
+    echo "   • Regla DNAT '${_RULE_NAME}' del firewall"
+    echo "   • IP estática DHCP 'raspi-tor'"
+    echo ""
+    read -r -p "  ¿Continuar? (s/N) " confirm
+    confirm=$(echo "${confirm}" | tr '[:upper:]' '[:lower:]')
+    [ "${confirm}" = "s" ] || { echo "Cancelado."; exit 0; }
+    echo ""
+
+    local rule_name="${_RULE_NAME}"
+    _ssh sh - << EOF
+set -eu
+RULE_NAME="${rule_name}"
+
+# ── Eliminar regla DNAT del firewall ─────────────────────
+fw_changed=0
+idx=0
+while uci -q get "firewall.@redirect[\${idx}]" >/dev/null 2>&1; do
+    name=\$(uci -q get "firewall.@redirect[\${idx}].name" 2>/dev/null || true)
+    if [ "\${name}" = "\${RULE_NAME}" ]; then
+        dest_ip=\$(uci -q get "firewall.@redirect[\${idx}].dest_ip"   2>/dev/null || true)
+        port=\$(uci    -q get "firewall.@redirect[\${idx}].dest_port" 2>/dev/null || true)
+        uci delete "firewall.@redirect[\${idx}]"
+        fw_changed=1
+        echo "  ✅ Regla DNAT '\${RULE_NAME}' eliminada (era: → \${dest_ip}:\${port})"
+        break
+    fi
+    idx=\$((idx + 1))
+done
+[ "\${fw_changed}" = "0" ] && echo "  — Regla '\${RULE_NAME}' no encontrada (ya estaba eliminada)"
+
+[ "\${fw_changed}" = "1" ] && uci commit firewall || true
+
+# ── Eliminar IP estática DHCP (raspi-tor) ────────────────
+dhcp_changed=0
+idx2=0
+while uci -q get "dhcp.@host[\${idx2}]" >/dev/null 2>&1; do
+    hname=\$(uci -q get "dhcp.@host[\${idx2}].name" 2>/dev/null || true)
+    if [ "\${hname}" = "raspi-tor" ]; then
+        hmac=\$(uci -q get "dhcp.@host[\${idx2}].mac" 2>/dev/null || true)
+        hip=\$(uci  -q get "dhcp.@host[\${idx2}].ip"  2>/dev/null || true)
+        uci delete "dhcp.@host[\${idx2}]"
+        dhcp_changed=1
+        echo "  ✅ IP estática 'raspi-tor' eliminada (\${hmac} → \${hip})"
+        break
+    fi
+    idx2=\$((idx2 + 1))
+done
+[ "\${dhcp_changed}" = "0" ] && echo "  — IP estática 'raspi-tor' no encontrada (ya estaba eliminada)"
+
+[ "\${dhcp_changed}" = "1" ] && uci commit dhcp || true
+
+# ── Recargar servicios ────────────────────────────────────
+echo ""
+[ "\${fw_changed}" = "1" ] && { /etc/init.d/firewall restart 2>/dev/null && echo "  ✅ Firewall reiniciado" || true; }
+[ "\${dhcp_changed}" = "1" ] && { /etc/init.d/dnsmasq restart 2>/dev/null && echo "  ✅ dnsmasq reiniciado" || true; }
+EOF
+
+    echo ""
+    log_info "✅ Desinstalación completada"
+    echo ""
+}
+
+# ---------------------------------------------------------------------------
 # status — muestra el estado del forwarding y la IP estática
 # ---------------------------------------------------------------------------
 _status() {
@@ -355,9 +433,10 @@ EOF
 # Main
 # ---------------------------------------------------------------------------
 case "${_SUBCMD}" in
-    enable)  _enable ;;
-    disable) _disable ;;
-    status)  _status ;;
+    enable)    _enable ;;
+    disable)   _disable ;;
+    uninstall) _uninstall ;;
+    status)    _status ;;
     -h|--help) _show_help ;;
     *) log_error "Subcomando desconocido: ${_SUBCMD}"; _show_help; exit 1 ;;
 esac

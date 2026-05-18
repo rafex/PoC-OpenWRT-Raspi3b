@@ -910,12 +910,19 @@ socks-enable *args='':
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh enable {{args}}
 
-# socks-disable: Desactiva el port forwarding del proxy SOCKS
+# socks-disable: Desactiva el port forwarding del proxy SOCKS (elimina la regla DNAT)
 # Uso: just socks-disable [--ip 192.168.x.x] [--env dev]
 socks-disable *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh disable {{args}}
+
+# socks-uninstall: Elimina la regla DNAT y la IP estática de la Raspi en DHCP
+# Uso: just socks-uninstall [--ip 192.168.x.x] [--env dev]
+socks-uninstall *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-socks-forward.sh uninstall {{args}}
 
 # socks-status: Muestra el estado del port forwarding SOCKS y la IP estática de la Raspi
 # Uso: just socks-status [--ip 192.168.x.x] [--env dev]
