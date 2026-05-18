@@ -266,7 +266,7 @@ if echo "\${dns_result}" | grep -q "^Address:.*10\."; then
     echo "  ✅ DNS .onion resuelve a IP virtual: \${vip}"
 else
     echo "  ⚠️  DNS sin respuesta — verifica que Tor esté corriendo en la Raspi"
-    echo "     (torrc: DNSPort 0.0.0.0:5353 y TransPort 0.0.0.0:9040)"
+    echo "     (torrc: DNSPort 0.0.0.0:${dns_port} y TransPort 0.0.0.0:${trans_port})"
 fi
 EOF
 
@@ -635,18 +635,21 @@ echo "  ── Capa 4: puertos Tor en la Raspi ───────────
 if [ -z "\${RASPI_IP}" ]; then
     warn "Raspi IP desconocida — se omite verificación de puertos"
 elif command -v nc >/dev/null 2>&1; then
-    if nc -z -w2 "\${RASPI_IP}" "\${DNS_PORT}" 2>/dev/null; then
+    # BusyBox nc no siempre soporta -z; </dev/null cierra stdin inmediatamente
+    # y nc sale 0 si pudo conectar, no-cero si el puerto está cerrado/filtrado
+    if nc -w 2 "\${RASPI_IP}" "\${DNS_PORT}" </dev/null 2>/dev/null; then
         ok "DNSPort alcanzable: \${RASPI_IP}:\${DNS_PORT}"
     else
         fail "DNSPort NO alcanzable: \${RASPI_IP}:\${DNS_PORT}"
         hint "Verifica en la Raspi: DNSPort 0.0.0.0:\${DNS_PORT} en /etc/tor/torrc"
-        hint "sudo systemctl status tor"
+        hint "sudo systemctl status tor@default"
     fi
-    if nc -z -w2 "\${RASPI_IP}" "\${TRANS_PORT}" 2>/dev/null; then
+    if nc -w 2 "\${RASPI_IP}" "\${TRANS_PORT}" </dev/null 2>/dev/null; then
         ok "TransPort alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
     else
         fail "TransPort NO alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
         hint "Verifica en la Raspi: TransPort 0.0.0.0:\${TRANS_PORT} en /etc/tor/torrc"
+        hint "sudo systemctl status tor@default"
     fi
 else
     warn "nc no disponible en el router — no se pueden verificar puertos"
