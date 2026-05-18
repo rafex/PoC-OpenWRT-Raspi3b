@@ -205,9 +205,9 @@ cat > "\${NFT_FILE}" << 'NFTEOF'
 # Generado por setup-tor-onion.sh — no editar manualmente
 #
 # DNAT: TCP al rango virtual .onion → Raspi TransPort
-add rule inet fw4 dstnat ip daddr ${vrange} tcp dnat ip to ${raspi_ip}:${trans_port}
-# MASQUERADE: el router es el origen para la Raspi → retorno correcto via conntrack
-add rule inet fw4 srcnat ip daddr ${raspi_ip} tcp dport ${trans_port} masquerade
+add rule inet fw4 dstnat ip daddr ${vrange} ip protocol tcp dnat ip to ${raspi_ip}:${trans_port}
+# MASQUERADE: el router actúa de origen para la Raspi → retorno correcto via conntrack
+add rule inet fw4 srcnat ip daddr ${raspi_ip} ip protocol tcp tcp dport ${trans_port} masquerade
 NFTEOF
 echo "  ✅ \${NFT_FILE} creado"
 
@@ -233,27 +233,40 @@ echo "  ✅ dnsmasq: .onion → \${RASPI_IP}#\${DNS_PORT}"
 
 # ── 4. Recargar servicios ─────────────────────────────────
 echo ""
-/etc/init.d/dnsmasq restart 2>/dev/null && echo "  ✅ dnsmasq reiniciado"  || true
-/etc/init.d/firewall restart 2>/dev/null && echo "  ✅ Firewall reiniciado" || true
+/etc/init.d/dnsmasq restart 2>/dev/null && echo "  ✅ dnsmasq reiniciado" || true
+
+fw_err=$(/etc/init.d/firewall restart 2>&1) \
+    && echo "  ✅ Firewall reiniciado" \
+    || { echo "  ❌ Error al reiniciar firewall:"; echo "\${fw_err}" | sed 's/^/     /'; }
 
 # ── 5. Verificar resolución DNS .onion ───────────────────
 echo ""
 echo "  Verificando resolución DNS .onion..."
-sleep 1
-if nslookup duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion 127.0.0.1 2>/dev/null \
-    | grep -q "10\."; then
-    echo "  ✅ DNS .onion resuelve a IP virtual (10.x.x.x) — OK"
+sleep 2
+dns_result=\$(nslookup duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion 127.0.0.1 2>/dev/null || true)
+if echo "\${dns_result}" | grep -q "^Address:.*10\."; then
+    vip=\$(echo "\${dns_result}" | grep "^Address:.*10\." | head -1 | awk '{print \$2}')
+    echo "  ✅ DNS .onion resuelve a IP virtual: \${vip}"
 else
-    echo "  ⚠️  Sin respuesta — verifica que Tor esté corriendo en la Raspi"
+    echo "  ⚠️  DNS sin respuesta — verifica que Tor esté corriendo en la Raspi"
+    echo "     (torrc: DNSPort 0.0.0.0:5353 y TransPort 0.0.0.0:9040)"
 fi
 EOF
 
     echo ""
     log_info "✅ Transparent .onion proxy activado"
     echo ""
-    echo "  Los clientes del router acceden a .onion sin configurar nada."
-    echo "  Prueba desde el Mac:"
-    echo "  curl http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion"
+    echo "  ┌─ Cómo probar ──────────────────────────────────────────────────"
+    echo "  │"
+    echo "  │  DNS (desde el Mac o cualquier cliente del router):"
+    echo "  │  nslookup duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion ${ROUTER_IP}"
+    echo "  │  → debe devolver una IP del rango 10.192.0.0/10"
+    echo "  │"
+    echo "  │  Nota: curl bloquea .onion por RFC 7686 — usa wget o un navegador:"
+    echo "  │  wget -qO- http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion"
+    echo "  │"
+    echo "  │  Firefox: about:config → network.dns.blockDotOnion → false"
+    echo "  └────────────────────────────────────────────────────────────────"
     echo ""
 }
 
