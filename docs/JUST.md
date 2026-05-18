@@ -40,10 +40,13 @@ just <recipe>                  # Ejecutar una recipe
 
 | Recipe | Descripción |
 |--------|-------------|
+| `just setup-env [ENV=prod]` | Descarga y extrae el Image Builder de OpenWRT (ejecutar una vez por máquina) |
 | `just build` | Compilar sin secrets (valores por defecto) |
 | `just build-dev` | Compilar para desarrollo (verifica secrets dev, genera config, compila) |
 | `just build-prod` | Compilar para producción (verifica secrets prod, genera config, compila) |
 | `just generate-config <env>` | Generar archivos de configuración desde templates + secrets |
+
+> **Nota**: `just setup-env` debe ejecutarse antes del primer `just build-*` en cada máquina nueva. Lee `OPENWRT_VERSION`, `TARGET` y `SUBTARGET` desde `environments/<env>/.env.public`.
 
 ### Validación
 
@@ -321,15 +324,22 @@ just clients --ip 192.168.0.1      # IP del router explícita
 ### Primera vez (o máquina nueva)
 
 ```bash
-just install-tools              # Linux: descarga binarios. macOS: indicaciones brew
-just setup                      # Genera clave age, crea environments
+# macOS
+brew install just sops age yq shellcheck
 
-# Si el repo ya tiene secrets de otra máquina:
+# Linux: just setup descarga los binarios a ~/.local/bin automáticamente
+just setup                      # tools + age key + environments + git hooks
+
+# Re-encriptar secrets con la clave de esta máquina
 just reinit-secrets prod
 just reinit-secrets dev
 
-just edit-secrets prod          # Agrega WiFi keys, WireGuard, etc.
-just create-password prod       # Genera hash de root
+# (Opcional) Llenar secrets
+just edit-secrets prod          # WiFi keys, WireGuard, etc.
+just create-password prod       # Hash SHA-512 de root
+
+# Descargar el Image Builder (una vez por máquina, antes del primer build)
+just setup-env prod
 ```
 
 ### Compilar y flashear

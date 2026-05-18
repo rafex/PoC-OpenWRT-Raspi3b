@@ -8,22 +8,24 @@ Prueba de concepto para compilar una imagen personalizada de **OpenWRT 25.12.2**
 git clone https://github.com/rafex/PoC-OpenWRT-Raspi3b.git
 cd PoC-OpenWRT-Raspi3b
 
-# macOS
+# macOS — instalar dependencias con brew
 brew install just sops age yq shellcheck
 
-# Linux — just install-tools descarga los binarios automáticamente
-just install-tools
-
-# Setup inicial (genera clave age + estructura de environments)
-just setup
+# Linux — just install-tools descarga los binarios automáticamente a ~/.local/bin
+just setup   # tools + age key + estructura de environments + git hooks
 
 # Primera vez en esta máquina: re-encriptar secrets con tu clave local
 just reinit-secrets prod
 just reinit-secrets dev
 
-# Llenar secrets y compilar
-just edit-secrets prod   # WiFi keys, WireGuard, etc.
-just create-password prod  # Hash SHA-512 de root
+# Descargar el Image Builder de OpenWRT (una vez por máquina)
+just setup-env prod
+
+# (Opcional) Llenar secrets antes de compilar
+just edit-secrets prod    # WiFi keys, WireGuard, etc.
+just create-password prod # Hash SHA-512 de root
+
+# Compilar
 just build-prod
 ```
 
