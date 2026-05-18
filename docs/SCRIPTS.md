@@ -318,7 +318,7 @@ La regla UCI se llama `tor_socks_fwd` (nombre fijo), lo que permite encontrarla 
 
 Configura OpenWRT para que los clientes LAN/WiFi accedan a dominios `.onion` sin configurar ningún proxy en sus dispositivos (transparent proxy).
 
-Prerrequisito: la Raspi3b debe tener Tor configurado con `TransPort 0.0.0.0:9040`, `DNSPort 0.0.0.0:5353`, `VirtualAddrNetworkIPv4 10.192.0.0/10` y `AutomapHostsOnResolve 1`.
+Prerrequisito: la Raspi3b debe tener Tor configurado con `TransPort 0.0.0.0:9040`, `DNSPort 0.0.0.0:5300` (evitar conflicto con mDNS en 5353), `VirtualAddrNetworkIPv4 10.192.0.0/10` y `AutomapHostsOnResolve 1`.
 
 Lo que configura en OpenWRT:
 1. **dnsmasq**: reenvía consultas `.onion` al puerto DNS de Tor en la Raspi → Tor devuelve una IP virtual del rango `10.192.0.0/10`
@@ -329,7 +329,7 @@ Lo que configura en OpenWRT:
 # Activar (auto-detecta IP de raspi-tor desde DHCP)
 scripts/build/setup-tor-onion.sh enable
 scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100
-scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100 --dns-port 5353 --trans-port 9040
+scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100 --dns-port 5300 --trans-port 9040
 
 # Desactivar (solo quita el DNAT; la entrada dnsmasq se conserva)
 scripts/build/setup-tor-onion.sh disable

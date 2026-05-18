@@ -937,7 +937,7 @@ socks-status *args='':
 
 # onion-enable: Activa el transparent proxy .onion (dnsmasq + nftables DNAT)
 # Pide IP de la Raspi si no se indica; auto-detecta desde raspi-tor en DHCP
-# Uso: just onion-enable [--raspi-ip 192.168.1.x] [--dns-port 5353] [--trans-port 9040]
+# Uso: just onion-enable [--raspi-ip 192.168.1.x] [--dns-port 5300] [--trans-port 9040]
 onion-enable *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
@@ -966,7 +966,7 @@ onion-status *args='':
 
 # onion-doctor: Diagnostica el stack .onion capa por capa (DHCP → dnsmasq → nftables → puertos Tor)
 # Muestra ✅/❌/⚠️ por check y sugerencias de corrección; sale con código 1 si hay errores
-# Uso: just onion-doctor [--ip 192.168.x.x] [--dns-port 5353] [--trans-port 9040]
+# Uso: just onion-doctor [--ip 192.168.x.x] [--dns-port 5300] [--trans-port 9040]
 onion-doctor *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086

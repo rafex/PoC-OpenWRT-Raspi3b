@@ -9,7 +9,7 @@
 #   VirtualAddrNetworkIPv4 10.192.0.0/10
 #   AutomapHostsOnResolve 1
 #   TransPort 0.0.0.0:9040
-#   DNSPort  0.0.0.0:5353
+#   DNSPort  0.0.0.0:5300   # evitar conflicto con mDNS (5353)
 #
 # Lo que hace en OpenWRT:
 #   1. dnsmasq: reenvía consultas .onion → Raspi DNSPort
@@ -25,11 +25,11 @@
 #   doctor    Diagnostica dependencias y configuración capa por capa
 #
 # Uso:
-#   setup-tor-onion.sh enable    [--raspi-ip <IP>] [--dns-port 5353] [--trans-port 9040]
+#   setup-tor-onion.sh enable    [--raspi-ip <IP>] [--dns-port 5300] [--trans-port 9040]
 #   setup-tor-onion.sh disable   [--ip <router>] [--env <env>]
 #   setup-tor-onion.sh uninstall [--ip <router>] [--env <env>]
 #   setup-tor-onion.sh status    [--ip <router>] [--env <env>]
-#   setup-tor-onion.sh doctor    [--ip <router>] [--dns-port 5353] [--trans-port 9040]
+#   setup-tor-onion.sh doctor    [--ip <router>] [--dns-port 5300] [--trans-port 9040]
 # ============================================================================
 set -euo pipefail
 
@@ -41,7 +41,7 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 _NFT_FILE="/etc/nftables.d/tor-onion.nft"
 _UCI_INCLUDE="tor_onion_nft"
 _VIRTUAL_RANGE="10.192.0.0/10"
-_DEFAULT_DNS_PORT="5353"
+_DEFAULT_DNS_PORT="5300"
 _DEFAULT_TRANS_PORT="9040"
 
 _SUBCMD=""
@@ -76,7 +76,7 @@ Opciones:
 Ejemplos:
   $(basename "$0") enable
   $(basename "$0") enable --raspi-ip 192.168.1.100
-  $(basename "$0") enable --raspi-ip 192.168.1.100 --dns-port 5353 --trans-port 9040
+  $(basename "$0") enable --raspi-ip 192.168.1.100 --dns-port 5300 --trans-port 9040
   $(basename "$0") disable
   $(basename "$0") uninstall
   $(basename "$0") status

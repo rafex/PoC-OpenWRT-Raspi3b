@@ -230,7 +230,7 @@ Configura OpenWRT para enrutar dominios `.onion` a través de Tor en la Raspi3b 
 Ejemplos:
 ```bash
 just onion-enable                                 # Auto-detecta IP raspi-tor desde DHCP
-just onion-enable --raspi-ip 192.168.1.100        # IP explícita (puertos default: 5353 + 9040)
+just onion-enable --raspi-ip 192.168.1.100        # IP explícita (puertos default: 5300 + 9040)
 just onion-disable                                # Solo quita DNAT, conserva DNS
 just onion-uninstall                              # Limpieza total
 just onion-status                                 # Ver estado y prueba DNS en vivo
@@ -242,7 +242,7 @@ Prerrequisito en la Raspi3b (`/etc/tor/torrc`):
 VirtualAddrNetworkIPv4 10.192.0.0/10
 AutomapHostsOnResolve 1
 TransPort 0.0.0.0:9040
-DNSPort  0.0.0.0:5353
+DNSPort  0.0.0.0:5300   # evitar conflicto con mDNS (puerto 5353)
 ```
 
 ### SOCKS Forward (Raspi3b / Tor)
