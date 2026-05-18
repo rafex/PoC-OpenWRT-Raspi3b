@@ -489,9 +489,10 @@ build-dev:
     just generate-config dev
     ENV=dev make build
 
-# build-prod: Compilar imagen para producción
+# build-prod: Compilar imagen para producción y verificar resultado
 # Carga variables públicas de prod + intenta descifrar secrets de prod.
 # Los secrets vacíos se omiten (no configuran esa funcionalidad).
+# Al terminar muestra la ruta de la imagen y el siguiente paso (flasheo).
 build-prod:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -499,6 +500,9 @@ build-prod:
     scripts/install/ensure-secrets.sh prod || exit 1
     just generate-config prod
     ENV=prod make build
+    ./scripts/build/verify.sh openwrt-builder/*/bin/targets/ath79/generic || true
+    echo ""
+    echo "✅ Imagen lista. Siguiente paso: ver docs/FLASH_INSTRUCTIONS.md"
 
 # build: Compilar sin secrets (usa valores por defecto del entorno)
 build:
@@ -979,15 +983,6 @@ router-onion-doctor *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh doctor {{args}}
-
-# flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
-flash ENV="prod":
-    @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
-    just build-prod
-    ./scripts/build/verify.sh openwrt-builder/*/bin/targets/ath79/generic || true
-    @echo ""
-    @echo "✅ Imagen compilada. Para flashear el router:"
-    @echo "   Ver docs/FLASH_INSTRUCTIONS.md"
 
 # ─────────────────────────────────────────────────────
 # Limpieza
