@@ -634,26 +634,33 @@ echo ""
 echo "  ── Capa 4: puertos Tor en la Raspi ─────────────────"
 if [ -z "\${RASPI_IP}" ]; then
     warn "Raspi IP desconocida — se omite verificación de puertos"
-elif command -v nc >/dev/null 2>&1; then
-    # BusyBox nc no siempre soporta -z; </dev/null cierra stdin inmediatamente
-    # y nc sale 0 si pudo conectar, no-cero si el puerto está cerrado/filtrado
-    if nc -w 2 "\${RASPI_IP}" "\${DNS_PORT}" </dev/null 2>/dev/null; then
-        ok "DNSPort alcanzable: \${RASPI_IP}:\${DNS_PORT}"
-    else
-        fail "DNSPort NO alcanzable: \${RASPI_IP}:\${DNS_PORT}"
-        hint "Verifica en la Raspi: DNSPort 0.0.0.0:\${DNS_PORT} en /etc/tor/torrc"
-        hint "sudo systemctl status tor@default"
-    fi
-    if nc -w 2 "\${RASPI_IP}" "\${TRANS_PORT}" </dev/null 2>/dev/null; then
-        ok "TransPort alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
-    else
-        fail "TransPort NO alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
-        hint "Verifica en la Raspi: TransPort 0.0.0.0:\${TRANS_PORT} en /etc/tor/torrc"
-        hint "sudo systemctl status tor@default"
-    fi
 else
-    warn "nc no disponible en el router — no se pueden verificar puertos"
-    hint "opkg update && opkg install netcat"
+    # DNSPort es UDP — nc sin -u no puede probarlo; usar consulta DNS directa.
+    # BusyBox nslookup acepta SERVER#PORT para especificar puerto no-53.
+    dns_direct=\$(nslookup duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion "\${RASPI_IP}#\${DNS_PORT}" 2>/dev/null || true)
+    if echo "\${dns_direct}" | grep -q "Address:.*10\."; then
+        ok "DNSPort UDP responde queries .onion: \${RASPI_IP}:\${DNS_PORT}"
+    else
+        fail "DNSPort UDP no responde: \${RASPI_IP}:\${DNS_PORT}"
+        hint "Verifica: DNSPort 0.0.0.0:\${DNS_PORT} en /etc/tor/torrc"
+        hint "sudo systemctl status tor@default  (puede estar aún bootstrapping)"
+    fi
+
+    # TransPort es TCP — nc conecta y Tor cierra la conexión (no hay ORIGINAL_DST).
+    # En algunos builds de BusyBox, RST del servidor da exit 1 aunque la conexión
+    # llegó. Si este check falla pero la Capa 3 está OK, el TransPort está activo.
+    if command -v nc >/dev/null 2>&1; then
+        if nc -w 2 "\${RASPI_IP}" "\${TRANS_PORT}" </dev/null 2>/dev/null; then
+            ok "TransPort TCP alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
+        else
+            fail "TransPort TCP no alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
+            hint "Verifica: TransPort 0.0.0.0:\${TRANS_PORT} en /etc/tor/torrc"
+            hint "sudo systemctl status tor@default"
+        fi
+    else
+        warn "nc no disponible — TransPort TCP no verificable vía red"
+        hint "opkg update && opkg install netcat"
+    fi
 fi
 
 # ── Resumen ──────────────────────────────────────────────
