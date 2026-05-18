@@ -550,7 +550,7 @@ router-update ip="" env="prod":
         ARGS="${ARGS} --ip {{ ip }}"
     fi
     # shellcheck disable=SC2086
-    scripts/build/router-update.sh ${ARGS}
+    scripts/build/update.sh ${ARGS}
 
 # router-update-force: Actualizar firmware borrando la configuración del router
 # Uso: just router-update-force [ip=<IP>] [env=<dev|prod>]
@@ -562,7 +562,7 @@ router-update-force ip="" env="prod":
         ARGS="${ARGS} --ip {{ ip }}"
     fi
     # shellcheck disable=SC2086
-    scripts/build/router-update.sh ${ARGS}
+    scripts/build/update.sh ${ARGS}
 
 # router-setup-extroot: Configurar USB como extroot en el router via SSH
 # Monta el USB, copia /overlay, configura fstab y reinicia.
@@ -575,7 +575,7 @@ router-setup-extroot ip="" device="" env="prod":
     if [ -n "{{ ip }}" ];     then ARGS="${ARGS} --ip {{ ip }}"; fi
     if [ -n "{{ device }}" ]; then ARGS="${ARGS} --device {{ device }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-setup-extroot.sh ${ARGS}
+    scripts/build/setup-extroot.sh ${ARGS}
 
 # router-setup-logs: Configurar logs persistentes en USB (extroot) via SSH
 # ⚠️  Prerrequisito: just router-setup-extroot debe haberse ejecutado y el router
@@ -587,7 +587,7 @@ router-setup-logs ip="" env="prod":
     ARGS="--env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-setup-logs.sh ${ARGS}
+    scripts/build/setup-logs.sh ${ARGS}
 
 # router-setup-auth: Copia clave SSH pública al router y establece contraseña root
 # Orden recomendado: primero copia la clave, luego pide contraseña (evita bloqueos)
@@ -599,7 +599,7 @@ router-setup-auth ip="" env="prod" key="":
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     if [ -n "{{ key }}" ]; then ARGS="${ARGS} --key {{ key }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-setup-auth.sh ${ARGS}
+    scripts/build/setup-auth.sh ${ARGS}
 
 # router-post-install: Instala paquetes adicionales en el router via opkg (post-flash)
 # Lee config/openwrt-router-post-install-packages.toml
@@ -613,7 +613,7 @@ router-post-install group="" ip="" env="prod":
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     if [ -n "{{ group }}" ]; then ARGS="${ARGS} --group {{ group }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-post-install.sh ${ARGS}
+    scripts/build/post-install.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # Portal cautivo (nftables + uhttpd, sin OpenNDS)
@@ -630,7 +630,7 @@ router-captive-setup ip="" env="prod" timeout="30" portal-url="" token="":
     if [ -n "{{ portal-url }}" ]; then ARGS="${ARGS} --portal-url {{ portal-url }}"; fi
     if [ -n "{{ token }}" ];      then ARGS="${ARGS} --token {{ token }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # router-captive-remove: Desinstala el portal cautivo del router
 # Uso: just router-captive-remove [ip=] [env=]
@@ -640,7 +640,7 @@ router-captive-remove ip="" env="prod":
     ARGS="uninstall --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # router-captive-allow: Autoriza una IP manualmente en el portal cautivo
 # timeout en minutos (default: 30). 0 = sin límite (permanente).
@@ -654,7 +654,7 @@ router-captive-allow client="" ip="" env="prod" timeout="30":
     ARGS="allow {{ client }} --env {{ env }} --timeout {{ timeout }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # router-captive-block: Revoca autorización de una IP del portal cautivo
 # Uso: just router-captive-block client=192.168.1.50 [ip=] [env=]
@@ -665,7 +665,7 @@ router-captive-block client="" ip="" env="prod":
     ARGS="block {{ client }} --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # router-captive-flush: Limpia todos los clientes autorizados del portal
 # Uso: just router-captive-flush [ip=] [env=]
@@ -675,7 +675,7 @@ router-captive-flush ip="" env="prod":
     ARGS="flush --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # router-captive-list: Muestra clientes autorizados y estado del portal
 # Uso: just router-captive-list [ip=] [env=]
@@ -685,7 +685,7 @@ router-captive-list ip="" env="prod":
     ARGS="list --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # router-captive-status: Diagnóstico del portal cautivo
 # Uso: just router-captive-status [ip=] [env=]
@@ -695,7 +695,7 @@ router-captive-status ip="" env="prod":
     ARGS="status --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-captive-setup.sh ${ARGS}
+    scripts/build/setup-captive.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # WiFi (APs y modo cliente)
@@ -714,7 +714,7 @@ router-wifi-setup subcmd="" ip="" env="prod" ssid="" password="" radio="" channe
     if [ -n "{{ channel }}" ];  then ARGS="${ARGS} --channel {{ channel }}"; fi
     if [ "{{ open }}" = "true" ]; then ARGS="${ARGS} --open"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh ${ARGS}
+    scripts/build/setup-wifi.sh ${ARGS}
 
 # router-wifi-ap: Configura un Access Point (completamente interactivo)
 # Sin args: pregunta radio disponible → SSID → contraseña → canal
@@ -722,7 +722,7 @@ router-wifi-setup subcmd="" ip="" env="prod" ssid="" password="" radio="" channe
 router-wifi-ap *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh ap {{args}}
+    scripts/build/setup-wifi.sh ap {{args}}
 
 # router-wifi-client: Conecta el router como cliente a otra red WiFi
 # Sin argumentos: escanea redes y guía interactivamente (SSID, banda, contraseña, BSSID)
@@ -730,7 +730,7 @@ router-wifi-ap *args='':
 router-wifi-client *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh client {{args}}
+    scripts/build/setup-wifi.sh client {{args}}
 
 # router-wifi-disconnect: Desconecta el cliente WiFi (elimina STA y wwan)
 # Uso: just router-wifi-disconnect [radio=radio1] [ip=] [env=]
@@ -742,7 +742,7 @@ router-wifi-disconnect radio="" ip="" env="prod":
     if [ -n "{{ radio }}" ]; then ARGS="${ARGS} --radio {{ radio }}"; fi
     if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh ${ARGS}
+    scripts/build/setup-wifi.sh ${ARGS}
 
 # router-wifi-scan: Escanea redes WiFi disponibles
 # Sin args: escanea ambos radios (2.4 GHz y 5 GHz)
@@ -750,7 +750,7 @@ router-wifi-disconnect radio="" ip="" env="prod":
 router-wifi-scan *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh scan {{args}}
+    scripts/build/setup-wifi.sh scan {{args}}
 
 # router-wifi-status: Muestra estado de todos los radios e interfaces WiFi
 # Uso: just router-wifi-status [ip=] [env=]
@@ -760,7 +760,7 @@ router-wifi-status ip="" env="prod":
     ARGS="status --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh ${ARGS}
+    scripts/build/setup-wifi.sh ${ARGS}
 
 # router-wifi-enable: Habilita un radio WiFi
 # Uso: just router-wifi-enable radio=radio0|2g|radio1|5g [ip=] [env=]
@@ -771,7 +771,7 @@ router-wifi-enable radio="" ip="" env="prod":
     ARGS="enable --radio {{ radio }} --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh ${ARGS}
+    scripts/build/setup-wifi.sh ${ARGS}
 
 # router-wifi-disable: Deshabilita un radio WiFi
 # Uso: just router-wifi-disable radio=radio0|2g|radio1|5g [ip=] [env=]
@@ -782,7 +782,7 @@ router-wifi-disable radio="" ip="" env="prod":
     ARGS="disable --radio {{ radio }} --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/router-wifi-setup.sh ${ARGS}
+    scripts/build/setup-wifi.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # Routing (prioridad WAN vs WiFi cliente y source-based routing)
@@ -908,7 +908,7 @@ router-dns-reset *args='':
 router-clients *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/show-router-clients.sh {{args}}
+    scripts/build/show-clients.sh {{args}}
 
 # ---------------------------------------------------------------------------
 # SOCKS Forward (Raspi3b / Tor)
