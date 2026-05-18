@@ -62,6 +62,7 @@ just build-prod
 | `just dns-set` / `just dns-show` / `just dns-reset` | Servidores DNS upstream de dnsmasq |
 | `just clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
 | `just socks-enable` / `just socks-disable` / `just socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
+| `just onion-enable` / `just onion-disable` / `just onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
 
 ## Licencia
 

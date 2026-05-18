@@ -931,6 +931,39 @@ socks-status *args='':
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh status {{args}}
 
+# ---------------------------------------------------------------------------
+# Transparent .onion proxy (Tor via Raspi3b)
+# ---------------------------------------------------------------------------
+
+# onion-enable: Activa el transparent proxy .onion (dnsmasq + nftables DNAT)
+# Pide IP de la Raspi si no se indica; auto-detecta desde raspi-tor en DHCP
+# Uso: just onion-enable [--raspi-ip 192.168.1.x] [--dns-port 5353] [--trans-port 9040]
+onion-enable *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-tor-onion.sh enable {{args}}
+
+# onion-disable: Desactiva el DNAT .onion (conserva la entrada dnsmasq)
+# Uso: just onion-disable [--ip 192.168.x.x] [--env dev]
+onion-disable *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-tor-onion.sh disable {{args}}
+
+# onion-uninstall: Elimina el DNAT y la entrada dnsmasq .onion (limpieza total)
+# Uso: just onion-uninstall [--ip 192.168.x.x] [--env dev]
+onion-uninstall *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-tor-onion.sh uninstall {{args}}
+
+# onion-status: Muestra el estado del transparent proxy .onion
+# Uso: just onion-status [--ip 192.168.x.x] [--env dev]
+onion-status *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-tor-onion.sh status {{args}}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="

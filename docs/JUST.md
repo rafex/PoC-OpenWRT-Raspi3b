@@ -215,6 +215,34 @@ just dns-show
 just dns-reset
 ```
 
+### Transparent .onion proxy (Tor via Raspi3b)
+
+Configura OpenWRT para enrutar dominios `.onion` a través de Tor en la Raspi3b de forma transparente. Los clientes WiFi/LAN acceden a `.onion` sin configurar ningún proxy.
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just onion-enable` | Activa el transparent proxy: dnsmasq `.onion` + nftables DNAT + MASQUERADE |
+| `just onion-disable` | Desactiva el DNAT (conserva la entrada dnsmasq `.onion`) |
+| `just onion-uninstall` | Limpieza total: elimina DNAT + entrada dnsmasq |
+| `just onion-status` | Muestra estado del include UCI, archivo nftables y prueba DNS en vivo |
+
+Ejemplos:
+```bash
+just onion-enable                                 # Auto-detecta IP raspi-tor desde DHCP
+just onion-enable --raspi-ip 192.168.1.100        # IP explícita (puertos default: 5353 + 9040)
+just onion-disable                                # Solo quita DNAT, conserva DNS
+just onion-uninstall                              # Limpieza total
+just onion-status                                 # Ver estado y prueba DNS en vivo
+```
+
+Prerrequisito en la Raspi3b (`/etc/tor/torrc`):
+```
+VirtualAddrNetworkIPv4 10.192.0.0/10
+AutomapHostsOnResolve 1
+TransPort 0.0.0.0:9040
+DNSPort  0.0.0.0:5353
+```
+
 ### SOCKS Forward (Raspi3b / Tor)
 
 Activa o desactiva el port forwarding del proxy SOCKS de la Raspberry Pi 3b para que dispositivos en la red upstream puedan usarlo.

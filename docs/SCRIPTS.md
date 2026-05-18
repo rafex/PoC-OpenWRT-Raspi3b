@@ -37,7 +37,8 @@ scripts/
 │   ├── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
 │   ├── setup-dns.sh            # Servidores DNS upstream de dnsmasq
 │   ├── show-clients.sh         # Lista dispositivos conectados (leases DHCP + ARP)
-│   └── setup-socks-forward.sh  # Port forwarding del proxy SOCKS de Raspi3b/Tor
+│   ├── setup-socks-forward.sh  # Port forwarding del proxy SOCKS de Raspi3b/Tor
+│   └── setup-tor-onion.sh      # Transparent proxy para dominios .onion
 └── templates/                  # Generación de configuraciones
     └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
@@ -312,6 +313,39 @@ scripts/build/setup-socks-forward.sh status
 La regla UCI se llama `tor_socks_fwd` (nombre fijo), lo que permite encontrarla y eliminarla con precisión sin afectar otras reglas. La IP estática en DHCP se guarda con el nombre `raspi-tor`.
 
 `uninstall` elimina ambas cosas y recarga firewall + dnsmasq. Deja el router en el estado previo a `enable`.
+
+### build/setup-tor-onion.sh
+
+Configura OpenWRT para que los clientes LAN/WiFi accedan a dominios `.onion` sin configurar ningún proxy en sus dispositivos (transparent proxy).
+
+Prerrequisito: la Raspi3b debe tener Tor configurado con `TransPort 0.0.0.0:9040`, `DNSPort 0.0.0.0:5353`, `VirtualAddrNetworkIPv4 10.192.0.0/10` y `AutomapHostsOnResolve 1`.
+
+Lo que configura en OpenWRT:
+1. **dnsmasq**: reenvía consultas `.onion` al puerto DNS de Tor en la Raspi → Tor devuelve una IP virtual del rango `10.192.0.0/10`
+2. **nftables DNAT**: redirige TCP al rango `10.192.0.0/10` → `raspi:9040` (TransPort)
+3. **nftables MASQUERADE**: el router actúa de intermediario para que el tráfico de retorno fluya correctamente via conntrack
+
+```bash
+# Activar (auto-detecta IP de raspi-tor desde DHCP)
+scripts/build/setup-tor-onion.sh enable
+scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100
+scripts/build/setup-tor-onion.sh enable --raspi-ip 192.168.1.100 --dns-port 5353 --trans-port 9040
+
+# Desactivar (solo quita el DNAT; la entrada dnsmasq se conserva)
+scripts/build/setup-tor-onion.sh disable
+
+# Desinstalar (DNAT + entrada dnsmasq)
+scripts/build/setup-tor-onion.sh uninstall
+
+# Estado
+scripts/build/setup-tor-onion.sh status
+```
+
+El include UCI se registra con el nombre fijo `tor_onion_nft` y el archivo nftables en `/etc/nftables.d/tor-onion.nft`.
+
+Diferencia `disable` vs `uninstall`:
+- `disable`: elimina el DNAT (las IPs virtuales dejan de redirigirse), pero `.onion` sigue resolviéndose via dnsmasq
+- `uninstall`: limpieza total — elimina el DNAT y la entrada dnsmasq
 
 ---
 
