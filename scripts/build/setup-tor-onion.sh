@@ -244,6 +244,23 @@ uci add_list dhcp.@dnsmasq[0].server="/onion/\${RASPI_IP}#\${DNS_PORT}"
 uci commit dhcp
 echo "  ✅ dnsmasq: .onion → \${RASPI_IP}#\${DNS_PORT}"
 
+# ── 3b. Exención DNS rebind protection para .onion ───────
+# dnsmasq tiene --stop-dns-rebind que descarta respuestas con IPs privadas
+# (10.x.x.x). Tor legítimamente devuelve IPs del rango 10.192.0.0/10 para
+# .onion vía AutomapHostsOnResolve, así que necesitamos eximir el dominio.
+rebind_domains=\$(uci -q get dhcp.@dnsmasq[0].rebind_domain 2>/dev/null || true)
+already_exempt=0
+for rd in \${rebind_domains}; do
+    [ "\${rd}" = "/onion/" ] && already_exempt=1
+done
+if [ "\${already_exempt}" = "0" ]; then
+    uci add_list dhcp.@dnsmasq[0].rebind_domain='/onion/'
+    uci commit dhcp
+    echo "  ✅ dnsmasq: rebind protection exenta para .onion"
+else
+    echo "  — dnsmasq: rebind exemption /onion/ ya configurada"
+fi
+
 # ── 4. Recargar servicios ─────────────────────────────────
 echo ""
 /etc/init.d/dnsmasq restart 2>/dev/null && echo "  ✅ dnsmasq reiniciado" || true
@@ -395,6 +412,19 @@ for s in \${servers}; do
 done
 [ "\${dns_changed}" = "0" ] && echo "  — Entrada dnsmasq .onion no encontrada"
 [ "\${dns_changed}" = "1" ] && uci commit dhcp || true
+
+# Eliminar exención rebind protection para .onion
+rebind_changed=0
+rebind_domains=\$(uci -q get dhcp.@dnsmasq[0].rebind_domain 2>/dev/null || true)
+for rd in \${rebind_domains}; do
+    if [ "\${rd}" = "/onion/" ]; then
+        uci -q del_list dhcp.@dnsmasq[0].rebind_domain='/onion/' 2>/dev/null || true
+        rebind_changed=1
+        echo "  ✅ dnsmasq: rebind exemption /onion/ eliminada"
+        break
+    fi
+done
+[ "\${rebind_changed}" = "1" ] && uci commit dhcp || true
 
 # ── Recargar servicios ────────────────────────────────────
 echo ""
@@ -574,6 +604,19 @@ if [ -n "\${onion_server}" ]; then
 else
     fail "Sin entrada dnsmasq server /onion/"
     hint "Ejecuta: just onion-enable"
+fi
+
+# Verificar exención rebind protection (sin esto dnsmasq descarta IPs 10.x.x.x)
+rebind_ok=0
+rebind_domains=\$(uci -q get dhcp.@dnsmasq[0].rebind_domain 2>/dev/null || true)
+for rd in \${rebind_domains}; do
+    [ "\${rd}" = "/onion/" ] && rebind_ok=1
+done
+if [ "\${rebind_ok}" = "1" ]; then
+    ok "dnsmasq rebind protection exenta para .onion"
+else
+    fail "dnsmasq rebind_domain '/onion/' no configurado — bloqueará respuestas 10.x.x.x"
+    hint "Ejecuta: just onion-enable  (lo configura automáticamente)"
 fi
 
 if ps 2>/dev/null | grep -q '[d]nsmasq'; then
