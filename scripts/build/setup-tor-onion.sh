@@ -235,9 +235,13 @@ echo "  ✅ dnsmasq: .onion → \${RASPI_IP}#\${DNS_PORT}"
 echo ""
 /etc/init.d/dnsmasq restart 2>/dev/null && echo "  ✅ dnsmasq reiniciado" || true
 
-fw_err=$(/etc/init.d/firewall restart 2>&1) \
-    && echo "  ✅ Firewall reiniciado" \
-    || { echo "  ❌ Error al reiniciar firewall:"; echo "\${fw_err}" | sed 's/^/     /'; }
+if /etc/init.d/firewall restart >/tmp/_tor_onion_fw.log 2>&1; then
+    echo "  ✅ Firewall reiniciado"
+else
+    echo "  ❌ Error al reiniciar firewall:"
+    sed 's/^/     /' /tmp/_tor_onion_fw.log
+fi
+rm -f /tmp/_tor_onion_fw.log
 
 # ── 5. Verificar resolución DNS .onion ───────────────────
 echo ""
@@ -302,7 +306,13 @@ else
     echo "  — \${NFT_FILE} no encontrado"
 fi
 
-/etc/init.d/firewall restart 2>/dev/null && echo "  ✅ Firewall reiniciado" || true
+if /etc/init.d/firewall restart >/tmp/_tor_onion_fw.log 2>&1; then
+    echo "  ✅ Firewall reiniciado"
+else
+    echo "  ❌ Error al reiniciar firewall:"
+    sed 's/^/     /' /tmp/_tor_onion_fw.log
+fi
+rm -f /tmp/_tor_onion_fw.log
 echo ""
 echo "  Nota: la entrada dnsmasq .onion se conserva."
 echo "  Usa 'uninstall' para eliminarla también."
@@ -375,7 +385,13 @@ done
 
 # ── Recargar servicios ────────────────────────────────────
 echo ""
-/etc/init.d/firewall restart 2>/dev/null && echo "  ✅ Firewall reiniciado" || true
+if /etc/init.d/firewall restart >/tmp/_tor_onion_fw.log 2>&1; then
+    echo "  ✅ Firewall reiniciado"
+else
+    echo "  ❌ Error al reiniciar firewall:"
+    sed 's/^/     /' /tmp/_tor_onion_fw.log
+fi
+rm -f /tmp/_tor_onion_fw.log
 [ "\${dns_changed}" = "1" ] && \
     { /etc/init.d/dnsmasq restart 2>/dev/null && echo "  ✅ dnsmasq reiniciado" || true; }
 EOF
