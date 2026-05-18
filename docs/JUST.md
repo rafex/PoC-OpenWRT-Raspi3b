@@ -225,6 +225,7 @@ Configura OpenWRT para enrutar dominios `.onion` a través de Tor en la Raspi3b 
 | `just onion-disable` | Desactiva el DNAT (conserva la entrada dnsmasq `.onion`) |
 | `just onion-uninstall` | Limpieza total: elimina DNAT + entrada dnsmasq |
 | `just onion-status` | Muestra estado del include UCI, archivo nftables y prueba DNS en vivo |
+| `just onion-doctor` | Diagnóstico capa por capa: DHCP → dnsmasq → nftables → puertos Tor en la Raspi |
 
 Ejemplos:
 ```bash
@@ -233,6 +234,7 @@ just onion-enable --raspi-ip 192.168.1.100        # IP explícita (puertos defau
 just onion-disable                                # Solo quita DNAT, conserva DNS
 just onion-uninstall                              # Limpieza total
 just onion-status                                 # Ver estado y prueba DNS en vivo
+just onion-doctor                                 # Diagnostica todo el stack, sale con código 1 si hay errores
 ```
 
 Prerrequisito en la Raspi3b (`/etc/tor/torrc`):

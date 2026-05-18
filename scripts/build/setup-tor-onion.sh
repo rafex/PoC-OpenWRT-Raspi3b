@@ -22,12 +22,14 @@
 #   disable   Desactiva el DNAT (conserva entrada DNS en dnsmasq)
 #   uninstall Elimina el DNAT y la entrada DNS de dnsmasq
 #   status    Muestra el estado actual
+#   doctor    Diagnostica dependencias y configuración capa por capa
 #
 # Uso:
 #   setup-tor-onion.sh enable    [--raspi-ip <IP>] [--dns-port 5353] [--trans-port 9040]
 #   setup-tor-onion.sh disable   [--ip <router>] [--env <env>]
 #   setup-tor-onion.sh uninstall [--ip <router>] [--env <env>]
 #   setup-tor-onion.sh status    [--ip <router>] [--env <env>]
+#   setup-tor-onion.sh doctor    [--ip <router>] [--dns-port 5353] [--trans-port 9040]
 # ============================================================================
 set -euo pipefail
 
@@ -61,6 +63,7 @@ Subcomandos:
   disable   Desactiva el DNAT (conserva la entrada DNS en dnsmasq)
   uninstall Elimina el DNAT y la entrada DNS de dnsmasq
   status    Muestra el estado actual
+  doctor    Diagnostica el stack completo capa por capa
 
 Opciones:
   --raspi-ip <IP>      IP de la Raspi3b (default: auto-detecta raspi-tor en DHCP)
@@ -77,6 +80,7 @@ Ejemplos:
   $(basename "$0") disable
   $(basename "$0") uninstall
   $(basename "$0") status
+  $(basename "$0") doctor
 HELP
 }
 
@@ -477,6 +481,199 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# doctor — diagnostica el stack completo capa por capa
+# ---------------------------------------------------------------------------
+_doctor() {
+    _check_ssh
+
+    local nft_file="${_NFT_FILE}"
+    local uci_include="${_UCI_INCLUDE}"
+    local dns_port="${_DNS_PORT:-${_DEFAULT_DNS_PORT}}"
+    local trans_port="${_TRANS_PORT:-${_DEFAULT_TRANS_PORT}}"
+
+    echo ""
+    echo "============================================="
+    echo " Diagnóstico — Transparent .onion proxy"
+    echo "============================================="
+
+    local _rc=0
+    _ssh sh - << EOF || _rc=$?
+NFT_FILE="${nft_file}"
+UCI_INCLUDE="${uci_include}"
+DNS_PORT="${dns_port}"
+TRANS_PORT="${trans_port}"
+
+PASS=0
+FAIL=0
+WARN=0
+RASPI_IP=""
+RASPI_MAC=""
+
+ok()   { echo "  ✅ \$*"; PASS=\$((PASS + 1)); }
+fail() { echo "  ❌ \$*"; FAIL=\$((FAIL + 1)); }
+warn() { echo "  ⚠️  \$*"; WARN=\$((WARN + 1)); }
+hint() { echo "     → \$*"; }
+
+# ── Capa 1: DHCP raspi-tor ───────────────────────────────
+echo ""
+echo "  ── Capa 1: IP estática raspi-tor (DHCP) ────────────"
+idx=0
+while uci -q get "dhcp.@host[\${idx}]" >/dev/null 2>&1; do
+    hname=\$(uci -q get "dhcp.@host[\${idx}].name" 2>/dev/null || true)
+    if [ "\${hname}" = "raspi-tor" ]; then
+        RASPI_IP=\$(uci -q get "dhcp.@host[\${idx}].ip"  2>/dev/null || true)
+        RASPI_MAC=\$(uci -q get "dhcp.@host[\${idx}].mac" 2>/dev/null || true)
+        break
+    fi
+    idx=\$((idx + 1))
+done
+
+if [ -n "\${RASPI_IP}" ]; then
+    ok "DHCP estático raspi-tor: \${RASPI_MAC} → \${RASPI_IP}"
+else
+    fail "Sin entrada DHCP 'raspi-tor' — IP de la Raspi desconocida"
+    hint "Ejecuta: just socks-enable"
+fi
+
+# Fallback: extraer IP desde la entrada dnsmasq /onion/ si existe
+if [ -z "\${RASPI_IP}" ]; then
+    servers=\$(uci -q get dhcp.@dnsmasq[0].server 2>/dev/null || true)
+    for s in \${servers}; do
+        case "\${s}" in
+            /onion/*)
+                RASPI_IP=\$(echo "\${s}" | sed 's|/onion/||;s|#.*||')
+                warn "Raspi IP obtenida desde dnsmasq (sin DHCP estático): \${RASPI_IP}"
+                break ;;
+        esac
+    done
+fi
+
+# Ping a la Raspi
+if [ -n "\${RASPI_IP}" ]; then
+    if ping -c 1 -W 2 "\${RASPI_IP}" >/dev/null 2>&1; then
+        ok "Raspi alcanzable en la red: \${RASPI_IP}"
+    else
+        fail "Raspi NO alcanzable: \${RASPI_IP}"
+        hint "Verifica que la Raspi esté encendida y conectada al LAN del router"
+    fi
+fi
+
+# ── Capa 2: dnsmasq .onion ───────────────────────────────
+echo ""
+echo "  ── Capa 2: dnsmasq .onion ──────────────────────────"
+servers=\$(uci -q get dhcp.@dnsmasq[0].server 2>/dev/null || true)
+onion_server=""
+for s in \${servers}; do
+    case "\${s}" in
+        /onion/*) onion_server="\${s}"; break ;;
+    esac
+done
+
+if [ -n "\${onion_server}" ]; then
+    ok "dnsmasq server .onion: \${onion_server}"
+else
+    fail "Sin entrada dnsmasq server /onion/"
+    hint "Ejecuta: just onion-enable"
+fi
+
+if ps 2>/dev/null | grep -q '[d]nsmasq'; then
+    ok "dnsmasq corriendo"
+else
+    fail "dnsmasq NO está corriendo"
+    hint "/etc/init.d/dnsmasq restart"
+fi
+
+dns_result=\$(nslookup duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion 127.0.0.1 2>/dev/null || true)
+if echo "\${dns_result}" | grep -q "^Address:.*10\."; then
+    vip=\$(echo "\${dns_result}" | grep "^Address:.*10\." | head -1 | awk '{print \$2}')
+    ok "DNS .onion resuelve a IP virtual: \${vip}"
+else
+    fail "DNS .onion no resuelve a IP virtual 10.x.x.x"
+    hint "Verifica en la Raspi: DNSPort 0.0.0.0:\${DNS_PORT} en /etc/tor/torrc"
+    hint "sudo systemctl restart tor  (en la Raspi)"
+fi
+
+# ── Capa 3: nftables DNAT ────────────────────────────────
+echo ""
+echo "  ── Capa 3: nftables DNAT ───────────────────────────"
+
+if uci -q get "firewall.\${UCI_INCLUDE}" >/dev/null 2>&1; then
+    nft_path=\$(uci -q get "firewall.\${UCI_INCLUDE}.path" 2>/dev/null || true)
+    ok "UCI include '\${UCI_INCLUDE}' registrado: \${nft_path}"
+else
+    fail "UCI include '\${UCI_INCLUDE}' no registrado en el firewall"
+    hint "Ejecuta: just onion-enable"
+fi
+
+if [ -f "\${NFT_FILE}" ]; then
+    ok "Archivo nft existe: \${NFT_FILE}"
+else
+    fail "Archivo nft NO existe: \${NFT_FILE}"
+    hint "Ejecuta: just onion-enable"
+fi
+
+if command -v nft >/dev/null 2>&1; then
+    if nft list chain inet fw4 tor_onion_dnat >/dev/null 2>&1; then
+        ok "Cadena tor_onion_dnat cargada en el kernel"
+    else
+        fail "Cadena tor_onion_dnat NO cargada (fw4 no incluyó el archivo)"
+        hint "Ejecuta: just onion-uninstall && just onion-enable"
+    fi
+    if nft list chain inet fw4 tor_onion_snat >/dev/null 2>&1; then
+        ok "Cadena tor_onion_snat cargada en el kernel"
+    else
+        fail "Cadena tor_onion_snat NO cargada (fw4 no incluyó el archivo)"
+        hint "Ejecuta: just onion-uninstall && just onion-enable"
+    fi
+else
+    warn "nft no disponible en el router — no se pueden verificar cadenas"
+fi
+
+# ── Capa 4: puertos Tor en la Raspi ─────────────────────
+echo ""
+echo "  ── Capa 4: puertos Tor en la Raspi ─────────────────"
+if [ -z "\${RASPI_IP}" ]; then
+    warn "Raspi IP desconocida — se omite verificación de puertos"
+elif command -v nc >/dev/null 2>&1; then
+    if nc -z -w2 "\${RASPI_IP}" "\${DNS_PORT}" 2>/dev/null; then
+        ok "DNSPort alcanzable: \${RASPI_IP}:\${DNS_PORT}"
+    else
+        fail "DNSPort NO alcanzable: \${RASPI_IP}:\${DNS_PORT}"
+        hint "Verifica en la Raspi: DNSPort 0.0.0.0:\${DNS_PORT} en /etc/tor/torrc"
+        hint "sudo systemctl status tor"
+    fi
+    if nc -z -w2 "\${RASPI_IP}" "\${TRANS_PORT}" 2>/dev/null; then
+        ok "TransPort alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
+    else
+        fail "TransPort NO alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
+        hint "Verifica en la Raspi: TransPort 0.0.0.0:\${TRANS_PORT} en /etc/tor/torrc"
+    fi
+else
+    warn "nc no disponible en el router — no se pueden verificar puertos"
+    hint "opkg update && opkg install netcat"
+fi
+
+# ── Resumen ──────────────────────────────────────────────
+echo ""
+echo "  ─────────────────────────────────────────────────────"
+echo "  Resultado: \${PASS} OK  |  \${FAIL} ERROR  |  \${WARN} AVISO"
+echo "  ─────────────────────────────────────────────────────"
+echo ""
+
+[ "\${FAIL}" -gt 0 ] && exit 1 || exit 0
+EOF
+
+    echo ""
+    if [ "${_rc}" -eq 0 ]; then
+        log_info "✅ Todos los checks pasaron — proxy .onion listo"
+    else
+        log_error "Hay errores — revisa los puntos marcados con ❌ arriba"
+    fi
+    echo ""
+    return "${_rc}"
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 case "${_SUBCMD}" in
@@ -484,6 +681,7 @@ case "${_SUBCMD}" in
     disable)   _disable ;;
     uninstall) _uninstall ;;
     status)    _status ;;
+    doctor)    _doctor ;;
     -h|--help) _show_help ;;
     *) log_error "Subcomando desconocido: ${_SUBCMD}"; _show_help; exit 1 ;;
 esac

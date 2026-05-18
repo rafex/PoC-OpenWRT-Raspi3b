@@ -339,6 +339,9 @@ scripts/build/setup-tor-onion.sh uninstall
 
 # Estado
 scripts/build/setup-tor-onion.sh status
+
+# Diagnóstico capa por capa
+scripts/build/setup-tor-onion.sh doctor
 ```
 
 El include UCI se registra con el nombre fijo `tor_onion_nft` y el archivo nftables en `/etc/nftables.d/tor-onion.nft`.
@@ -346,6 +349,14 @@ El include UCI se registra con el nombre fijo `tor_onion_nft` y el archivo nftab
 Diferencia `disable` vs `uninstall`:
 - `disable`: elimina el DNAT (las IPs virtuales dejan de redirigirse), pero `.onion` sigue resolviéndose via dnsmasq
 - `uninstall`: limpieza total — elimina el DNAT y la entrada dnsmasq
+
+El subcomando `doctor` verifica el stack completo en 4 capas y muestra ✅/❌/⚠️ por check:
+1. **DHCP**: entrada `raspi-tor` y alcanzabilidad de la Raspi
+2. **dnsmasq**: server `/onion/`, proceso corriendo y resolución DNS real
+3. **nftables**: include UCI, archivo `.nft` y cadenas `tor_onion_dnat`/`tor_onion_snat` cargadas en el kernel
+4. **Puertos Tor**: DNSPort y TransPort accesibles desde el router vía `nc`
+
+Sale con código de salida 1 si algún check falla, útil para scripts.
 
 ---
 

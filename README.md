@@ -63,6 +63,7 @@ just build-prod
 | `just clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
 | `just socks-enable` / `just socks-disable` / `just socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
 | `just onion-enable` / `just onion-disable` / `just onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
+| `just onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |
 
 ## Licencia
 

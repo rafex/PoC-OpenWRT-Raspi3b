@@ -964,6 +964,14 @@ onion-status *args='':
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh status {{args}}
 
+# onion-doctor: Diagnostica el stack .onion capa por capa (DHCP → dnsmasq → nftables → puertos Tor)
+# Muestra ✅/❌/⚠️ por check y sugerencias de corrección; sale con código 1 si hay errores
+# Uso: just onion-doctor [--ip 192.168.x.x] [--dns-port 5353] [--trans-port 9040]
+onion-doctor *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/build/setup-tor-onion.sh doctor {{args}}
+
 # flash: Compilar y preparar para flashear (no ejecuta el flasheo automáticamente)
 flash ENV="prod":
     @echo "=== Preparando flasheo para entorno {{ ENV }} ==="
