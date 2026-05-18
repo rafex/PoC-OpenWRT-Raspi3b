@@ -39,10 +39,10 @@ install-tools force="false":
     # Determinar qué instalar
     if [ "$FORCE" = "true" ]; then
         echo "(modo force: se reinstalarán todas las herramientas)"
-        missing=(just make sops age yq)
+        missing=(just make gawk sops age yq)
     else
         missing=()
-        for tool in just make sops age yq; do
+        for tool in just make gawk sops age yq; do
             if ! command -v "$tool" &>/dev/null; then
                 missing+=("$tool")
             fi
@@ -62,6 +62,8 @@ install-tools force="false":
     path_hint=false
     case "$(uname -s)" in
         Darwin)
+            # gawk no es necesario en macOS (el Image Builder solo corre en Linux x86_64)
+            # pero se incluye por consistencia si alguien lo solicita explícitamente
             cmds+=("brew install ${missing[*]}")
             ;;
         Linux)
@@ -70,6 +72,7 @@ install-tools force="false":
             for tool in "${missing[@]}"; do
                 case "$tool" in
                     make)  cmds+=("sudo apt-get install -y make") ;;
+                    gawk)  cmds+=("sudo apt-get install -y gawk") ;;  # GNU awk requerido por el Image Builder de OpenWRT
                     just)  if [ "$FORCE" = "true" ]; then
                                cmds+=("rm -rf ~/.local/bin/just")
                            fi

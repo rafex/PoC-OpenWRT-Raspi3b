@@ -15,7 +15,7 @@ BUILD_DIR="${BUILD_DIR:-$(pwd)/openwrt-builder}"
 # ---------------------------------------------------------------------------
 check_deps() {
     log_step "Checking system dependencies..."
-    local deps=("wget" "make" "gcc" "g++" "awk" "find" "tar")
+    local deps=("wget" "make" "gcc" "g++" "gawk" "find" "tar")
     local missing=()
 
     # Check for zstd or unzstd
