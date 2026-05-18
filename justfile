@@ -984,6 +984,124 @@ router-onion-doctor *args='':
     # shellcheck disable=SC2086
     scripts/router/setup-tor-onion.sh doctor {{args}}
 
+# ---------------------------------------------------------------------------
+# Backup y restauración
+# ---------------------------------------------------------------------------
+
+# router-backup: Descarga backup de /etc/config del router a ./backups/
+# Uso: just router-backup [ip=] [env=] [dir=]
+router-backup *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/backup.sh backup {{args}}
+
+# router-restore: Aplica un backup local en el router y reinicia
+# Uso: just router-restore --file backups/router-YYYYMMDD.tar.gz [ip=] [env=]
+router-restore *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/backup.sh restore {{args}}
+
+# router-backup-list: Lista los backups locales disponibles en ./backups/
+router-backup-list *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/backup.sh list {{args}}
+
+# ---------------------------------------------------------------------------
+# Estado y reinicio
+# ---------------------------------------------------------------------------
+
+# router-status: Muestra estado general del router (sistema, red, WiFi, clientes, servicios)
+# Uso: just router-status [ip=] [env=]
+router-status *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/status.sh {{args}}
+
+# router-reboot: Reinicia el router via SSH
+# Uso: just router-reboot [ip=] [env=] [--wait]
+router-reboot *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/reboot.sh {{args}}
+
+# ---------------------------------------------------------------------------
+# WireGuard
+# ---------------------------------------------------------------------------
+
+# router-wireguard-status: Muestra estado del túnel WireGuard y peers activos
+# Uso: just router-wireguard-status [ip=] [env=]
+router-wireguard-status *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-wireguard.sh status {{args}}
+
+# router-wireguard-enable / disable: Activa o desactiva la interfaz wg0
+# Uso: just router-wireguard-enable [ip=] [env=]
+router-wireguard-enable *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-wireguard.sh enable {{args}}
+
+router-wireguard-disable *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-wireguard.sh disable {{args}}
+
+# router-wireguard-peer-list: Lista los peers WireGuard configurados en UCI
+# Uso: just router-wireguard-peer-list [ip=] [env=]
+router-wireguard-peer-list *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-wireguard.sh peer-list {{args}}
+
+# router-wireguard-peer-add: Añade un peer al túnel WireGuard
+# Uso: just router-wireguard-peer-add --pubkey <key> --endpoint <IP:port> --allowed-ips <CIDR> [--name <n>]
+router-wireguard-peer-add *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-wireguard.sh peer-add {{args}}
+
+# router-wireguard-peer-remove: Elimina un peer WireGuard por su clave pública
+# Uso: just router-wireguard-peer-remove --pubkey <key> [ip=] [env=]
+router-wireguard-peer-remove *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-wireguard.sh peer-remove {{args}}
+
+# ---------------------------------------------------------------------------
+# Port forwarding
+# ---------------------------------------------------------------------------
+
+# router-port-forward-list: Lista todas las reglas de port forwarding
+# Uso: just router-port-forward-list [ip=] [env=]
+router-port-forward-list *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-port-forward.sh list {{args}}
+
+# router-port-forward-add: Añade una regla de port forwarding (DNAT desde WAN)
+# Uso: just router-port-forward-add --name <n> --port <ext> --dest-ip <IP> [--dest-port <p>] [--proto tcp|udp|both]
+router-port-forward-add *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-port-forward.sh add {{args}}
+
+# router-port-forward-remove: Elimina una regla de port forwarding por nombre
+# Uso: just router-port-forward-remove --name <nombre> [ip=] [env=]
+router-port-forward-remove *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-port-forward.sh remove {{args}}
+
+# router-port-forward-status: Muestra reglas activas con contadores nftables
+# Uso: just router-port-forward-status [ip=] [env=]
+router-port-forward-status *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-port-forward.sh status {{args}}
+
 # ─────────────────────────────────────────────────────
 # Limpieza
 # ─────────────────────────────────────────────────────
