@@ -687,20 +687,14 @@ else
     hint "La Capa 2 valida el DNSPort completo: si la nslookup via dnsmasq pasa, el puerto está OK"
     hint "Para verificar bootstrap: grep Bootstrapped /run/tor/notices.log (en la Raspi)"
 
-    # TransPort es TCP — nc conecta y Tor cierra la conexión (no hay ORIGINAL_DST).
-    # En algunos builds de BusyBox, RST del servidor da exit 1 aunque la conexión
-    # llegó. Si este check falla pero la Capa 3 está OK, el TransPort está activo.
-    if command -v nc >/dev/null 2>&1; then
-        if nc -w 2 "\${RASPI_IP}" "\${TRANS_PORT}" </dev/null 2>/dev/null; then
-            ok "TransPort TCP alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
-        else
-            fail "TransPort TCP no alcanzable: \${RASPI_IP}:\${TRANS_PORT}"
-            hint "Verifica: TransPort 0.0.0.0:\${TRANS_PORT} en /etc/tor/torrc"
-            hint "sudo systemctl status tor@default"
-        fi
+    # TransPort: nc siempre falla porque Tor rechaza conexiones directas
+    # (no DNAT'd — no tiene SO_ORIGINAL_DST → RST inmediato por diseño).
+    # Verificar en su lugar que la regla DNAT apunta al destino correcto.
+    if nft list chain inet fw4 tor_onion_dnat 2>/dev/null | grep -q "dnat ip to \${RASPI_IP}:\${TRANS_PORT}"; then
+        ok "TransPort DNAT apunta a \${RASPI_IP}:\${TRANS_PORT} (activo)"
     else
-        warn "nc no disponible — TransPort TCP no verificable vía red"
-        hint "opkg update && opkg install netcat"
+        fail "DNAT no apunta a \${RASPI_IP}:\${TRANS_PORT} — regla incorrecta o ausente"
+        hint "Ejecuta: just onion-uninstall && just onion-enable"
     fi
 fi
 
