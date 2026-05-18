@@ -352,11 +352,26 @@ Diferencia `disable` vs `uninstall`:
 
 El subcomando `doctor` verifica el stack completo en 4 capas y muestra ✅/❌/⚠️ por check:
 1. **DHCP**: entrada `raspi-tor` y alcanzabilidad de la Raspi
-2. **dnsmasq**: server `/onion/`, proceso corriendo y resolución DNS real
+2. **dnsmasq**: server `/onion/`, proceso corriendo, rebind_domain `/onion/` exento y resolución DNS real
 3. **nftables**: include UCI, archivo `.nft` y cadenas `tor_onion_dnat`/`tor_onion_snat` cargadas en el kernel
-4. **Puertos Tor**: DNSPort y TransPort accesibles desde el router vía `nc`
+4. **Puertos Tor**: TransPort verificado vía regla DNAT en nftables; DNSPort reportado como ⚠️ (UDP — no testable con TCP desde OpenWRT; si la Capa 2 pasa, el puerto está OK)
 
 Sale con código de salida 1 si algún check falla, útil para scripts.
+
+**Requisito de red en los clientes**: el proxy transparente solo funciona si el dispositivo cliente usa el router OpenWRT como resolver DNS. Si el equipo tiene varias interfaces de red activas (p.ej. WiFi a otra red + ethernet al OpenWRT), las consultas `.onion` pueden salir por la interfaz incorrecta y no pasar por dnsmasq.
+
+En equipos Linux con `systemd-resolved` conectados a múltiples redes: verificar con `resolvectl status` que la interfaz ethernet al OpenWRT tiene prioridad para `.onion`.
+
+**Alternativa SOCKS5** (funciona independientemente de la interfaz de red):
+```bash
+# Acceso puntual
+curl --socks5-hostname 192.168.1.136:9050 http://dominio.onion
+
+# Variables de entorno (sesión completa)
+export http_proxy=socks5h://192.168.1.136:9050
+export https_proxy=socks5h://192.168.1.136:9050
+curl http://dominio.onion
+```
 
 ---
 

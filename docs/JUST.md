@@ -245,6 +245,21 @@ TransPort 0.0.0.0:9040
 DNSPort  0.0.0.0:5300   # evitar conflicto con mDNS (puerto 5353)
 ```
 
+**Requisito de red en los clientes**: el proxy transparente solo funciona si el dispositivo usa el router OpenWRT como resolver DNS. Si el equipo tiene varias interfaces de red activas (p.ej. WiFi a otra red + ethernet al OpenWRT), las consultas `.onion` pueden salir por la interfaz incorrecta y no pasar por dnsmasq del router.
+
+En equipos Linux con `systemd-resolved` verificar con `resolvectl status` que la interfaz ethernet al OpenWRT tiene prioridad. Regla práctica: si `cat /etc/resolv.conf` muestra `127.0.0.53`, el equipo usa systemd-resolved — asegurarse de que la ruta de DNS para `.onion` llega al router.
+
+**Alternativa SOCKS5** (no depende de qué interfaz esté activa):
+```bash
+# Acceso puntual
+curl --socks5-hostname 192.168.1.136:9050 http://dominio.onion
+
+# Variables de entorno para la sesión
+export http_proxy=socks5h://192.168.1.136:9050
+export https_proxy=socks5h://192.168.1.136:9050
+curl http://dominio.onion
+```
+
 ### SOCKS Forward (Raspi3b / Tor)
 
 Activa o desactiva el port forwarding del proxy SOCKS de la Raspberry Pi 3b para que dispositivos en la red upstream puedan usarlo.
