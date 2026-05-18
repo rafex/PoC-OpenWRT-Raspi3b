@@ -374,6 +374,8 @@ echo "  Regla de port forwarding:"
 
 idx=0
 found=""
+dest_ip=""
+dest_port=""
 while uci -q get "firewall.@redirect[\${idx}]" >/dev/null 2>&1; do
     name=\$(uci -q get "firewall.@redirect[\${idx}].name" 2>/dev/null || true)
     if [ "\${name}" = "\${RULE_NAME}" ]; then
@@ -423,6 +425,33 @@ if [ -n "\${found2}" ]; then
     echo "  ✅ \${hmac} → \${hip}  (raspi-tor)"
 else
     echo "  — (sin entrada estática para raspi-tor)"
+fi
+
+# ── Prueba de conectividad SOCKS ──────────────────────
+echo ""
+echo "  Prueba SOCKS → Tor (check.torproject.org):"
+if [ -z "\${dest_ip}" ] || [ -z "\${dest_port}" ]; then
+    echo "  — Regla inactiva, sin proxy que probar"
+elif ! command -v curl >/dev/null 2>&1; then
+    echo "  ⚠️  curl no disponible en el router"
+    echo "  Prueba desde el Mac:"
+    echo "  curl --socks5-hostname \${dest_ip}:\${dest_port} https://check.torproject.org/api/ip"
+else
+    echo "  Conectando via \${dest_ip}:\${dest_port} (máx. 20s)..."
+    response=\$(curl --socks5-hostname "\${dest_ip}:\${dest_port}" \
+        --max-time 20 --silent \
+        https://check.torproject.org/api/ip 2>/dev/null || true)
+    if [ -z "\${response}" ]; then
+        echo "  ❌ Sin respuesta — ¿Tor corriendo en la Raspi?"
+    else
+        is_tor=\$(echo "\${response}" | grep -o '"IsTor":[a-z]*' | cut -d: -f2 || true)
+        exit_ip=\$(echo "\${response}" | grep -o '"IP":"[^"]*"' | cut -d'"' -f4 || true)
+        if [ "\${is_tor}" = "true" ]; then
+            echo "  ✅ Tor OK — IP de salida: \${exit_ip}"
+        else
+            echo "  ⚠️  Conectado pero IsTor=false — IP: \${exit_ip}"
+        fi
+    fi
 fi
 
 echo ""
