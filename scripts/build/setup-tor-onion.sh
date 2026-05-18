@@ -204,10 +204,19 @@ cat > "\${NFT_FILE}" << 'NFTEOF'
 # Transparent Tor proxy — .onion
 # Generado por setup-tor-onion.sh — no editar manualmente
 #
+# Este archivo se incluye DENTRO del bloque table inet fw4 { } de fw4,
+# por eso usa definiciones de cadenas con hooks (no 'add rule').
+#
 # DNAT: TCP al rango virtual .onion → Raspi TransPort
-add rule inet fw4 dstnat ip daddr ${vrange} ip protocol tcp dnat ip to ${raspi_ip}:${trans_port}
+chain tor_onion_dnat {
+    type nat hook prerouting priority dstnat; policy accept;
+    ip daddr ${vrange} meta l4proto tcp dnat ip to ${raspi_ip}:${trans_port}
+}
 # MASQUERADE: el router actúa de origen para la Raspi → retorno correcto via conntrack
-add rule inet fw4 srcnat ip daddr ${raspi_ip} ip protocol tcp tcp dport ${trans_port} masquerade
+chain tor_onion_snat {
+    type nat hook postrouting priority srcnat; policy accept;
+    ip daddr ${raspi_ip} tcp dport ${trans_port} masquerade
+}
 NFTEOF
 echo "  ✅ \${NFT_FILE} creado"
 
