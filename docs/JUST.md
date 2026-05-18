@@ -59,8 +59,8 @@ just <recipe>                  # Ejecutar una recipe
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just update [ip=<IP>] [env=<env>]` | Actualizar firmware via sysupgrade **manteniendo** configuración |
-| `just update-force [ip=<IP>] [env=<env>]` | Actualizar firmware **borrando** configuración del router |
+| `just router-update [ip=<IP>] [env=<env>]` | Actualizar firmware via sysupgrade **manteniendo** configuración |
+| `just router-update-force [ip=<IP>] [env=<env>]` | Actualizar firmware **borrando** configuración del router |
 | `just flash [env]` | Compilar y preparar imagen (no flashea automáticamente) |
 
 La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto `192.168.1.1`.
@@ -69,44 +69,44 @@ La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto 
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just setup-extroot [ip=] [device=] [env=]` | Configura USB como extroot (`/overlay`) para ampliar almacenamiento |
-| `just setup-logs [ip=] [env=]` | Configura logs persistentes en el USB (requiere extroot activo) |
-| `just setup-auth [ip=] [env=] [key=]` | Copia clave SSH pública al router y establece contraseña root |
+| `just router-setup-extroot [ip=] [device=] [env=]` | Configura USB como extroot (`/overlay`) para ampliar almacenamiento |
+| `just router-setup-logs [ip=] [env=]` | Configura logs persistentes en el USB (requiere extroot activo) |
+| `just router-setup-auth [ip=] [env=] [key=]` | Copia clave SSH pública al router y establece contraseña root |
 
 ### Post-instalación de paquetes
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just post-install [group=] [ip=] [env=]` | Instala paquetes adicionales via `opkg` (lee `openwrt-post-install-packages.toml`) |
+| `just router-post-install [group=] [ip=] [env=]` | Instala paquetes adicionales via `opkg` (lee `openwrt-router-post-install-packages.toml`) |
 
 Ejemplo:
 ```bash
-just post-install                          # Instala todos los grupos
-just post-install group=captive_portal     # Solo el grupo captive_portal (uhttpd)
-scripts/build/post-install.sh --list       # Ver grupos disponibles
+just router-post-install                          # Instala todos los grupos
+just router-post-install group=captive_portal     # Solo el grupo captive_portal (uhttpd)
+scripts/build/post-install.sh --list              # Ver grupos disponibles
 ```
 
 ### Portal cautivo
 
-Requiere: `just post-install group=captive_portal` (instala `uhttpd`).
+Requiere: `just router-post-install group=captive_portal` (instala `uhttpd`).
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just setup-captive [ip=] [env=] [timeout=30] [portal-url=] [token=]` | Instala el portal cautivo (nftables + uhttpd) |
-| `just remove-captive [ip=] [env=]` | Desinstala el portal cautivo |
-| `just captive-allow client=<IP> [timeout=30] [ip=] [env=]` | Autoriza una IP manualmente (`timeout=0` = permanente) |
-| `just captive-block client=<IP> [ip=] [env=]` | Revoca el acceso de una IP |
-| `just captive-flush [ip=] [env=]` | Limpia todos los clientes autorizados |
-| `just captive-list [ip=] [env=]` | Lista clientes autorizados y estado del portal |
-| `just captive-status [ip=] [env=]` | Diagnóstico completo del portal |
+| `just router-captive-setup [ip=] [env=] [timeout=30] [portal-url=] [token=]` | Instala el portal cautivo (nftables + uhttpd) |
+| `just router-captive-remove [ip=] [env=]` | Desinstala el portal cautivo |
+| `just router-captive-allow client=<IP> [timeout=30] [ip=] [env=]` | Autoriza una IP manualmente (`timeout=0` = permanente) |
+| `just router-captive-block client=<IP> [ip=] [env=]` | Revoca el acceso de una IP |
+| `just router-captive-flush [ip=] [env=]` | Limpia todos los clientes autorizados |
+| `just router-captive-list [ip=] [env=]` | Lista clientes autorizados y estado del portal |
+| `just router-captive-status [ip=] [env=]` | Diagnóstico completo del portal |
 
 Ejemplos:
 ```bash
-just setup-captive                                      # Portal local (HTML en el router)
-just setup-captive portal-url=https://portal.example.com token=abc123  # Portal externo
-just captive-allow client=192.168.1.50                 # 30 min (default)
-just captive-allow client=192.168.1.50 timeout=120     # 2 horas
-just captive-allow client=192.168.1.50 timeout=0       # Sin límite
+just router-captive-setup                                      # Portal local (HTML en el router)
+just router-captive-setup portal-url=https://portal.example.com token=abc123  # Portal externo
+just router-captive-allow client=192.168.1.50                 # 30 min (default)
+just router-captive-allow client=192.168.1.50 timeout=120     # 2 horas
+just router-captive-allow client=192.168.1.50 timeout=0       # Sin límite
 ```
 
 ### WiFi
@@ -115,36 +115,36 @@ Todas las recipes pasan argumentos directamente al script (`--flag valor`).
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just wifi-ap` | AP interactivo: detecta radios libres → SSID → contraseña → canal |
-| `just wifi-client` | Cliente interactivo: selecciona banda → escanea → SSID → contraseña |
-| `just wifi-disconnect` | Desconecta todos los clientes STA y elimina interfaz `wwan` |
-| `just wifi-scan` | Escanea 2.4 GHz y 5 GHz; con `--radio` solo esa banda |
-| `just wifi-status` | Estado de radios e interfaces (banda, canal, SSID, clientes) |
-| `just wifi-enable --radio <r>` | Habilita un radio |
-| `just wifi-disable --radio <r>` | Deshabilita un radio |
+| `just router-wifi-ap` | AP interactivo: detecta radios libres → SSID → contraseña → canal |
+| `just router-wifi-client` | Cliente interactivo: selecciona banda → escanea → SSID → contraseña |
+| `just router-wifi-disconnect` | Desconecta todos los clientes STA y elimina interfaz `wwan` |
+| `just router-wifi-scan` | Escanea 2.4 GHz y 5 GHz; con `--radio` solo esa banda |
+| `just router-wifi-status` | Estado de radios e interfaces (banda, canal, SSID, clientes) |
+| `just router-wifi-enable --radio <r>` | Habilita un radio |
+| `just router-wifi-disable --radio <r>` | Deshabilita un radio |
 
 Alias de radio válidos: `radio0`, `radio1`, `2g`, `5g`, `2.4ghz`, `5ghz`.
 
 Ejemplos:
 ```bash
-just wifi-ap                                       # AP completamente interactivo
-just wifi-ap --ssid MiRed --radio 5g              # Pre-selecciona radio y SSID
-just wifi-ap --ssid MiRed --channel 36 --open     # Sin contraseña, canal fijo
+just router-wifi-ap                                       # AP completamente interactivo
+just router-wifi-ap --ssid MiRed --radio 5g              # Pre-selecciona radio y SSID
+just router-wifi-ap --ssid MiRed --channel 36 --open     # Sin contraseña, canal fijo
 
-just wifi-client                                   # Interactivo: elige banda → escanea
-just wifi-client --radio 2.4ghz                   # Fuerza 2.4 GHz, luego interactivo
-just wifi-client --radio 5g --ssid RedExterna     # Fuerza radio y SSID
+just router-wifi-client                                   # Interactivo: elige banda → escanea
+just router-wifi-client --radio 2.4ghz                   # Fuerza 2.4 GHz, luego interactivo
+just router-wifi-client --radio 5g --ssid RedExterna     # Fuerza radio y SSID
 
-just wifi-disconnect                               # Desconecta todos los clientes
-just wifi-disconnect --radio radio0               # Solo desconecta radio0
+just router-wifi-disconnect                               # Desconecta todos los clientes
+just router-wifi-disconnect --radio radio0               # Solo desconecta radio0
 
-just wifi-scan                                     # Escanea 2.4 GHz y 5 GHz
-just wifi-scan --radio 5g                         # Solo 5 GHz
-just wifi-scan --radio radio0                     # Solo 2.4 GHz
+just router-wifi-scan                                     # Escanea 2.4 GHz y 5 GHz
+just router-wifi-scan --radio 5g                         # Solo 5 GHz
+just router-wifi-scan --radio radio0                     # Solo 2.4 GHz
 
-just wifi-status
-just wifi-disable --radio radio1
-just wifi-enable --radio radio0
+just router-wifi-status
+just router-wifi-disable --radio radio1
+just router-wifi-enable --radio radio0
 ```
 
 ### Routing
@@ -153,28 +153,28 @@ Gestiona qué interfaz usa el router como salida a internet y permite fijar IPs 
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just routing-status` | Muestra rutas, gateways, métricas y pins activos |
-| `just routing-priority <wan\|wifi\|equal>` | Define la interfaz de salida preferida |
-| `just routing-pin --from <IP> --via <wan\|wifi>` | Fija tráfico de una IP LAN a una interfaz concreta |
-| `just routing-unpin --from <IP>` | Elimina el pin de una IP LAN |
-| `just routing-pins` | Lista todos los pins activos |
-| `just routing-reset` | Elimina todos los pins y restaura prioridad a WAN |
+| `just router-routing-status` | Muestra rutas, gateways, métricas y pins activos |
+| `just router-routing-priority <wan\|wifi\|equal>` | Define la interfaz de salida preferida |
+| `just router-routing-pin --from <IP> --via <wan\|wifi>` | Fija tráfico de una IP LAN a una interfaz concreta |
+| `just router-routing-unpin --from <IP>` | Elimina el pin de una IP LAN |
+| `just router-routing-pins` | Lista todos los pins activos |
+| `just router-routing-reset` | Elimina todos los pins y restaura prioridad a WAN |
 
 Modos de prioridad:
 - `wan` — WAN físico como gateway preferido (métrica más baja)
 - `wifi` — Cliente WiFi (`wwan`) como gateway preferido
 - `equal` — Ambas interfaces con la misma métrica
 
-Los pins de enrutamiento persisten entre reinicios vía `/etc/routing-pins.conf` y un hotplug script.
+Los pins de enrutamiento persisten entre reinicios vía `/etc/router-routing-pins.conf` y un hotplug script.
 
 Ejemplos:
 ```bash
-just routing-priority wifi                               # Preferir WiFi cliente
-just routing-priority wan                                # Preferir WAN físico
-just routing-pin --from 192.168.1.50 --via wifi         # Laptop siempre por WiFi
-just routing-pin --from 192.168.1.51 --via wan          # Servidor siempre por WAN
-just routing-unpin --from 192.168.1.50
-just routing-reset
+just router-routing-priority wifi                               # Preferir WiFi cliente
+just router-routing-priority wan                                # Preferir WAN físico
+just router-routing-pin --from 192.168.1.50 --via wifi         # Laptop siempre por WiFi
+just router-routing-pin --from 192.168.1.51 --via wan          # Servidor siempre por WAN
+just router-routing-unpin --from 192.168.1.50
+just router-routing-reset
 ```
 
 ### IPs Estáticas
@@ -183,19 +183,19 @@ Gestiona DHCP static leases: asigna IPs fijas a dispositivos por MAC address.
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just static-ip-add --mac <MAC> --assign <IP> [--name <nombre>]` | Asigna IP estática a un dispositivo |
-| `just static-ip-remove --mac <MAC>` o `--assign <IP>` | Elimina asignación por MAC o por IP |
-| `just static-ip-list` | Muestra todas las asignaciones + leases activos |
-| `just static-ip-clear` | Elimina todas las asignaciones |
-| `just static-ip-import --file <csv>` | Importa desde CSV (formato: `MAC,IP,nombre`) |
+| `just router-static-ip-add --mac <MAC> --assign <IP> [--name <nombre>]` | Asigna IP estática a un dispositivo |
+| `just router-static-ip-remove --mac <MAC>` o `--assign <IP>` | Elimina asignación por MAC o por IP |
+| `just router-static-ip-list` | Muestra todas las asignaciones + leases activos |
+| `just router-static-ip-clear` | Elimina todas las asignaciones |
+| `just router-static-ip-import --file <csv>` | Importa desde CSV (formato: `MAC,IP,nombre`) |
 
 Ejemplos:
 ```bash
-just static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 --name servidor
-just static-ip-remove --mac AA:BB:CC:DD:EE:FF
-just static-ip-remove --assign 192.168.1.100
-just static-ip-list
-just static-ip-import --file hosts.csv
+just router-static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 --name servidor
+just router-static-ip-remove --mac AA:BB:CC:DD:EE:FF
+just router-static-ip-remove --assign 192.168.1.100
+just router-static-ip-list
+just router-static-ip-import --file hosts.csv
 ```
 
 ### DNS
@@ -204,18 +204,18 @@ Configura los servidores DNS upstream que usa dnsmasq para resolver nombres.
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just dns-set` | Configura DNS (default: 1.1.1.1 Cloudflare + 8.8.8.8 Google) |
-| `just dns-show` | Muestra la configuración DNS actual |
-| `just dns-reset` | Restaura DNS por defecto (1.1.1.1 + 8.8.8.8) |
+| `just router-dns-set` | Configura DNS (default: 1.1.1.1 Cloudflare + 8.8.8.8 Google) |
+| `just router-dns-show` | Muestra la configuración DNS actual |
+| `just router-dns-reset` | Restaura DNS por defecto (1.1.1.1 + 8.8.8.8) |
 
 Ejemplos:
 ```bash
-just dns-set                                              # Cloudflare + Google
-just dns-set --primary 9.9.9.9                           # Quad9 + Google
-just dns-set --primary 9.9.9.9 --secondary 149.112.112.112  # Quad9 solo
-just dns-set --primary 208.67.222.222 --secondary 208.67.220.220  # OpenDNS
-just dns-show
-just dns-reset
+just router-dns-set                                              # Cloudflare + Google
+just router-dns-set --primary 9.9.9.9                           # Quad9 + Google
+just router-dns-set --primary 9.9.9.9 --secondary 149.112.112.112  # Quad9 solo
+just router-dns-set --primary 208.67.222.222 --secondary 208.67.220.220  # OpenDNS
+just router-dns-show
+just router-dns-reset
 ```
 
 ### Transparent .onion proxy (Tor via Raspi3b)
@@ -224,20 +224,20 @@ Configura OpenWRT para enrutar dominios `.onion` a través de Tor en la Raspi3b 
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just onion-enable` | Activa el transparent proxy: dnsmasq `.onion` + nftables DNAT + MASQUERADE |
-| `just onion-disable` | Desactiva el DNAT (conserva la entrada dnsmasq `.onion`) |
-| `just onion-uninstall` | Limpieza total: elimina DNAT + entrada dnsmasq |
-| `just onion-status` | Muestra estado del include UCI, archivo nftables y prueba DNS en vivo |
-| `just onion-doctor` | Diagnóstico capa por capa: DHCP → dnsmasq → nftables → puertos Tor en la Raspi |
+| `just router-onion-enable` | Activa el transparent proxy: dnsmasq `.onion` + nftables DNAT + MASQUERADE |
+| `just router-onion-disable` | Desactiva el DNAT (conserva la entrada dnsmasq `.onion`) |
+| `just router-onion-uninstall` | Limpieza total: elimina DNAT + entrada dnsmasq |
+| `just router-onion-status` | Muestra estado del include UCI, archivo nftables y prueba DNS en vivo |
+| `just router-onion-doctor` | Diagnóstico capa por capa: DHCP → dnsmasq → nftables → puertos Tor en la Raspi |
 
 Ejemplos:
 ```bash
-just onion-enable                                 # Auto-detecta IP raspi-tor desde DHCP
-just onion-enable --raspi-ip 192.168.1.100        # IP explícita (puertos default: 5300 + 9040)
-just onion-disable                                # Solo quita DNAT, conserva DNS
-just onion-uninstall                              # Limpieza total
-just onion-status                                 # Ver estado y prueba DNS en vivo
-just onion-doctor                                 # Diagnostica todo el stack, sale con código 1 si hay errores
+just router-onion-enable                                 # Auto-detecta IP raspi-tor desde DHCP
+just router-onion-enable --raspi-ip 192.168.1.100        # IP explícita (puertos default: 5300 + 9040)
+just router-onion-disable                                # Solo quita DNAT, conserva DNS
+just router-onion-uninstall                              # Limpieza total
+just router-onion-status                                 # Ver estado y prueba DNS en vivo
+just router-onion-doctor                                 # Diagnostica todo el stack, sale con código 1 si hay errores
 ```
 
 Prerrequisito en la Raspi3b (`/etc/tor/torrc`):
@@ -269,10 +269,10 @@ Activa o desactiva el port forwarding del proxy SOCKS de la Raspberry Pi 3b para
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just socks-enable` | Activa el forwarding: pide IP de la Raspi, fija IP estática en DHCP y crea la regla DNAT |
-| `just socks-disable` | Elimina la regla DNAT del firewall |
-| `just socks-uninstall` | Elimina la regla DNAT **y** la IP estática de la Raspi en DHCP |
-| `just socks-status` | Muestra el estado de la regla y la IP estática de la Raspi |
+| `just router-socks-enable` | Activa el forwarding: pide IP de la Raspi, fija IP estática en DHCP y crea la regla DNAT |
+| `just router-socks-disable` | Elimina la regla DNAT del firewall |
+| `just router-socks-uninstall` | Elimina la regla DNAT **y** la IP estática de la Raspi en DHCP |
+| `just router-socks-status` | Muestra el estado de la regla y la IP estática de la Raspi |
 
 Diferencia entre `disable` y `uninstall`:
 - `disable` — solo elimina la regla de port forwarding. La IP estática de la Raspi queda en DHCP.
@@ -280,15 +280,15 @@ Diferencia entre `disable` y `uninstall`:
 
 Ejemplos:
 ```bash
-just socks-enable                                 # Interactivo: pide IP de la Raspi
-just socks-enable --raspi-ip 192.168.1.100        # Con IP predefinida (puerto default 9050)
-just socks-enable --raspi-ip 192.168.1.100 --port 9050
-just socks-disable                                # Quita el forwarding, conserva IP estática
-just socks-uninstall                              # Limpieza total
-just socks-status
+just router-socks-enable                                 # Interactivo: pide IP de la Raspi
+just router-socks-enable --raspi-ip 192.168.1.100        # Con IP predefinida (puerto default 9050)
+just router-socks-enable --raspi-ip 192.168.1.100 --port 9050
+just router-socks-disable                                # Quita el forwarding, conserva IP estática
+just router-socks-uninstall                              # Limpieza total
+just router-socks-status
 ```
 
-Flujo de `socks-enable`:
+Flujo de `router-socks-enable`:
 1. Pide la IP actual de la Raspi3b (si no se pasa con `--raspi-ip`)
 2. Detecta la MAC de la Raspi en la tabla ARP del router
 3. Llama a `setup-static-ip.sh add` para fijar la IP en DHCP como `raspi-tor`
@@ -301,13 +301,13 @@ Lista los dispositivos conectados al router: leases DHCP activos y tabla ARP.
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just clients` | Lista dispositivos conectados (leases DHCP + tabla ARP) |
+| `just router-clients` | Lista dispositivos conectados (leases DHCP + tabla ARP) |
 
 Ejemplos:
 ```bash
-just clients                        # Red por defecto (prod)
-just clients --env dev              # Entorno dev
-just clients --ip 192.168.0.1      # IP del router explícita
+just router-clients                        # Red por defecto (prod)
+just router-clients --env dev              # Entorno dev
+just router-clients --ip 192.168.0.1      # IP del router explícita
 ```
 
 ### Limpieza
@@ -349,57 +349,57 @@ just build-prod
 # Sigue docs/FLASH_INSTRUCTIONS.md para el flasheo físico
 
 # Post-flash: configuración inicial del router
-just setup-auth                 # Clave SSH + contraseña root
-just setup-extroot              # USB como extroot (si hay USB conectado)
-just setup-logs                 # Logs persistentes (tras reinicio con extroot)
+just router-setup-auth                 # Clave SSH + contraseña root
+just router-setup-extroot              # USB como extroot (si hay USB conectado)
+just router-setup-logs                 # Logs persistentes (tras reinicio con extroot)
 ```
 
 ### Configurar WiFi
 
 ```bash
-just wifi-status                                         # Ver estado actual
+just router-wifi-status                                         # Ver estado actual
 
-just wifi-ap                                             # AP interactivo (detecta radios libres)
-just wifi-ap --ssid MiRed --radio 5g                    # Pre-selecciona radio
+just router-wifi-ap                                             # AP interactivo (detecta radios libres)
+just router-wifi-ap --ssid MiRed --radio 5g                    # Pre-selecciona radio
 
-just wifi-client                                         # Interactivo: banda → escanea → SSID
-just wifi-client --radio 2.4ghz                         # Fuerza 2.4 GHz, resto interactivo
+just router-wifi-client                                         # Interactivo: banda → escanea → SSID
+just router-wifi-client --radio 2.4ghz                         # Fuerza 2.4 GHz, resto interactivo
 
-just wifi-scan                                           # Escanea 2.4 GHz y 5 GHz
-just wifi-scan --radio 5g                               # Solo 5 GHz
+just router-wifi-scan                                           # Escanea 2.4 GHz y 5 GHz
+just router-wifi-scan --radio 5g                               # Solo 5 GHz
 
-just dns-set                                             # DNS Cloudflare + Google
-just dns-set --primary 9.9.9.9                          # Cambiar DNS primario
+just router-dns-set                                             # DNS Cloudflare + Google
+just router-dns-set --primary 9.9.9.9                          # Cambiar DNS primario
 ```
 
 ### Instalar portal cautivo
 
 ```bash
-just post-install group=captive_portal  # Instala uhttpd en el router
-just setup-captive                      # Instala el portal (30 min por defecto)
-just captive-status                     # Verificar que funciona
-just captive-allow client=192.168.1.50  # Autorizar dispositivo manualmente
+just router-post-install group=captive_portal  # Instala uhttpd en el router
+just router-captive-setup                      # Instala el portal (30 min por defecto)
+just router-captive-status                     # Verificar que funciona
+just router-captive-allow client=192.168.1.50  # Autorizar dispositivo manualmente
 ```
 
 ### Gestionar routing
 
 ```bash
-# Router con WAN físico + cliente WiFi (wifi-client):
-just routing-status                                               # Ver configuración actual
-just routing-priority wifi                                        # Preferir WiFi como salida
-just routing-pin --from 192.168.1.100 --via wan                  # NAS siempre por WAN
-just routing-pin --from 192.168.1.50  --via wifi                 # Laptop siempre por WiFi
-just routing-unpin --from 192.168.1.50
-just routing-reset
+# Router con WAN físico + cliente WiFi (router-wifi-client):
+just router-routing-status                                               # Ver configuración actual
+just router-routing-priority wifi                                        # Preferir WiFi como salida
+just router-routing-pin --from 192.168.1.100 --via wan                  # NAS siempre por WAN
+just router-routing-pin --from 192.168.1.50  --via wifi                 # Laptop siempre por WiFi
+just router-routing-unpin --from 192.168.1.50
+just router-routing-reset
 ```
 
 ### Asignar IPs fijas
 
 ```bash
-just static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.10 --name nas
-just static-ip-add --mac BB:CC:DD:EE:FF:00 --assign 192.168.1.11 --name impresora
-just static-ip-list
-just static-ip-remove --mac AA:BB:CC:DD:EE:FF
+just router-static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.10 --name nas
+just router-static-ip-add --mac BB:CC:DD:EE:FF:00 --assign 192.168.1.11 --name impresora
+just router-static-ip-list
+just router-static-ip-remove --mac AA:BB:CC:DD:EE:FF
 ```
 
 ---

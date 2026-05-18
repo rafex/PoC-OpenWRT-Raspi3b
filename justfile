@@ -535,10 +535,10 @@ validate:
 # Update / Flasheo
 # ─────────────────────────────────────────────────────
 
-# update: Actualizar firmware del router via sysupgrade (mantiene configuración)
-# Uso: just update [ip=<IP>] [env=<dev|prod>]
+# router-update: Actualizar firmware del router via sysupgrade (mantiene configuración)
+# Uso: just router-update [ip=<IP>] [env=<dev|prod>]
 # La IP se infiere de environments/<env>/.env.public o usa 192.168.1.1 por defecto
-update ip="" env="prod":
+router-update ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }}"
@@ -546,11 +546,11 @@ update ip="" env="prod":
         ARGS="${ARGS} --ip {{ ip }}"
     fi
     # shellcheck disable=SC2086
-    scripts/build/update.sh ${ARGS}
+    scripts/build/router-update.sh ${ARGS}
 
-# update-force: Actualizar firmware borrando la configuración del router
-# Uso: just update-force [ip=<IP>] [env=<dev|prod>]
-update-force ip="" env="prod":
+# router-update-force: Actualizar firmware borrando la configuración del router
+# Uso: just router-update-force [ip=<IP>] [env=<dev|prod>]
+router-update-force ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }} --force"
@@ -558,67 +558,67 @@ update-force ip="" env="prod":
         ARGS="${ARGS} --ip {{ ip }}"
     fi
     # shellcheck disable=SC2086
-    scripts/build/update.sh ${ARGS}
+    scripts/build/router-update.sh ${ARGS}
 
-# setup-extroot: Configurar USB como extroot en el router via SSH
+# router-setup-extroot: Configurar USB como extroot en el router via SSH
 # Monta el USB, copia /overlay, configura fstab y reinicia.
 # Prerrequisito: USB formateado como ext4 antes de conectar al router.
-# Uso: just setup-extroot [ip=<IP>] [device=<dev>] [env=<env>]
-setup-extroot ip="" device="" env="prod":
+# Uso: just router-setup-extroot [ip=<IP>] [device=<dev>] [env=<env>]
+router-setup-extroot ip="" device="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }}"
     if [ -n "{{ ip }}" ];     then ARGS="${ARGS} --ip {{ ip }}"; fi
     if [ -n "{{ device }}" ]; then ARGS="${ARGS} --device {{ device }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-extroot.sh ${ARGS}
+    scripts/build/router-setup-extroot.sh ${ARGS}
 
-# setup-logs: Configurar logs persistentes en USB (extroot) via SSH
-# ⚠️  Prerrequisito: just setup-extroot debe haberse ejecutado y el router
+# router-setup-logs: Configurar logs persistentes en USB (extroot) via SSH
+# ⚠️  Prerrequisito: just router-setup-extroot debe haberse ejecutado y el router
 #    debe haber reiniciado con el USB montado como /overlay.
-# Uso: just setup-logs [ip=<IP>] [env=<env>]
-setup-logs ip="" env="prod":
+# Uso: just router-setup-logs [ip=<IP>] [env=<env>]
+router-setup-logs ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-logs.sh ${ARGS}
+    scripts/build/router-setup-logs.sh ${ARGS}
 
-# setup-auth: Copia clave SSH pública al router y establece contraseña root
+# router-setup-auth: Copia clave SSH pública al router y establece contraseña root
 # Orden recomendado: primero copia la clave, luego pide contraseña (evita bloqueos)
-# Uso: just setup-auth [ip=<IP>] [env=<env>] [key=<path>]
-setup-auth ip="" env="prod" key="":
+# Uso: just router-setup-auth [ip=<IP>] [env=<env>] [key=<path>]
+router-setup-auth ip="" env="prod" key="":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     if [ -n "{{ key }}" ]; then ARGS="${ARGS} --key {{ key }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-auth.sh ${ARGS}
+    scripts/build/router-setup-auth.sh ${ARGS}
 
-# post-install: Instala paquetes adicionales en el router via opkg (post-flash)
-# Lee config/openwrt-post-install-packages.toml
-# Uso: just post-install [group=<grupo>] [ip=<IP>] [env=<env>]
-#      just post-install group=captive_portal
-#      just post-install --list  → muestra grupos disponibles
-post-install group="" ip="" env="prod":
+# router-post-install: Instala paquetes adicionales en el router via opkg (post-flash)
+# Lee config/openwrt-router-post-install-packages.toml
+# Uso: just router-post-install [group=<grupo>] [ip=<IP>] [env=<env>]
+#      just router-post-install group=captive_portal
+#      just router-post-install --list  → muestra grupos disponibles
+router-post-install group="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     if [ -n "{{ group }}" ]; then ARGS="${ARGS} --group {{ group }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/post-install.sh ${ARGS}
+    scripts/build/router-post-install.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # Portal cautivo (nftables + uhttpd, sin OpenNDS)
-# Flujo: just post-install group=captive_portal → just setup-captive
+# Flujo: just router-post-install group=captive_portal → just router-captive-setup
 # ---------------------------------------------------------------------------
 
-# setup-captive: Instala el portal cautivo en el router
-# Uso: just setup-captive [ip=] [env=] [timeout=30] [portal-url=] [token=]
-setup-captive ip="" env="prod" timeout="30" portal-url="" token="":
+# router-captive-setup: Instala el portal cautivo en el router
+# Uso: just router-captive-setup [ip=] [env=] [timeout=30] [portal-url=] [token=]
+router-captive-setup ip="" env="prod" timeout="30" portal-url="" token="":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="install --env {{ env }} --timeout {{ timeout }}"
@@ -626,80 +626,80 @@ setup-captive ip="" env="prod" timeout="30" portal-url="" token="":
     if [ -n "{{ portal-url }}" ]; then ARGS="${ARGS} --portal-url {{ portal-url }}"; fi
     if [ -n "{{ token }}" ];      then ARGS="${ARGS} --token {{ token }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
-# remove-captive: Desinstala el portal cautivo del router
-# Uso: just remove-captive [ip=] [env=]
-remove-captive ip="" env="prod":
+# router-captive-remove: Desinstala el portal cautivo del router
+# Uso: just router-captive-remove [ip=] [env=]
+router-captive-remove ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="uninstall --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
-# captive-allow: Autoriza una IP manualmente en el portal cautivo
+# router-captive-allow: Autoriza una IP manualmente en el portal cautivo
 # timeout en minutos (default: 30). 0 = sin límite (permanente).
-# Uso: just captive-allow client=192.168.1.50 [timeout=30] [ip=] [env=]
-#      just captive-allow client=192.168.1.50 timeout=0    # permanente
-#      just captive-allow client=192.168.1.50 timeout=120  # 2 horas
-captive-allow client="" ip="" env="prod" timeout="30":
+# Uso: just router-captive-allow client=192.168.1.50 [timeout=30] [ip=] [env=]
+#      just router-captive-allow client=192.168.1.50 timeout=0    # permanente
+#      just router-captive-allow client=192.168.1.50 timeout=120  # 2 horas
+router-captive-allow client="" ip="" env="prod" timeout="30":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{ client }}" ]; then echo "ERROR: especifica client=<IP>"; exit 1; fi
     ARGS="allow {{ client }} --env {{ env }} --timeout {{ timeout }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
-# captive-block: Revoca autorización de una IP del portal cautivo
-# Uso: just captive-block client=192.168.1.50 [ip=] [env=]
-captive-block client="" ip="" env="prod":
+# router-captive-block: Revoca autorización de una IP del portal cautivo
+# Uso: just router-captive-block client=192.168.1.50 [ip=] [env=]
+router-captive-block client="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{ client }}" ]; then echo "ERROR: especifica client=<IP>"; exit 1; fi
     ARGS="block {{ client }} --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
-# captive-flush: Limpia todos los clientes autorizados del portal
-# Uso: just captive-flush [ip=] [env=]
-captive-flush ip="" env="prod":
+# router-captive-flush: Limpia todos los clientes autorizados del portal
+# Uso: just router-captive-flush [ip=] [env=]
+router-captive-flush ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="flush --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
-# captive-list: Muestra clientes autorizados y estado del portal
-# Uso: just captive-list [ip=] [env=]
-captive-list ip="" env="prod":
+# router-captive-list: Muestra clientes autorizados y estado del portal
+# Uso: just router-captive-list [ip=] [env=]
+router-captive-list ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="list --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
-# captive-status: Diagnóstico del portal cautivo
-# Uso: just captive-status [ip=] [env=]
-captive-status ip="" env="prod":
+# router-captive-status: Diagnóstico del portal cautivo
+# Uso: just router-captive-status [ip=] [env=]
+router-captive-status ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="status --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-captive.sh ${ARGS}
+    scripts/build/router-captive-setup.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # WiFi (APs y modo cliente)
 # ---------------------------------------------------------------------------
 
-# setup-wifi: Configura WiFi en el router (AP o cliente)
-# Ver subcomandos con: just setup-wifi help
-setup-wifi subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" open="false":
+# router-wifi-setup: Configura WiFi en el router (AP o cliente)
+# Ver subcomandos con: just router-wifi-setup help
+router-wifi-setup subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" open="false":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="{{ subcmd }} --env {{ env }}"
@@ -710,83 +710,83 @@ setup-wifi subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" op
     if [ -n "{{ channel }}" ];  then ARGS="${ARGS} --channel {{ channel }}"; fi
     if [ "{{ open }}" = "true" ]; then ARGS="${ARGS} --open"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/router-wifi-setup.sh ${ARGS}
 
-# wifi-ap: Configura un Access Point (completamente interactivo)
+# router-wifi-ap: Configura un Access Point (completamente interactivo)
 # Sin args: pregunta radio disponible → SSID → contraseña → canal
-# Uso: just wifi-ap [--radio 5g|radio1] [--ssid MiRed] [--channel 6] [--open] [--env dev]
-wifi-ap *args='':
+# Uso: just router-wifi-ap [--radio 5g|radio1] [--ssid MiRed] [--channel 6] [--open] [--env dev]
+router-wifi-ap *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ap {{args}}
+    scripts/build/router-wifi-setup.sh ap {{args}}
 
-# wifi-client: Conecta el router como cliente a otra red WiFi
+# router-wifi-client: Conecta el router como cliente a otra red WiFi
 # Sin argumentos: escanea redes y guía interactivamente (SSID, banda, contraseña, BSSID)
-# Uso: just wifi-client [--radio 2g|5g|radio0|radio1] [--ssid OtraRed] [--env dev]
-wifi-client *args='':
+# Uso: just router-wifi-client [--radio 2g|5g|radio0|radio1] [--ssid OtraRed] [--env dev]
+router-wifi-client *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh client {{args}}
+    scripts/build/router-wifi-setup.sh client {{args}}
 
-# wifi-disconnect: Desconecta el cliente WiFi (elimina STA y wwan)
-# Uso: just wifi-disconnect [radio=radio1] [ip=] [env=]
+# router-wifi-disconnect: Desconecta el cliente WiFi (elimina STA y wwan)
+# Uso: just router-wifi-disconnect [radio=radio1] [ip=] [env=]
 #      Sin radio=: desconecta todos los clientes STA activos
-wifi-disconnect radio="" ip="" env="prod":
+router-wifi-disconnect radio="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="disconnect --env {{ env }}"
     if [ -n "{{ radio }}" ]; then ARGS="${ARGS} --radio {{ radio }}"; fi
     if [ -n "{{ ip }}" ];    then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/router-wifi-setup.sh ${ARGS}
 
-# wifi-scan: Escanea redes WiFi disponibles
+# router-wifi-scan: Escanea redes WiFi disponibles
 # Sin args: escanea ambos radios (2.4 GHz y 5 GHz)
-# Uso: just wifi-scan [--radio 2g|5g|radio0|radio1] [--env dev] [--ip 192.168.x.x]
-wifi-scan *args='':
+# Uso: just router-wifi-scan [--radio 2g|5g|radio0|radio1] [--env dev] [--ip 192.168.x.x]
+router-wifi-scan *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh scan {{args}}
+    scripts/build/router-wifi-setup.sh scan {{args}}
 
-# wifi-status: Muestra estado de todos los radios e interfaces WiFi
-# Uso: just wifi-status [ip=] [env=]
-wifi-status ip="" env="prod":
+# router-wifi-status: Muestra estado de todos los radios e interfaces WiFi
+# Uso: just router-wifi-status [ip=] [env=]
+router-wifi-status ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="status --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/router-wifi-setup.sh ${ARGS}
 
-# wifi-enable: Habilita un radio WiFi
-# Uso: just wifi-enable radio=radio0|2g|radio1|5g [ip=] [env=]
-wifi-enable radio="" ip="" env="prod":
+# router-wifi-enable: Habilita un radio WiFi
+# Uso: just router-wifi-enable radio=radio0|2g|radio1|5g [ip=] [env=]
+router-wifi-enable radio="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{ radio }}" ]; then echo "ERROR: especifica radio=<radio0|radio1|2g|5g>"; exit 1; fi
     ARGS="enable --radio {{ radio }} --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/router-wifi-setup.sh ${ARGS}
 
-# wifi-disable: Deshabilita un radio WiFi
-# Uso: just wifi-disable radio=radio0|2g|radio1|5g [ip=] [env=]
-wifi-disable radio="" ip="" env="prod":
+# router-wifi-disable: Deshabilita un radio WiFi
+# Uso: just router-wifi-disable radio=radio0|2g|radio1|5g [ip=] [env=]
+router-wifi-disable radio="" ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{ radio }}" ]; then echo "ERROR: especifica radio=<radio0|radio1|2g|5g>"; exit 1; fi
     ARGS="disable --radio {{ radio }} --env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/build/setup-wifi.sh ${ARGS}
+    scripts/build/router-wifi-setup.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # Routing (prioridad WAN vs WiFi cliente y source-based routing)
 # ---------------------------------------------------------------------------
 
-# routing-status: Muestra rutas, gateways y métricas actuales
-# Uso: just routing-status [ip=] [env=]
-routing-status ip="" env="prod":
+# router-routing-status: Muestra rutas, gateways y métricas actuales
+# Uso: just router-routing-status [ip=] [env=]
+router-routing-status ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="status --env {{ env }}"
@@ -794,37 +794,37 @@ routing-status ip="" env="prod":
     # shellcheck disable=SC2086
     scripts/build/setup-routing.sh ${ARGS}
 
-# routing-priority: Define qué interfaz es la salida preferida
-# Uso: just routing-priority <wan|wifi|equal> [--env dev] [--ip 192.168.x.x]
-routing-priority *args='':
+# router-routing-priority: Define qué interfaz es la salida preferida
+# Uso: just router-routing-priority <wan|wifi|equal> [--env dev] [--ip 192.168.x.x]
+router-routing-priority *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-routing.sh priority {{args}}
 
-# routing-pin: Fija el tráfico de una IP LAN a una interfaz concreta
-# Uso: just routing-pin --from 192.168.1.50 --via wifi [--env dev]
-routing-pin *args='':
+# router-routing-pin: Fija el tráfico de una IP LAN a una interfaz concreta
+# Uso: just router-routing-pin --from 192.168.1.50 --via wifi [--env dev]
+router-routing-pin *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-routing.sh pin {{args}}
 
-# routing-unpin: Elimina el pin de enrutamiento para una IP LAN
-# Uso: just routing-unpin --from 192.168.1.50 [--env dev]
-routing-unpin *args='':
+# router-routing-unpin: Elimina el pin de enrutamiento para una IP LAN
+# Uso: just router-routing-unpin --from 192.168.1.50 [--env dev]
+router-routing-unpin *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-routing.sh unpin {{args}}
 
-# routing-pins: Lista todos los pins de enrutamiento activos
-# Uso: just routing-pins [--env dev] [--ip 192.168.x.x]
-routing-pins *args='':
+# router-routing-pins: Lista todos los pins de enrutamiento activos
+# Uso: just router-routing-pins [--env dev] [--ip 192.168.x.x]
+router-routing-pins *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-routing.sh pins {{args}}
 
-# routing-reset: Elimina todos los pins y restaura prioridad a WAN
-# Uso: just routing-reset [--env dev] [--ip 192.168.x.x]
-routing-reset *args='':
+# router-routing-reset: Elimina todos los pins y restaura prioridad a WAN
+# Uso: just router-routing-reset [--env dev] [--ip 192.168.x.x]
+router-routing-reset *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-routing.sh reset {{args}}
@@ -833,38 +833,38 @@ routing-reset *args='':
 # IPs Estáticas (DHCP leases por MAC address)
 # ---------------------------------------------------------------------------
 
-# static-ip-add: Asigna IP estática a un MAC address
-# Uso: just static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 [--name servidor]
-static-ip-add *args='':
+# router-static-ip-add: Asigna IP estática a un MAC address
+# Uso: just router-static-ip-add --mac AA:BB:CC:DD:EE:FF --assign 192.168.1.100 [--name servidor]
+router-static-ip-add *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-static-ip.sh add {{args}}
 
-# static-ip-remove: Elimina asignación de IP estática (por MAC o por IP)
-# Uso: just static-ip-remove --mac AA:BB:CC:DD:EE:FF
-#      just static-ip-remove --assign 192.168.1.100
-static-ip-remove *args='':
+# router-static-ip-remove: Elimina asignación de IP estática (por MAC o por IP)
+# Uso: just router-static-ip-remove --mac AA:BB:CC:DD:EE:FF
+#      just router-static-ip-remove --assign 192.168.1.100
+router-static-ip-remove *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-static-ip.sh remove {{args}}
 
-# static-ip-list: Muestra todas las asignaciones de IP estática
-# Uso: just static-ip-list [--env dev] [--ip 192.168.x.x]
-static-ip-list *args='':
+# router-static-ip-list: Muestra todas las asignaciones de IP estática
+# Uso: just router-static-ip-list [--env dev] [--ip 192.168.x.x]
+router-static-ip-list *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-static-ip.sh list {{args}}
 
-# static-ip-clear: Elimina TODAS las asignaciones de IP estática
-# Uso: just static-ip-clear [--env dev] [--ip 192.168.x.x]
-static-ip-clear *args='':
+# router-static-ip-clear: Elimina TODAS las asignaciones de IP estática
+# Uso: just router-static-ip-clear [--env dev] [--ip 192.168.x.x]
+router-static-ip-clear *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-static-ip.sh clear {{args}}
 
-# static-ip-import: Importa asignaciones desde CSV (MAC,IP,nombre)
-# Uso: just static-ip-import --file hosts.csv [--env dev]
-static-ip-import *args='':
+# router-static-ip-import: Importa asignaciones desde CSV (MAC,IP,nombre)
+# Uso: just router-static-ip-import --file hosts.csv [--env dev]
+router-static-ip-import *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-static-ip.sh import {{args}}
@@ -873,24 +873,24 @@ static-ip-import *args='':
 # DNS
 # ---------------------------------------------------------------------------
 
-# dns-set: Configura los servidores DNS upstream del router
+# router-dns-set: Configura los servidores DNS upstream del router
 # Sin args: usa Cloudflare (1.1.1.1) + Google (8.8.8.8)
-# Uso: just dns-set [--primary 9.9.9.9] [--secondary 149.112.112.112] [--env dev]
-dns-set *args='':
+# Uso: just router-dns-set [--primary 9.9.9.9] [--secondary 149.112.112.112] [--env dev]
+router-dns-set *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-dns.sh set {{args}}
 
-# dns-show: Muestra la configuración DNS actual del router
-# Uso: just dns-show [--ip 192.168.x.x] [--env dev]
-dns-show *args='':
+# router-dns-show: Muestra la configuración DNS actual del router
+# Uso: just router-dns-show [--ip 192.168.x.x] [--env dev]
+router-dns-show *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-dns.sh show {{args}}
 
-# dns-reset: Restaura los DNS por defecto (1.1.1.1 + 8.8.8.8)
-# Uso: just dns-reset [--ip 192.168.x.x] [--env dev]
-dns-reset *args='':
+# router-dns-reset: Restaura los DNS por defecto (1.1.1.1 + 8.8.8.8)
+# Uso: just router-dns-reset [--ip 192.168.x.x] [--env dev]
+router-dns-reset *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-dns.sh reset {{args}}
@@ -899,42 +899,42 @@ dns-reset *args='':
 # Clientes DHCP
 # ---------------------------------------------------------------------------
 
-# clients: Lista los dispositivos conectados al router (leases DHCP + tabla ARP)
-# Uso: just clients [--ip 192.168.x.x] [--env dev]
-clients *args='':
+# router-clients: Lista los dispositivos conectados al router (leases DHCP + tabla ARP)
+# Uso: just router-clients [--ip 192.168.x.x] [--env dev]
+router-clients *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
-    scripts/build/show-clients.sh {{args}}
+    scripts/build/show-router-clients.sh {{args}}
 
 # ---------------------------------------------------------------------------
 # SOCKS Forward (Raspi3b / Tor)
 # ---------------------------------------------------------------------------
 
-# socks-enable: Activa el port forwarding del proxy SOCKS de la Raspi3b (Tor)
+# router-socks-enable: Activa el port forwarding del proxy SOCKS de la Raspi3b (Tor)
 # Pide la IP de la Raspi interactivamente, asigna IP estática en DHCP y crea la regla DNAT
-# Uso: just socks-enable [--raspi-ip 192.168.1.x] [--port 9050]
-socks-enable *args='':
+# Uso: just router-socks-enable [--raspi-ip 192.168.1.x] [--port 9050]
+router-socks-enable *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh enable {{args}}
 
-# socks-disable: Desactiva el port forwarding del proxy SOCKS (elimina la regla DNAT)
-# Uso: just socks-disable [--ip 192.168.x.x] [--env dev]
-socks-disable *args='':
+# router-socks-disable: Desactiva el port forwarding del proxy SOCKS (elimina la regla DNAT)
+# Uso: just router-socks-disable [--ip 192.168.x.x] [--env dev]
+router-socks-disable *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh disable {{args}}
 
-# socks-uninstall: Elimina la regla DNAT y la IP estática de la Raspi en DHCP
-# Uso: just socks-uninstall [--ip 192.168.x.x] [--env dev]
-socks-uninstall *args='':
+# router-socks-uninstall: Elimina la regla DNAT y la IP estática de la Raspi en DHCP
+# Uso: just router-socks-uninstall [--ip 192.168.x.x] [--env dev]
+router-socks-uninstall *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh uninstall {{args}}
 
-# socks-status: Muestra el estado del port forwarding SOCKS y la IP estática de la Raspi
-# Uso: just socks-status [--ip 192.168.x.x] [--env dev]
-socks-status *args='':
+# router-socks-status: Muestra el estado del port forwarding SOCKS y la IP estática de la Raspi
+# Uso: just router-socks-status [--ip 192.168.x.x] [--env dev]
+router-socks-status *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-socks-forward.sh status {{args}}
@@ -943,39 +943,39 @@ socks-status *args='':
 # Transparent .onion proxy (Tor via Raspi3b)
 # ---------------------------------------------------------------------------
 
-# onion-enable: Activa el transparent proxy .onion (dnsmasq + nftables DNAT)
+# router-onion-enable: Activa el transparent proxy .onion (dnsmasq + nftables DNAT)
 # Pide IP de la Raspi si no se indica; auto-detecta desde raspi-tor en DHCP
-# Uso: just onion-enable [--raspi-ip 192.168.1.x] [--dns-port 5300] [--trans-port 9040]
-onion-enable *args='':
+# Uso: just router-onion-enable [--raspi-ip 192.168.1.x] [--dns-port 5300] [--trans-port 9040]
+router-onion-enable *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh enable {{args}}
 
-# onion-disable: Desactiva el DNAT .onion (conserva la entrada dnsmasq)
-# Uso: just onion-disable [--ip 192.168.x.x] [--env dev]
-onion-disable *args='':
+# router-onion-disable: Desactiva el DNAT .onion (conserva la entrada dnsmasq)
+# Uso: just router-onion-disable [--ip 192.168.x.x] [--env dev]
+router-onion-disable *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh disable {{args}}
 
-# onion-uninstall: Elimina el DNAT y la entrada dnsmasq .onion (limpieza total)
-# Uso: just onion-uninstall [--ip 192.168.x.x] [--env dev]
-onion-uninstall *args='':
+# router-onion-uninstall: Elimina el DNAT y la entrada dnsmasq .onion (limpieza total)
+# Uso: just router-onion-uninstall [--ip 192.168.x.x] [--env dev]
+router-onion-uninstall *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh uninstall {{args}}
 
-# onion-status: Muestra el estado del transparent proxy .onion
-# Uso: just onion-status [--ip 192.168.x.x] [--env dev]
-onion-status *args='':
+# router-onion-status: Muestra el estado del transparent proxy .onion
+# Uso: just router-onion-status [--ip 192.168.x.x] [--env dev]
+router-onion-status *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh status {{args}}
 
-# onion-doctor: Diagnostica el stack .onion capa por capa (DHCP → dnsmasq → nftables → puertos Tor)
+# router-onion-doctor: Diagnostica el stack .onion capa por capa (DHCP → dnsmasq → nftables → puertos Tor)
 # Muestra ✅/❌/⚠️ por check y sugerencias de corrección; sale con código 1 si hay errores
-# Uso: just onion-doctor [--ip 192.168.x.x] [--dns-port 5300] [--trans-port 9040]
-onion-doctor *args='':
+# Uso: just router-onion-doctor [--ip 192.168.x.x] [--dns-port 5300] [--trans-port 9040]
+router-onion-doctor *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/build/setup-tor-onion.sh doctor {{args}}

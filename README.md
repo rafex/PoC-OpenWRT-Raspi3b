@@ -47,25 +47,29 @@ just build-prod
 - ✅ Cliente Tor
 - ❌ LuCi, uhttpd, rpcd (excluidos — uhttpd disponible via post-install)
 
-## Scripts de gestión del router
+## Gestión del router (vía SSH)
 
-| Script | Descripción |
+Las recetas con prefijo `router-` se ejecutan en el router OpenWRT vía SSH.
+Las recetas sin prefijo corren localmente (build, secrets, herramientas).
+
+| Receta | Descripción |
 |--------|-------------|
-| `just setup-auth` | Copia clave SSH pública + contraseña root |
-| `just setup-extroot` | Configura USB como extroot (`/overlay`) |
-| `just setup-logs` | Logs persistentes en USB |
-| `just post-install` | Instala paquetes adicionales via `opkg` |
-| `just setup-captive` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
-| `just wifi-ap` | Configura AP interactivo (detecta radios libres) |
-| `just wifi-client` | Conecta como cliente WiFi (selección de banda interactiva) |
-| `just wifi-scan` / `just wifi-status` | Escanea ambos radios y muestra estado |
-| `just routing-priority` / `just routing-pin` | Prioridad WAN vs WiFi + source-based routing |
-| `just static-ip-add` / `just static-ip-list` | DHCP leases estáticos por MAC address |
-| `just dns-set` / `just dns-show` / `just dns-reset` | Servidores DNS upstream de dnsmasq |
-| `just clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
-| `just socks-enable` / `just socks-disable` / `just socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
-| `just onion-enable` / `just onion-disable` / `just onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
-| `just onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |
+| `just router-setup-auth` | Copia clave SSH pública + contraseña root |
+| `just router-setup-extroot` | Configura USB como extroot (`/overlay`) |
+| `just router-setup-logs` | Logs persistentes en USB |
+| `just router-post-install` | Instala paquetes adicionales via `opkg` |
+| `just router-captive-setup` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
+| `just router-wifi-ap` | Configura AP interactivo (detecta radios libres) |
+| `just router-wifi-client` | Conecta como cliente WiFi (selección de banda interactiva) |
+| `just router-wifi-scan` / `just router-wifi-status` | Escanea ambos radios y muestra estado |
+| `just router-routing-priority` / `just router-routing-pin` | Prioridad WAN vs WiFi + source-based routing |
+| `just router-static-ip-add` / `just router-static-ip-list` | DHCP leases estáticos por MAC address |
+| `just router-dns-set` / `just router-dns-show` / `just router-dns-reset` | Servidores DNS upstream de dnsmasq |
+| `just router-clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
+| `just router-update` / `just router-update-force` | Actualiza firmware via sysupgrade |
+| `just router-socks-enable` / `just router-socks-disable` / `just router-socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
+| `just router-onion-enable` / `just router-onion-disable` / `just router-onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
+| `just router-onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |
 
 ## Licencia
 
