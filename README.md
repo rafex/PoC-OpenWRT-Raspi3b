@@ -66,7 +66,13 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-static-ip-add` / `just router-static-ip-list` | DHCP leases estáticos por MAC address |
 | `just router-dns-set` / `just router-dns-show` / `just router-dns-reset` | Servidores DNS upstream de dnsmasq |
 | `just router-clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
+| `just router-status` | Vista general: sistema, RAM, red, WiFi, clientes DHCP y servicios |
+| `just router-backup` / `just router-restore` / `just router-backup-list` | Backup y restauración de configuración (`/etc/config`) |
+| `just router-reboot` / `just router-reboot --wait` | Reinicia el router; `--wait` bloquea hasta reconexión |
 | `just router-update` / `just router-update-force` | Actualiza firmware via sysupgrade |
+| `just router-wireguard-status` / `just router-wireguard-peer-list` | Estado del túnel WireGuard y peers activos |
+| `just router-wireguard-peer-add` / `just router-wireguard-peer-remove` | Añade / elimina peers WireGuard via UCI |
+| `just router-port-forward-list` / `just router-port-forward-add` / `just router-port-forward-remove` | Port forwarding DNAT desde WAN (TCP/UDP/ambos) |
 | `just router-socks-enable` / `just router-socks-disable` / `just router-socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
 | `just router-onion-enable` / `just router-onion-disable` / `just router-onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
 | `just router-onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |

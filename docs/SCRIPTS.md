@@ -40,7 +40,12 @@ scripts/
 │   ├── setup-dns.sh            # Servidores DNS upstream de dnsmasq
 │   ├── show-clients.sh         # Lista dispositivos conectados (leases DHCP + ARP)
 │   ├── setup-socks-forward.sh  # Port forwarding del proxy SOCKS de Raspi3b/Tor
-│   └── setup-tor-onion.sh      # Transparent proxy para dominios .onion
+│   ├── setup-tor-onion.sh      # Transparent proxy para dominios .onion
+│   ├── backup.sh               # Backup y restauración de /etc/config (sysupgrade -b)
+│   ├── reboot.sh               # Reinicio remoto con espera opcional de reconexión
+│   ├── status.sh               # Vista general: sistema, red, WiFi, DHCP, servicios
+│   ├── setup-wireguard.sh      # Gestión del túnel WireGuard (wg0) via UCI
+│   └── setup-port-forward.sh   # Port forwarding DNAT desde WAN via UCI firewall
 └── templates/                  # Generación de configuraciones
     └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
@@ -390,6 +395,158 @@ scripts/router/show-clients.sh --ip 192.168.0.1  # IP del router explícita
 Salida:
 - **LEASES DHCP**: IP, MAC, hostname, tiempo restante (`23h 45m`, `permanente`, `expirado`) y si aparece en ARP (`[en red]` / `[sin ARP]`).
 - **TABLA ARP**: todos los dispositivos con tráfico reciente, incluyendo los que tienen IP estática (no gestionada por DHCP).
+
+### router/backup.sh
+
+Backup y restauración de la configuración del router (`/etc/config`) usando `sysupgrade -b`. Los backups se descargan a `./backups/` con nombre `router-<IP>-<timestamp>.tar.gz`.
+
+```bash
+# Descargar backup de configuración
+scripts/router/backup.sh backup
+scripts/router/backup.sh backup --dir /tmp/router-backups   # directorio alternativo
+
+# Restaurar desde backup (confirmación interactiva, reinicia el router)
+scripts/router/backup.sh restore --file backups/router-192.168.1.1-20260518-142300.tar.gz
+
+# Listar backups locales disponibles
+scripts/router/backup.sh list
+```
+
+Subcomandos: `backup`, `restore`, `list`. Opciones: `--ip`, `--env`, `--dir` (backup/list), `--file` (restore).
+
+Flujo de `backup`: genera `/tmp/router-backup-<ts>.tar.gz` en el router via `sysupgrade -b`, lo descarga con SCP y lo elimina del `/tmp` del router.
+
+Flujo de `restore`: sube el archivo al router (`/tmp/router-restore.tar.gz`), aplica `tar xzf -C /` y ejecuta `reboot`. Pide confirmación antes de proceder.
+
+---
+
+### router/reboot.sh
+
+Reinicia el router via SSH. Sin `--wait` envía el comando y retorna inmediatamente (útil en shell interactivo). Con `--wait` bloquea hasta que el router vuelve a estar disponible.
+
+```bash
+# Reboot inmediato (no espera)
+scripts/router/reboot.sh
+scripts/router/reboot.sh --ip 192.168.1.1
+
+# Reboot + esperar reconexión (~60s)
+scripts/router/reboot.sh --wait
+scripts/router/reboot.sh --ip 192.168.1.1 --env prod --wait
+```
+
+Con `--wait`: espera 20 segundos iniciales (tiempo de apagado), luego sondea SSH cada 3 segundos hasta un máximo de 90 segundos, imprimiendo `.` en cada intento. Si el router no responde en 90s, imprime un aviso pero no sale con error.
+
+---
+
+### router/status.sh
+
+Vista general del router en una sola llamada SSH. Muestra todo el estado sin modificar ninguna configuración.
+
+```bash
+scripts/router/status.sh
+scripts/router/status.sh --ip 192.168.0.1
+scripts/router/status.sh --env dev
+```
+
+Secciones mostradas:
+
+| Sección | Contenido |
+|---------|-----------|
+| **Sistema** | Hostname, versión firmware (OpenWRT), uptime, carga (1m 5m 15m) |
+| **Memoria** | MB usados / total / porcentaje de uso |
+| **Almacenamiento** | `/`, `/overlay`, `/tmp` — uso y espacio disponible |
+| **Red** | IP WAN, LAN (br-lan), WiFi cliente (wwan), WireGuard (wg0) si existen |
+| **WiFi** | Radios con banda, canal y estado (activo/deshabilitado) |
+| **Clientes DHCP** | IP, MAC y hostname de cada dispositivo conectado |
+| **Servicios** | dnsmasq, nftables, dropbear, tor, wireguard — ✅ activo / ❌ inactivo |
+
+Implementado como un único heredoc `<< 'REMOTE'` para minimizar el número de conexiones SSH.
+
+---
+
+### router/setup-wireguard.sh
+
+Gestiona el túnel WireGuard (`wg0`) en OpenWRT via UCI. Asume que WireGuard está incluido en la imagen compilada (`kmod-wireguard`, `wireguard-tools`).
+
+```bash
+# Estado del túnel y peers activos
+scripts/router/setup-wireguard.sh status
+
+# Activar / desactivar la interfaz
+scripts/router/setup-wireguard.sh enable
+scripts/router/setup-wireguard.sh disable
+
+# Listar peers configurados en UCI
+scripts/router/setup-wireguard.sh peer-list
+
+# Añadir peer
+scripts/router/setup-wireguard.sh peer-add \
+    --pubkey "abc123...==" \
+    --endpoint "1.2.3.4:51820" \
+    --allowed-ips "10.0.0.2/32" \
+    --name "laptop"
+
+# Peer solo receptor (sin endpoint, sin keepalive de salida)
+scripts/router/setup-wireguard.sh peer-add \
+    --pubkey "xyz789...==" \
+    --allowed-ips "10.0.0.3/32"
+
+# Eliminar peer por clave pública
+scripts/router/setup-wireguard.sh peer-remove --pubkey "abc123...=="
+```
+
+Subcomandos: `status`, `enable`, `disable`, `peer-list`, `peer-add`, `peer-remove`.
+
+`peer-add` crea entradas UCI `network.@wireguard_wg0[-1]` con `persistent_keepalive=25` y `route_allowed_ips=1`. `--endpoint` acepta formato `IP:puerto`. `--name` se almacena como `description` (opcional).
+
+`peer-remove` itera en orden inverso por índice (`tac`) para no romper los índices UCI al eliminar.
+
+`status` muestra el estado de la interfaz `wg0` (UP/DOWN, IP asignada), la salida de `wg show wg0` con estadísticas de peers activos y la configuración UCI completa.
+
+---
+
+### router/setup-port-forward.sh
+
+Gestiona reglas de port forwarding DNAT desde la WAN hacia hosts de la LAN. Usa UCI `firewall redirect` con `target=DNAT` y `src=wan`.
+
+```bash
+# Listar reglas activas
+scripts/router/setup-port-forward.sh list
+
+# Añadir regla TCP simple (puerto externo = puerto interno)
+scripts/router/setup-port-forward.sh add \
+    --name "web" --port 8080 --dest-ip 192.168.1.50
+
+# Puerto externo distinto del interno
+scripts/router/setup-port-forward.sh add \
+    --name "ssh-raspi" --port 2222 --dest-ip 192.168.1.136 --dest-port 22
+
+# Protocolo both: crea nombre-tcp y nombre-udp
+scripts/router/setup-port-forward.sh add \
+    --name "nas-smb" --port 445 --dest-ip 192.168.1.30 --proto both
+
+# Eliminar regla (o par tcp/udp) por nombre
+scripts/router/setup-port-forward.sh remove --name "web"
+scripts/router/setup-port-forward.sh remove --name "nas-smb"   # elimina nas-smb-tcp y nas-smb-udp
+
+# Estado en vivo con contadores nftables
+scripts/router/setup-port-forward.sh status
+```
+
+Subcomandos: `list`, `add`, `remove`, `status`.
+
+Opciones de `add`:
+- `--name <nombre>` — nombre de la regla UCI (requerido)
+- `--port <puerto>` — puerto externo WAN (requerido)
+- `--dest-ip <IP>` — IP destino en la LAN (requerido)
+- `--dest-port <p>` — puerto interno si difiere del externo (default: igual a `--port`)
+- `--proto tcp|udp|both` — protocolo (default: `tcp`); `both` crea dos reglas
+
+`remove` busca por nombre exacto y también por `nombre-tcp` / `nombre-udp`, por lo que funciona tanto para reglas simples como para las creadas con `--proto both`. Itera en orden inverso para no romper los índices UCI.
+
+`status` muestra los contadores de paquetes/bytes desde `nft list table inet fw4` y la configuración UCI completa (redirects).
+
+Tras cada `add` o `remove` se ejecuta `uci commit firewall` y `/etc/init.d/firewall reload`.
 
 ---
 

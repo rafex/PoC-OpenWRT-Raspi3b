@@ -61,7 +61,6 @@ just <recipe>                  # Ejecutar una recipe
 |--------|-------------|
 | `just router-update [ip=<IP>] [env=<env>]` | Actualizar firmware via sysupgrade **manteniendo** configuración |
 | `just router-update-force [ip=<IP>] [env=<env>]` | Actualizar firmware **borrando** configuración del router |
-| `just flash [env]` | Compilar y preparar imagen (no flashea automáticamente) |
 
 La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto `192.168.1.1`.
 
@@ -310,6 +309,90 @@ just router-clients --env dev              # Entorno dev
 just router-clients --ip 192.168.0.1      # IP del router explícita
 ```
 
+### Backup y restauración
+
+Guarda y restaura la configuración del router (`/etc/config`) usando `sysupgrade -b`.
+Los backups se descargan localmente a `./backups/`.
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just router-backup` | Descarga backup de configuración a `./backups/` |
+| `just router-restore --file <path>` | Aplica un backup en el router y reinicia |
+| `just router-backup-list` | Lista los backups locales disponibles |
+
+Ejemplos:
+```bash
+just router-backup                                          # Descarga backup con timestamp
+just router-backup-list                                     # Ver backups disponibles
+just router-restore --file backups/router-192.168.1.1-20260518-142300.tar.gz
+```
+
+### Estado y reinicio
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just router-status` | Vista general: sistema, RAM, red, WiFi, clientes DHCP y servicios |
+| `just router-reboot` | Reinicia el router via SSH |
+| `just router-reboot --wait` | Reinicia y espera hasta que el router vuelva a responder |
+
+`router-status` muestra en una sola llamada SSH: hostname, firmware, uptime, carga, RAM, almacenamiento, IPs WAN/LAN/WireGuard, radios WiFi, leases DHCP activos y estado de servicios (dnsmasq, nftables, dropbear, tor, wireguard).
+
+```bash
+just router-status
+just router-reboot --wait     # útil en scripts: bloquea hasta reconexión (~60s)
+```
+
+### WireGuard
+
+Gestiona el túnel WireGuard (`wg0`) configurado vía UCI en el router. WireGuard ya está incluido en la imagen compilada.
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just router-wireguard-status` | Estado del túnel y peers activos (`wg show`) |
+| `just router-wireguard-enable` | Activa la interfaz `wg0` |
+| `just router-wireguard-disable` | Desactiva la interfaz `wg0` |
+| `just router-wireguard-peer-list` | Lista los peers configurados en UCI |
+| `just router-wireguard-peer-add --pubkey <k> --endpoint <IP:port> --allowed-ips <CIDR>` | Añade un peer |
+| `just router-wireguard-peer-remove --pubkey <k>` | Elimina un peer por su clave pública |
+
+Ejemplos:
+```bash
+just router-wireguard-status
+just router-wireguard-peer-list
+just router-wireguard-peer-add \
+    --pubkey "abc123...==" \
+    --endpoint "1.2.3.4:51820" \
+    --allowed-ips "10.0.0.2/32" \
+    --name "laptop"
+just router-wireguard-peer-remove --pubkey "abc123...=="
+just router-wireguard-disable
+```
+
+### Port forwarding
+
+Gestiona reglas DNAT desde la WAN hacia hosts de la LAN vía UCI (`firewall redirect`).
+
+| Recipe | Descripción |
+|--------|-------------|
+| `just router-port-forward-list` | Lista todas las reglas de port forwarding |
+| `just router-port-forward-add --name <n> --port <ext> --dest-ip <IP>` | Añade una regla DNAT |
+| `just router-port-forward-remove --name <n>` | Elimina una regla por nombre |
+| `just router-port-forward-status` | Muestra reglas activas con contadores nftables en vivo |
+
+Opciones de `add`:
+- `--dest-port <p>` — puerto destino si difiere del externo (default: igual a `--port`)
+- `--proto tcp|udp|both` — protocolo (default: `tcp`); `both` crea dos reglas
+
+Ejemplos:
+```bash
+just router-port-forward-list
+just router-port-forward-add --name "web" --port 8080 --dest-ip 192.168.1.50
+just router-port-forward-add --name "nas-smb" --port 445 --dest-ip 192.168.1.30 --proto both
+just router-port-forward-add --name "ssh-raspi" --port 2222 --dest-ip 192.168.1.136 --dest-port 22
+just router-port-forward-remove --name "web"
+just router-port-forward-status
+```
+
 ### Limpieza
 
 | Recipe | Descripción |
@@ -379,6 +462,53 @@ just router-post-install group=captive_portal  # Instala uhttpd en el router
 just router-captive-setup                      # Instala el portal (30 min por defecto)
 just router-captive-status                     # Verificar que funciona
 just router-captive-allow client=192.168.1.50  # Autorizar dispositivo manualmente
+```
+
+### Verificar estado y hacer backup antes de actualizar
+
+```bash
+just router-status                                      # Vista general: sistema, red, servicios
+just router-backup                                      # Descarga backup a ./backups/ con timestamp
+just router-backup-list                                 # Ver backups disponibles
+
+just router-update                                      # Actualizar firmware (mantiene config)
+
+# Si algo sale mal: restaurar desde backup
+just router-restore --file backups/router-192.168.1.1-20260518-142300.tar.gz
+```
+
+### Reiniciar el router
+
+```bash
+just router-reboot                                      # Reboot inmediato (retorna al instante)
+just router-reboot --wait                               # Reboot + espera hasta reconexión (~60s)
+```
+
+### Gestionar WireGuard
+
+```bash
+just router-wireguard-status                            # Estado del túnel y peers activos
+just router-wireguard-peer-list                         # Peers configurados en UCI
+
+just router-wireguard-peer-add \
+    --pubkey "abc123...==" \
+    --endpoint "1.2.3.4:51820" \
+    --allowed-ips "10.0.0.2/32" \
+    --name "laptop"
+
+just router-wireguard-peer-remove --pubkey "abc123...=="
+just router-wireguard-disable                           # Apagar el túnel temporalmente
+```
+
+### Gestionar port forwarding
+
+```bash
+just router-port-forward-list                                                      # Ver reglas activas
+just router-port-forward-add --name "web" --port 8080 --dest-ip 192.168.1.50      # HTTP
+just router-port-forward-add --name "nas-smb" --port 445 --dest-ip 192.168.1.30 --proto both
+just router-port-forward-add --name "ssh-raspi" --port 2222 --dest-ip 192.168.1.136 --dest-port 22
+just router-port-forward-status                                                    # Contadores nftables en vivo
+just router-port-forward-remove --name "web"
 ```
 
 ### Gestionar routing
