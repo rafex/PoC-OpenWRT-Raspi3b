@@ -136,13 +136,18 @@ Prerrequisito: formatear el USB como ext4 antes de conectarlo al router.
 
 ### router/setup-logs.sh
 
-Configura logs persistentes en el USB (extroot). Crea `/overlay/var/log` con link simbólico desde `/var/log`.
+Configura un buffer circular de 64 KB en RAM para syslog. No requiere USB ni extroot. Si existía una configuración previa con `log_file` (USB), la elimina limpiamente antes de aplicar el nuevo valor.
 
 ```bash
 scripts/router/setup-logs.sh --env prod
+scripts/router/setup-logs.sh --ip 192.168.1.1
 ```
 
-Prerrequisito: `setup-extroot.sh` debe haberse ejecutado y el router reiniciado con el USB activo.
+Aplica `uci set system.@system[0].log_size='64'`, reinicia el servicio de log y muestra las últimas 10 entradas. Para seguir los logs en tiempo real:
+
+```bash
+ssh root@<router-ip> 'logread -f'
+```
 
 ### router/setup-auth.sh
 

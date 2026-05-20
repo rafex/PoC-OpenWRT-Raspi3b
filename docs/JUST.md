@@ -69,7 +69,7 @@ La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto 
 | Recipe | Descripción |
 |--------|-------------|
 | `just router-setup-extroot [ip=] [device=] [env=]` | Configura USB como extroot (`/overlay`) para ampliar almacenamiento |
-| `just router-setup-logs [ip=] [env=]` | Configura logs persistentes en el USB (requiere extroot activo) |
+| `just router-setup-logs [ip=] [env=]` | Configura buffer de logs en RAM (64 KB, sin USB ni extroot) |
 | `just router-setup-auth [ip=] [env=] [key=]` | Copia clave SSH pública al router y establece contraseña root |
 
 ### Post-instalación de paquetes
@@ -434,7 +434,7 @@ just build-prod
 # Post-flash: configuración inicial del router
 just router-setup-auth                 # Clave SSH + contraseña root
 just router-setup-extroot              # USB como extroot (si hay USB conectado)
-just router-setup-logs                 # Logs persistentes (tras reinicio con extroot)
+just router-setup-logs                 # Buffer de logs en RAM (64 KB, no requiere USB)
 ```
 
 ### Configurar WiFi
