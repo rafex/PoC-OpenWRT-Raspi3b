@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # ============================================================================
-# setup-logs.sh — Configura el buffer de logs en RAM en OpenWRT
+# setup-logs-ram.sh — Buffer de logs en RAM (syslog circular, sin USB)
 #
-# Configura syslog para usar un buffer circular de 64 KB en RAM.
-# No requiere USB ni extroot.
+# Configura syslog con un buffer circular de 64 KB en RAM.
+# No requiere USB ni extroot. Los logs NO persisten entre reinicios.
 #
 # Qué hace:
 #   1. Elimina cualquier log_file previo (USB/extroot) que pudiera existir
-#   2. Establece log_size=64 (KB) en /etc/config/system
+#   2. Establece log_size=64 KB en /etc/config/system
 #   3. Reinicia el servicio de log
 #   4. Muestra las últimas entradas con logread
 #
 # Uso:
-#   scripts/router/setup-logs.sh [--ip <IP>] [--env <env>]
+#   scripts/router/setup-logs-ram.sh [--ip <IP>] [--env <env>]
 # ============================================================================
 set -euo pipefail
 
@@ -29,10 +29,13 @@ while [[ $# -gt 0 ]]; do
         --ip)  _CLI_IP="${2:?}"; shift 2 ;;
         --env) _ENV="${2:?}";    shift 2 ;;
         -h|--help)
-            echo "Uso: setup-logs.sh [--ip <IP>] [--env <env>]"
+            echo "Uso: setup-logs-ram.sh [--ip <IP>] [--env <env>]"
             echo ""
-            echo "  Configura un buffer circular de 64 KB en RAM para syslog."
-            echo "  No requiere USB ni extroot."
+            echo "  Configura buffer circular de 64 KB en RAM para syslog."
+            echo "  No requiere USB ni extroot. Los logs se pierden al reiniciar."
+            echo ""
+            echo "  Ver logs:    ssh root@<IP> 'logread'"
+            echo "  En tiempo real: ssh root@<IP> 'logread -f'"
             exit 0 ;;
         *) log_error "Opción desconocida: $1"; exit 1 ;;
     esac
@@ -60,25 +63,26 @@ log_step "Configurando buffer de logs en RAM (64 KB)..."
 _ssh sh - << 'REMOTE'
 set -eu
 
-# Eliminar log_file si existía de una configuración USB previa
+# Eliminar configuración de log a archivo si existía
 uci -q delete system.@system[0].log_file  2>/dev/null || true
 uci -q delete system.@system[0].log_proto 2>/dev/null || true
 uci -q delete system.@system[0].log_ip    2>/dev/null || true
 uci -q delete system.@system[0].log_port  2>/dev/null || true
 
-# Buffer circular de 64 KB en RAM
+# Buffer circular en RAM
 uci set system.@system[0].log_size='64'
 uci commit system
 
 /etc/init.d/log restart 2>/dev/null || true
 sleep 1
 
-echo "✅ log_size = 64 KB (buffer en RAM)"
+echo "✅ Modo: RAM  |  log_size = 64 KB"
 echo ""
 echo "Últimas entradas (logread):"
 echo "──────────────────────────────────────────────"
 logread | tail -10 || echo "  (sin entradas aún)"
 echo "──────────────────────────────────────────────"
 echo ""
-echo "Comando útil: logread -f   (seguir en tiempo real)"
+echo "  logread          → ver todos los logs en RAM"
+echo "  logread -f       → seguir en tiempo real"
 REMOTE

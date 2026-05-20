@@ -32,7 +32,8 @@ scripts/
 │   ├── post-install.sh         # Instala paquetes adicionales via opkg
 │   ├── setup-auth.sh           # Copia clave SSH pública + contraseña root
 │   ├── setup-extroot.sh        # Configura USB como extroot (/overlay)
-│   ├── setup-logs.sh           # Logs persistentes en USB (extroot)
+│   ├── setup-logs-ram.sh       # Buffer de logs en RAM (64 KB, sin USB)
+│   ├── setup-logs-file.sh      # Logs persistentes en archivo (USB/extroot)
 │   ├── setup-captive.sh        # Portal cautivo nftables + uhttpd
 │   ├── setup-wifi.sh           # Gestión WiFi (AP interactivo, cliente, scan, disconnect)
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
@@ -134,19 +135,38 @@ scripts/router/setup-extroot.sh --ip 192.168.1.1 --device /dev/sdb1
 
 Prerrequisito: formatear el USB como ext4 antes de conectarlo al router.
 
-### router/setup-logs.sh
+### router/setup-logs-ram.sh
 
-Configura un buffer circular de 64 KB en RAM para syslog. No requiere USB ni extroot. Si existía una configuración previa con `log_file` (USB), la elimina limpiamente antes de aplicar el nuevo valor.
+Buffer circular de 64 KB en RAM. No requiere USB ni extroot. Los logs **no persisten** entre reinicios. Si existía una configuración previa con `log_file` (USB), la elimina limpiamente.
 
 ```bash
-scripts/router/setup-logs.sh --env prod
-scripts/router/setup-logs.sh --ip 192.168.1.1
+scripts/router/setup-logs-ram.sh --env prod
+scripts/router/setup-logs-ram.sh --ip 192.168.1.1
 ```
 
-Aplica `uci set system.@system[0].log_size='64'`, reinicia el servicio de log y muestra las últimas 10 entradas. Para seguir los logs en tiempo real:
+Aplica `uci set system.@system[0].log_size='64'`, reinicia el servicio y muestra `logread | tail -10`.
 
 ```bash
-ssh root@<router-ip> 'logread -f'
+ssh root@<router-ip> 'logread'       # ver buffer completo
+ssh root@<router-ip> 'logread -f'    # seguir en tiempo real
+```
+
+### router/setup-logs-file.sh
+
+Logs persistentes en archivo (`/overlay/log/messages`). Requiere extroot activo (USB montado como `/overlay`). Los logs sobreviven a reinicios mientras el USB esté conectado.
+
+```bash
+scripts/router/setup-logs-file.sh --env prod
+scripts/router/setup-logs-file.sh --ip 192.168.1.1
+```
+
+Prerrequisito: `just router-setup-extroot` ejecutado y router reiniciado con el USB activo. El script verifica que `/overlay` esté montado desde un dispositivo externo antes de continuar.
+
+Aplica `log_file=/overlay/log/messages` y `log_size=128`, reinicia el servicio y verifica la creación del archivo.
+
+```bash
+ssh root@<router-ip> 'tail -f /overlay/log/messages'   # seguir en tiempo real
+ssh root@<router-ip> 'logread'                          # buffer RAM (funciona en ambos modos)
 ```
 
 ### router/setup-auth.sh

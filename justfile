@@ -577,17 +577,27 @@ router-setup-extroot ip="" device="" env="prod":
     # shellcheck disable=SC2086
     scripts/router/setup-extroot.sh ${ARGS}
 
-# router-setup-logs: Configurar logs persistentes en USB (extroot) via SSH
-# ⚠️  Prerrequisito: just router-setup-extroot debe haberse ejecutado y el router
-#    debe haber reiniciado con el USB montado como /overlay.
-# Uso: just router-setup-logs [ip=<IP>] [env=<env>]
-router-setup-logs ip="" env="prod":
+# router-setup-logs-ram: Buffer de logs en RAM (64 KB, sin USB ni extroot)
+# Los logs NO persisten entre reinicios.
+# Uso: just router-setup-logs-ram [ip=<IP>] [env=<env>]
+router-setup-logs-ram ip="" env="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="--env {{ env }}"
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-logs.sh ${ARGS}
+    scripts/router/setup-logs-ram.sh ${ARGS}
+
+# router-setup-logs-file: Logs persistentes en archivo (USB montado como extroot)
+# ⚠️  Prerrequisito: just router-setup-extroot + reinicio del router.
+# Uso: just router-setup-logs-file [ip=<IP>] [env=<env>]
+router-setup-logs-file ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="--env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-logs-file.sh ${ARGS}
 
 # router-setup-auth: Copia clave SSH pública al router y establece contraseña root
 # Orden recomendado: primero copia la clave, luego pide contraseña (evita bloqueos)
