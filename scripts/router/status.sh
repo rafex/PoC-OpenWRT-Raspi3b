@@ -252,17 +252,168 @@ uci show wireless 2>/dev/null | awk -F'[.=]' '
     }
 ' | sort
 
-# ── Clientes DHCP ──────────────────────────────────────
+# ── Dispositivos / DHCP ────────────────────────────────
 sep
-echo "CLIENTES DHCP"
+echo "DISPOSITIVOS / DHCP"
 sep
-if [ -f /tmp/dhcp.leases ]; then
-    count=$(wc -l < /tmp/dhcp.leases)
-    printf "  Conectados: %d\n" "${count}"
-    awk '{printf "  %-16s  %-20s  %s\n", $3, $4, $2}' /tmp/dhcp.leases
-else
-    echo "  (sin leases activos)"
+tmp_static="/tmp/router-status-static.$$"
+tmp_arp="/tmp/router-status-arp.$$"
+tmp_leases="/tmp/router-status-leases.$$"
+: > "${tmp_static}"
+: > "${tmp_arp}"
+: > "${tmp_leases}"
+
+idx=0
+while uci -q get "dhcp.@host[${idx}]" >/dev/null 2>&1; do
+    static_mac=$(uci -q get "dhcp.@host[${idx}].mac" 2>/dev/null || true)
+    static_ip=$(uci -q get "dhcp.@host[${idx}].ip" 2>/dev/null || true)
+    static_name=$(uci -q get "dhcp.@host[${idx}].name" 2>/dev/null || true)
+    if [ -n "${static_mac}" ] || [ -n "${static_ip}" ]; then
+        printf "%s %s %s\n" "${static_ip:-?}" "$(echo "${static_mac:-?}" | tr 'A-F' 'a-f')" "${static_name:-?}" >> "${tmp_static}"
+    fi
+    idx=$((idx + 1))
+done
+
+if [ -f /proc/net/arp ]; then
+    awk 'NR > 1 && $4 != "00:00:00:00:00:00" {print $1, tolower($4), $6, $3}' /proc/net/arp > "${tmp_arp}"
 fi
+
+if [ -f /tmp/dhcp.leases ] && [ -s /tmp/dhcp.leases ]; then
+    cp /tmp/dhcp.leases "${tmp_leases}"
+fi
+
+lease_count=$(wc -l < "${tmp_leases}" 2>/dev/null || echo 0)
+static_count=$(wc -l < "${tmp_static}" 2>/dev/null || echo 0)
+arp_count=$(wc -l < "${tmp_arp}" 2>/dev/null || echo 0)
+printf "  Leases activos : %s\n" "${lease_count}"
+printf "  Reservas DHCP  : %s\n" "${static_count}"
+printf "  Entradas ARP   : %s\n" "${arp_count}"
+echo ""
+printf "  %-16s  %-18s  %-22s  %-12s  %-12s  %s\n" "IP" "MAC" "Nombre" "Origen" "Estado" "Lease"
+printf "  %-16s  %-18s  %-22s  %-12s  %-12s  %s\n" "----------------" "-----------------" "----------------------" "------------" "------------" "------------"
+
+if [ -s "${tmp_leases}" ]; then
+    while read -r exp mac ip host _rest; do
+        mac_lc=$(echo "${mac}" | tr 'A-F' 'a-f')
+        [ "${host}" = "*" ] && host="(desconocido)"
+
+        if [ "${exp}" = "0" ]; then
+            lease_left="permanente"
+        else
+            remaining=$((exp - $(date +%s)))
+            if [ "${remaining}" -le 0 ]; then
+                lease_left="expirado"
+            elif [ "${remaining}" -ge 3600 ]; then
+                lease_left="$((remaining / 3600))h $(((remaining % 3600) / 60))m"
+            else
+                lease_left="$((remaining / 60))m"
+            fi
+        fi
+
+        status="sin ARP"
+        grep -q "^${ip} " "${tmp_arp}" 2>/dev/null && status="en red"
+
+        origin="dhcp"
+        if grep -qiE "^${ip} ${mac_lc} " "${tmp_static}" 2>/dev/null || grep -qiE "^[^ ]+ ${mac_lc} " "${tmp_static}" 2>/dev/null; then
+            origin="dhcp/reserva"
+        fi
+
+        printf "  %-16s  %-18s  %-22s  %-12s  %-12s  %s\n" "${ip}" "${mac_lc}" "${host}" "${origin}" "${status}" "${lease_left}"
+    done < "${tmp_leases}"
+fi
+
+if [ -s "${tmp_static}" ]; then
+    while read -r ip mac name; do
+        if ! awk -v ip="${ip}" -v mac="${mac}" 'tolower($2) == mac || $3 == ip {found=1} END{exit found ? 0 : 1}' "${tmp_leases}" 2>/dev/null; then
+            status="sin ARP"
+            grep -q "^${ip} " "${tmp_arp}" 2>/dev/null && status="en red"
+            printf "  %-16s  %-18s  %-22s  %-12s  %-12s  %s\n" "${ip}" "${mac}" "${name}" "reserva" "${status}" "-"
+        fi
+    done < "${tmp_static}"
+fi
+
+if [ -s "${tmp_arp}" ]; then
+    while read -r ip mac iface flags; do
+        if awk -v ip="${ip}" -v mac="${mac}" 'tolower($2) == mac || $3 == ip {found=1} END{exit found ? 0 : 1}' "${tmp_leases}" 2>/dev/null; then
+            continue
+        fi
+        if awk -v ip="${ip}" -v mac="${mac}" '$1 == ip || $2 == mac {found=1} END{exit found ? 0 : 1}' "${tmp_static}" 2>/dev/null; then
+            continue
+        fi
+        case "${flags}" in
+            0x2|0x6) status="en red" ;;
+            *) status="arp ${flags}" ;;
+        esac
+        printf "  %-16s  %-18s  %-22s  %-12s  %-12s  %s\n" "${ip}" "${mac}" "(desconocido)" "arp/${iface}" "${status}" "-"
+    done < "${tmp_arp}"
+fi
+
+if [ ! -s "${tmp_leases}" ] && [ ! -s "${tmp_static}" ] && [ ! -s "${tmp_arp}" ]; then
+    echo "  (sin leases DHCP, reservas ni entradas ARP)"
+fi
+
+rm -f "${tmp_static}" "${tmp_arp}" "${tmp_leases}"
+
+# ── Portal cautivo ─────────────────────────────────────
+sep
+echo "PORTAL CAUTIVO"
+sep
+CAPTIVE_CFG="/etc/captive/config"
+CAPTIVE_NFT="/etc/captive/captive.nft"
+CAPTIVE_TABLE="ip captive"
+CAPTIVE_SET="allowed_clients"
+
+if [ -x /etc/init.d/captive ] || [ -f "${CAPTIVE_CFG}" ] || [ -f "${CAPTIVE_NFT}" ] || nft list table ${CAPTIVE_TABLE} >/dev/null 2>&1; then
+    printf "  Instalado       : %s\n" "$(ok si)"
+else
+    printf "  Instalado       : %s\n" "$(bad "no detectado")"
+fi
+
+if [ -x /etc/init.d/captive ]; then
+    if /etc/init.d/captive enabled >/dev/null 2>&1; then captive_enabled="habilitado"; else captive_enabled="no habilitado"; fi
+    if /etc/init.d/captive running >/dev/null 2>&1; then captive_running="$(ok activo)"; else captive_running="$(bad inactivo)"; fi
+    printf "  Servicio        : %s (%s)\n" "${captive_running}" "${captive_enabled}"
+else
+    printf "  Servicio        : %s\n" "$(bad "no registrado")"
+fi
+
+if nft list table ${CAPTIVE_TABLE} >/dev/null 2>&1; then
+    printf "  nftables        : %s tabla '%s'\n" "$(ok activa)" "${CAPTIVE_TABLE}"
+else
+    printf "  nftables        : %s tabla '%s'\n" "$(bad no activa)" "${CAPTIVE_TABLE}"
+fi
+
+if [ -f "${CAPTIVE_CFG}" ]; then
+    mode=$(grep -E '^MODE=' "${CAPTIVE_CFG}" 2>/dev/null | cut -d= -f2- || true)
+    timeout=$(grep -E '^TIMEOUT=' "${CAPTIVE_CFG}" 2>/dev/null | cut -d= -f2- || true)
+    portal_url=$(grep -E '^PORTAL_URL=' "${CAPTIVE_CFG}" 2>/dev/null | cut -d= -f2- || true)
+    [ -n "${mode}" ] && printf "  Modo            : %s\n" "${mode}"
+    [ -n "${timeout}" ] && printf "  Timeout         : %s\n" "${timeout}"
+    [ -n "${portal_url}" ] && printf "  Portal externo  : %s\n" "${portal_url}"
+else
+    printf "  Config          : %s\n" "$(warn "/etc/captive/config no encontrado")"
+fi
+
+authorized=$(nft list set ${CAPTIVE_TABLE} ${CAPTIVE_SET} 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[^,}]*' || true)
+if [ -n "${authorized}" ]; then
+    echo "  Autorizados:"
+    echo "${authorized}" | while IFS= read -r entry; do
+        client_ip=$(echo "${entry}" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+        expires=$(echo "${entry}" | grep -o 'expires .*' || true)
+        lease_name=$(awk -v ip="${client_ip}" '$3 == ip {print $4; exit}' /tmp/dhcp.leases 2>/dev/null || true)
+        lease_mac=$(awk -v ip="${client_ip}" '$3 == ip {print tolower($2); exit}' /tmp/dhcp.leases 2>/dev/null || true)
+        printf "    %-16s %-18s %-20s %s\n" "${client_ip}" "${lease_mac:--}" "${lease_name:--}" "${expires}"
+    done
+else
+    echo "  Autorizados     : ninguno"
+fi
+
+dhcp_opt_252=$(uci -q get dhcp.@dnsmasq[0].dhcp_option 2>/dev/null | tr ' ' '\n' | grep '^252,' || true)
+probe_count=$(uci -q get dhcp.@dnsmasq[0].address 2>/dev/null | tr ' ' '\n' | grep -cE '/(connectivity|captive|msft|detectportal|network)/' || true)
+filter_aaaa=$(uci -q get dhcp.@dnsmasq[0].filter_aaaa 2>/dev/null || echo "?")
+printf "  DHCP opt 252    : %s\n" "${dhcp_opt_252:-no configurada}"
+printf "  Probe domains   : %s entrada(s) dnsmasq\n" "${probe_count}"
+printf "  filter_aaaa     : %s\n" "${filter_aaaa}"
 
 # ── Servicios ──────────────────────────────────────────
 sep
