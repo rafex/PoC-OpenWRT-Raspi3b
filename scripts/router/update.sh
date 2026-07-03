@@ -90,11 +90,16 @@ _find_sysupgrade() {
         bin=$(find "${REPO_ROOT}/openwrt-builder" \
               -name "openwrt-${OPENWRT_VERSION}-*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
               | sort -r | head -1)
+        if [ -z "${bin}" ]; then
+            log_error "No se encontró imagen sysupgrade para ${PROFILE} en OpenWRT ${OPENWRT_VERSION}"
+            echo "   Solución:"
+            echo "     just setup-env ${_ENV}"
+            echo "     just build-${_ENV}"
+            echo ""
+            echo "   No se usará una imagen de otra versión."
+            exit 1
+        fi
     else
-        bin=""
-    fi
-
-    if [ -z "${bin}" ]; then
         bin=$(find "${REPO_ROOT}/openwrt-builder" -name "*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
               | sort -r | head -1)
     fi
