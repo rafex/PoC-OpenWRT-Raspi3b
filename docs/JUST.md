@@ -2,6 +2,8 @@
 
 `justfile` es el **único punto de entrada** del proyecto. Orquesta todas las tareas: setup, secrets, build, validación, flasheo y configuración del router.
 
+Antes de compilar con `just build-prod`, revisa [Configuración de Build](CONFIGURACION_BUILD.md) para saber qué archivos controlan versión, modelo, paquetes, secrets y overlay.
+
 ```bash
 just --list                    # Ver todas las recipes disponibles
 just <recipe>                  # Ejecutar una recipe
@@ -68,6 +70,7 @@ La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto 
 
 | Recipe | Descripción |
 |--------|-------------|
+| `just router-copy-keys [ip=] [env=] [key=]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
 | `just router-setup-extroot [ip=] [device=] [env=]` | Configura USB como extroot (`/overlay`) para ampliar almacenamiento |
 | `just router-setup-logs-ram [ip=] [env=]` | Buffer de logs en RAM (64 KB) — sin USB, no persisten entre reinicios |
 | `just router-setup-logs-file [ip=] [env=]` | Logs persistentes en archivo (`/overlay/log/messages`) — requiere extroot activo |
@@ -332,14 +335,15 @@ just router-restore --file backups/router-192.168.1.1-20260518-142300.tar.gz
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just router-status` | Vista general: sistema, RAM, red, WiFi, clientes DHCP y servicios |
+| `just router-status` | Diagnóstico general: versión, salud, RAM, almacenamiento, red, WiFi, DHCP y servicios |
 | `just router-reboot` | Reinicia el router via SSH |
 | `just router-reboot --wait` | Reinicia y espera hasta que el router vuelva a responder |
 
-`router-status` muestra en una sola llamada SSH: hostname, firmware, uptime, carga, RAM, almacenamiento, IPs WAN/LAN/WireGuard, radios WiFi, leases DHCP activos y estado de servicios (dnsmasq, nftables, dropbear, tor, wireguard).
+`router-status` muestra en una sola llamada SSH: modelo, firmware, kernel, uptime, carga, package manager, RAM/swap, almacenamiento, extroot, rutas, IPs WAN/LAN/WWAN/WireGuard, radios e interfaces WiFi, leases DHCP, servicios instalados/habilitados/activos y pruebas de salud de internet/DNS.
 
 ```bash
 just router-status
+just router-status --ip 192.168.1.1
 just router-reboot --wait     # útil en scripts: bloquea hasta reconexión (~60s)
 ```
 

@@ -1,6 +1,6 @@
 # Build Instructions — OpenWRT 25.12.5 for TP-Link TL-WDR3600
 
-Guía completa para compilar una imagen personalizada de OpenWRT 25.12.5 para el router TP-Link TL-WDR3600 v1.0 (N600 Wireless Dual Band Gigabit Router). La versión está fijada en el proyecto para reproducibilidad; revisa `environments/<env>/.env.public` si quieres subir a otra versión.
+Guía completa para compilar una imagen personalizada de OpenWRT 25.12.5 para el router TP-Link TL-WDR3600 v1.0 (N600 Wireless Dual Band Gigabit Router). Antes de compilar, revisa [Configuración de Build](CONFIGURACION_BUILD.md) para saber dónde cambiar versión, perfil, paquetes, secrets y overlay.
 
 ## Requisitos del sistema
 

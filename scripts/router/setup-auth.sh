@@ -5,19 +5,20 @@
 # Qué hace:
 #   1. Copia la clave SSH pública local a /etc/dropbear/authorized_keys
 #      en el router (evita duplicados)
-#   2. Establece contraseña para root (sesión interactiva via SSH)
+#   2. Opcionalmente establece contraseña para root (sesión interactiva via SSH)
 #
 # ⚠️  IMPORTANTE: ejecutar antes de establecer contraseña para no bloquearse.
 #     Si solo se setea contraseña sin copiar la clave, el acceso posterior
 #     requiere escribir la contraseña en cada conexión.
 #
 # Uso:
-#   scripts/build/setup-auth.sh [--ip <IP>] [--env <env>] [--key <path>]
+#   scripts/router/setup-auth.sh [--ip <IP>] [--env <env>] [--key <path>] [--keys-only]
 #
 # Opciones:
 #   --ip <IP>      IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)
 #   --env <env>    Entorno para leer .env.public (default: prod)
 #   --key <path>   Ruta a clave pública SSH (default: auto-detectar ~/.ssh/id_*.pub)
+#   --keys-only    Solo copia claves a Dropbear; no cambia contraseña root
 # ============================================================================
 set -euo pipefail
 
@@ -31,6 +32,7 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 _ENV="prod"
 _CLI_IP=""
 _KEY=""
+_KEYS_ONLY=false
 
 # ---------------------------------------------------------------------------
 # Parsear argumentos
@@ -49,17 +51,22 @@ while [[ $# -gt 0 ]]; do
             _KEY="${2:?--key requiere un argumento}"
             shift 2
             ;;
+        --keys-only)
+            _KEYS_ONLY=true
+            shift
+            ;;
         -h|--help)
-            echo "Uso: $0 [--ip <IP>] [--env <env>] [--key <path>]"
+            echo "Uso: $0 [--ip <IP>] [--env <env>] [--key <path>] [--keys-only]"
             echo ""
-            echo "  --ip <IP>     IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)"
-            echo "  --env         Entorno para leer .env.public (default: prod)"
-            echo "  --key <path>  Ruta a clave pública SSH (default: auto-detectar)"
+            echo "  --ip <IP>      IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)"
+            echo "  --env          Entorno para leer .env.public (default: prod)"
+            echo "  --key <path>   Ruta a clave pública SSH (default: auto-detectar)"
+            echo "  --keys-only    Solo copia claves; no cambia contraseña root"
             exit 0
             ;;
         *)
             log_error "Argumento desconocido: $1"
-            echo "   Uso: $0 [--ip <IP>] [--env <env>] [--key <path>]"
+            echo "   Uso: $0 [--ip <IP>] [--env <env>] [--key <path>] [--keys-only]"
             exit 1
             ;;
     esac
@@ -92,18 +99,29 @@ _ssh() {
 # ---------------------------------------------------------------------------
 _check_ssh() {
     log_step "Verificando conectividad SSH con el router..."
-    if ! ssh -q -p "${SSH_PORT}" \
+    if ssh -q -p "${SSH_PORT}" \
             -o ConnectTimeout=5 \
             -o StrictHostKeyChecking=accept-new \
             -o BatchMode=yes \
             "root@${ROUTER_IP}" "exit" 2>/dev/null; then
+        log_info "✅ Conectado con clave SSH a root@${ROUTER_IP}"
+        return 0
+    fi
+
+    log_warn "La clave SSH todavía no funciona; se intentará conexión interactiva."
+    echo "   Si el router pide contraseña, escríbela una vez para instalar la clave."
+
+    if ! ssh -q -p "${SSH_PORT}" \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=accept-new \
+            "root@${ROUTER_IP}" "exit"; then
         log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
         echo ""
         echo "   Verifica:"
         echo "   • El router está encendido y conectado por cable Ethernet"
         echo "   • La IP es correcta (usa --ip <IP>)"
         echo "   • SSH está habilitado en el router"
-        echo "   • Si ya tiene contraseña, SSH con clave debe funcionar"
+        echo "   • La contraseña root es correcta si el router la solicita"
         exit 1
     fi
     log_info "✅ Conectado a root@${ROUTER_IP}"
@@ -148,20 +166,48 @@ _copy_ssh_key() {
     log_info "   Clave: ${key_file}"
 
     # Inyectar clave en heredoc (expansión local), verificar duplicados en router
-    _ssh sh - <<REMOTE
+_ssh sh - <<REMOTE
 set -eu
 KEY="${pub_key}"
 AUTHKEYS="/etc/dropbear/authorized_keys"
 mkdir -p /etc/dropbear
 chmod 700 /etc/dropbear
+touch "\${AUTHKEYS}"
+chmod 600 "\${AUTHKEYS}"
+
+if [ -f /root/.ssh/authorized_keys ]; then
+    cat /root/.ssh/authorized_keys >> "\${AUTHKEYS}"
+fi
+
 if [ -f "\${AUTHKEYS}" ] && grep -qF "\${KEY}" "\${AUTHKEYS}" 2>/dev/null; then
     echo "      ℹ️  Clave ya presente en \${AUTHKEYS}"
 else
     echo "\${KEY}" >> "\${AUTHKEYS}"
-    chmod 600 "\${AUTHKEYS}"
     echo "      ✅ Clave copiada a \${AUTHKEYS}"
 fi
+sort -u "\${AUTHKEYS}" -o "\${AUTHKEYS}"
+chmod 600 "\${AUTHKEYS}"
+/etc/init.d/dropbear restart >/dev/null 2>&1 || true
 REMOTE
+}
+
+# ---------------------------------------------------------------------------
+# Verificar acceso con llave
+# ---------------------------------------------------------------------------
+_verify_key_login() {
+    log_step "Verificando acceso SSH sin contraseña..."
+    if ssh -q -p "${SSH_PORT}" \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=accept-new \
+            -o BatchMode=yes \
+            "root@${ROUTER_IP}" "exit" 2>/dev/null; then
+        log_info "✅ Acceso por clave funcionando"
+        return 0
+    fi
+
+    log_error "La clave se copió, pero SSH sin contraseña aún no funciona."
+    echo "   Revisa en el router: /etc/dropbear/authorized_keys"
+    exit 1
 }
 
 # ---------------------------------------------------------------------------
@@ -204,7 +250,12 @@ main() {
     echo ""
     echo "   Pasos:"
     echo "   1. Copiar clave SSH al router"
-    echo "   2. Establecer contraseña root (interactivo)"
+    if "${_KEYS_ONLY}"; then
+        echo "   2. Verificar acceso sin contraseña"
+    else
+        echo "   2. Establecer contraseña root (interactivo)"
+        echo "   3. Verificar acceso sin contraseña"
+    fi
     echo ""
     read -r -p "¿Continuar? (s/N) " answer
     answer=$(echo "${answer}" | tr '[:upper:]' '[:lower:]')
@@ -215,14 +266,21 @@ main() {
 
     echo ""
     _copy_ssh_key "${key_file}"
+    _verify_key_login
 
-    echo ""
-    _set_password
+    if ! "${_KEYS_ONLY}"; then
+        echo ""
+        _set_password
+    fi
 
     echo ""
     log_info "✅ Autenticación configurada:"
     echo "   • Clave SSH: acceso sin contraseña desde esta máquina"
-    echo "   • Contraseña root: establecida para acceso por consola o en otras máquinas"
+    if "${_KEYS_ONLY}"; then
+        echo "   • Contraseña root: sin cambios"
+    else
+        echo "   • Contraseña root: establecida para acceso por consola o en otras máquinas"
+    fi
     echo ""
     echo "   Verificar acceso con clave:"
     echo "   ssh root@${ROUTER_IP}"

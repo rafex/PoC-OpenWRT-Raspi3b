@@ -176,9 +176,11 @@ Copia la clave SSH pública al router (`/etc/dropbear/authorized_keys`) y establ
 ```bash
 scripts/router/setup-auth.sh --env prod
 scripts/router/setup-auth.sh --key ~/.ssh/id_ed25519.pub  # Clave explícita
+scripts/router/setup-auth.sh --keys-only                  # Solo copia claves
 ```
 
 Auto-detecta la clave pública local en orden: `id_ed25519.pub` > `id_ecdsa.pub` > `id_rsa.pub`. Previene duplicados con `grep -qF`.
+En OpenWRT copia la clave a `/etc/dropbear/authorized_keys` y, si existe `/root/.ssh/authorized_keys` creado por `ssh-copy-id`, migra esas claves al archivo de Dropbear.
 
 ### router/setup-captive.sh
 
@@ -477,13 +479,14 @@ Secciones mostradas:
 
 | Sección | Contenido |
 |---------|-----------|
-| **Sistema** | Hostname, versión firmware (OpenWRT), uptime, carga (1m 5m 15m) |
-| **Memoria** | MB usados / total / porcentaje de uso |
-| **Almacenamiento** | `/`, `/overlay`, `/tmp` — uso y espacio disponible |
-| **Red** | IP WAN, LAN (br-lan), WiFi cliente (wwan), WireGuard (wg0) si existen |
-| **WiFi** | Radios con banda, canal y estado (activo/deshabilitado) |
+| **Sistema** | Hostname, modelo, firmware, release, target, kernel, uptime, carga, gestor de paquetes |
+| **Memoria** | RAM usada / total / porcentaje, estado OK/ALTO/CRITICO, swap |
+| **Almacenamiento** | `/rom`, `/`, `/overlay`, `/tmp`, estado de extroot y `fstab` |
+| **Red** | WAN, LAN, WWAN, WireGuard, gateway y rutas IPv4 |
+| **WiFi** | Radios con banda/canal/estado e interfaces AP/STA configuradas |
 | **Clientes DHCP** | IP, MAC y hostname de cada dispositivo conectado |
-| **Servicios** | dnsmasq, nftables, dropbear, tor, wireguard — ✅ activo / ❌ inactivo |
+| **Servicios** | dnsmasq, firewall, dropbear, wireguard, tor, uhttpd — instalado, habilitado y activo |
+| **Salud** | Prueba de internet IPv4, DNS local y últimos logs relevantes |
 
 Implementado como un único heredoc `<< 'REMOTE'` para minimizar el número de conexiones SSH.
 

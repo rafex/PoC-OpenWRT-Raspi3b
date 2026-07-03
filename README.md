@@ -33,6 +33,7 @@ just build-prod
 
 | Guía | Descripción |
 |------|-------------|
+| [Configuración de Build](docs/CONFIGURACION_BUILD.md) | Dónde cambiar versión, modelo, paquetes, secrets y overlay |
 | [Uso de Just](docs/JUST.md) | Todas las recipes del task manager |
 | [Scripts](docs/SCRIPTS.md) | Referencia de scripts modulares |
 | [Compilación](docs/BUILD_INSTRUCTIONS.md) | Guía completa de compilación |
@@ -55,6 +56,7 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 
 | Receta | Descripción |
 |--------|-------------|
+| `just router-copy-keys` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
 | `just router-setup-auth` | Copia clave SSH pública + contraseña root |
 | `just router-setup-extroot` | Configura USB como extroot (`/overlay`) |
 | `just router-setup-logs` | Logs persistentes en USB |
@@ -67,7 +69,7 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-static-ip-add` / `just router-static-ip-list` | DHCP leases estáticos por MAC address |
 | `just router-dns-set` / `just router-dns-show` / `just router-dns-reset` | Servidores DNS upstream de dnsmasq |
 | `just router-clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
-| `just router-status` | Vista general: sistema, RAM, red, WiFi, clientes DHCP y servicios |
+| `just router-status` | Diagnóstico general: versión, salud, RAM, almacenamiento, red, WiFi, DHCP y servicios |
 | `just router-backup` / `just router-restore` / `just router-backup-list` | Backup y restauración de configuración (`/etc/config`) |
 | `just router-reboot` / `just router-reboot --wait` | Reinicia el router; `--wait` bloquea hasta reconexión |
 | `just router-update` / `just router-update-force` | Actualiza firmware via sysupgrade |
