@@ -12,7 +12,7 @@ Con los mini no breaks, se busca garantizar una fuente de alimentación estable 
 
 ## Software
 
-- OpenWRT 25.12.2
+- OpenWRT 25.12.5
 - DietPi RPi234 Trixie (ARMv8)
 
 ## Objetivo
@@ -25,8 +25,9 @@ Compilar una versión personalizada de OpenWRT para el TP-Link TL-WDR3600 con:
 - ✅ USB Storage
 - ✅ VPN WireGuard
 - ✅ Wi-Fi Dual-Band (2.4/5 GHz)
-- ✅ Cliente Tor
-- ❌ LuCi, uhttpd, rpcd (excluidos)
+- ✅ Integración Tor vía Raspberry Pi 3B (SOCKS/.onion transparent proxy)
+- ❌ LuCi, uhttpd, módulos LuCI de rpcd (excluidos)
+- ✅ `rpcd` base incluido solo para servicios del sistema (`ubus`/`netifd`)
 
 ## Arquitectura del proyecto
 
@@ -83,7 +84,9 @@ repo/
 ├── .envrc.example                 # Ejemplo de variables
 ├── build-openwrt.sh               # Wrapper → scripts/build/openwrt.sh
 ├── config/
-│   └── openwrt-packages.txt       # Paquetes a incluir/excluir
+│   ├── openwrt-packages.toml      # Fuente de verdad de paquetes
+│   ├── openwrt-packages.txt       # Generado desde TOML
+│   └── openwrt-post-install-packages.toml
 ├── environments/{dev,prod}/       # Secrets por entorno
 ├── scripts/
 │   ├── commons/{logging,utils,toml-parser}.sh       # Utilidades compartidas

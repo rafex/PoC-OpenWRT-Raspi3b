@@ -228,7 +228,7 @@ generate-age-key:
 create-environments:
     #!/usr/bin/env bash
     set -euo pipefail
-    O_VERSION="25.12.2"
+    O_VERSION="25.12.5"
 
     # ── Pre-flight: verificar sops ──────────────────────────────────
     if ! command -v sops &>/dev/null; then
@@ -298,7 +298,7 @@ create-environments:
     for env in dev prod; do
         SECRETS_FILE="environments/${env}/secrets.enc.yaml"
         if [ ! -f "$SECRETS_FILE" ]; then
-            printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "$SECRETS_FILE"
+            printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nDROPBEAR_RSA_HOST_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "$SECRETS_FILE"
             SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt" sops --config .sops.yaml --encrypt --in-place "$SECRETS_FILE"
             echo "✅ environments/${env}/secrets.enc.yaml creado y encriptado"
             echo "   Llena tus datos con: just edit-secrets ${env}"
@@ -318,7 +318,7 @@ setup-env ENV="prod":
     fi
     # Cargar variables del entorno
     set -a; source "${ENV_FILE}"; set +a
-    OPENWRT_VERSION="${OPENWRT_VERSION:-25.12.2}"
+    OPENWRT_VERSION="${OPENWRT_VERSION:-25.12.5}"
     TARGET="${TARGET:-ath79}"
     SUBTARGET="${SUBTARGET:-generic}"
     export OPENWRT_VERSION TARGET SUBTARGET
@@ -372,7 +372,7 @@ reinit-secrets ENV:
 
     SECRETS_FILE="environments/{{ ENV }}/secrets.enc.yaml"
     rm -f "${SECRETS_FILE}"
-    printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "${SECRETS_FILE}"
+    printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nDROPBEAR_RSA_HOST_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "${SECRETS_FILE}"
     SOPS_AGE_KEY_FILE="${KEYFILE}" sops --config .sops.yaml --encrypt --in-place "${SECRETS_FILE}"
     echo "✅ ${SECRETS_FILE} re-creado con tu clave"
     echo ""

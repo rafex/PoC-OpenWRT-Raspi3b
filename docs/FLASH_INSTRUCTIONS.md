@@ -1,8 +1,8 @@
 # Flash Instructions — OpenWRT on TP-Link TL-WDR3600
 
-Procedimiento para instalar la imagen personalizada de OpenWRT 25.12.2 en el router TP-Link TL-WDR3600 v1.0.
+Procedimiento para instalar la imagen personalizada de OpenWRT 25.12.5 en el router TP-Link TL-WDR3600 v1.0.
 
-> ⚡ **Pre-compila con**: `just flash prod` (compila, verifica y prepara la imagen)
+> Pre-compila con: `just build-prod`.
 
 ## ⚠️ Advertencias
 
@@ -68,17 +68,17 @@ El TL-WDR3600 tiene un servidor TFTP integrado en el bootloader para recuperaci�
 
 ### Método 3: Sysupgrade (desde OpenWRT existente)
 
-Si ya tienes OpenWRT instalado y solo actualizas, usa `just update`:
+Si ya tienes OpenWRT instalado y solo actualizas, usa las recipes `router-update`:
 
 ```bash
 # Actualizar manteniendo configuración (IP desde environments/prod/.env.public)
-just update
+just router-update
 
 # Actualizar con IP distinta
-just update ip=192.168.0.1
+just router-update ip=192.168.0.1
 
 # Actualizar borrando configuración del router (vuelve a defaults de OpenWRT)
-just update-force
+just router-update-force
 ```
 
 O manualmente:
@@ -144,11 +144,11 @@ vi /etc/config/network
 # Agregar sección wireguard_iface...
 ```
 
-### 6. Activar Tor
+### 6. Integración Tor vía Raspberry Pi 3B
 
 ```bash
-/etc/init.d/tor enable
-/etc/init.d/tor start
+just router-socks-enable
+just router-onion-enable
 ```
 
 ## Recuperación en caso de fallo

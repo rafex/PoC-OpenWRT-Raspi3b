@@ -19,6 +19,7 @@ PACKAGES_FILE="${PACKAGES_FILE:-${REPO_ROOT}/config/openwrt-packages.txt}"
 TOML_FILE="${REPO_ROOT}/config/openwrt-packages.toml"
 BUILDER_DIR="${BUILDER_DIR:-}"
 OVERLAY_DIR="${OVERLAY_DIR:-}"
+ENV="${ENV:-}"
 
 # ---------------------------------------------------------------------------
 # Parse command-line arguments
@@ -135,7 +136,14 @@ main() {
     log_info "Packages: ${count} from ${PACKAGES_FILE}"
 
     # Step 3: Compile
-    "${SCRIPT_DIR}/compile.sh" "${builder}" "${packages}" "${PROFILE}" || exit $?
+    if [ -z "${OVERLAY_DIR}" ] && [ -n "${ENV}" ] && [ -d "${REPO_ROOT}/config/overlay/${ENV}" ]; then
+        OVERLAY_DIR="${REPO_ROOT}/config/overlay/${ENV}"
+    fi
+    if [ -n "${OVERLAY_DIR}" ] && [[ "${OVERLAY_DIR}" != /* ]]; then
+        OVERLAY_DIR="$(cd "$(dirname "${OVERLAY_DIR}")" && pwd)/$(basename "${OVERLAY_DIR}")"
+    fi
+
+    "${SCRIPT_DIR}/compile.sh" "${builder}" "${packages}" "${PROFILE}" "${OVERLAY_DIR}" || exit $?
 
     # Step 4: Report
     report_results "${builder}"

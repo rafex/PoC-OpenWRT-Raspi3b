@@ -195,7 +195,7 @@ def display(result: dict) -> str:
 
     # ── Header ───────────────────────────────────────────────────────────
     lines.append(box_top())
-    lines.append(box_line(f"{BOLD}OpenWRT 25.12.2 — Package Configuration{RESET}"))
+    lines.append(box_line(f"{BOLD}OpenWRT 25.12.5 — Package Configuration{RESET}"))
     lines.append(box_line(f"Profile: {CYAN}{profile}{RESET}  |  Target: {CYAN}{target}{RESET}  |  RAM: {YELLOW}{ram} MB{RESET}"))
     lines.append(box_mid())
 

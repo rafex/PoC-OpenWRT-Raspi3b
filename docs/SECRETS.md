@@ -18,7 +18,7 @@ environments/{dev,prod}/
 | Archivo | Contiene | ¿Se commitea? |
 |---------|----------|---------------|
 | `.env.public` | Versión OpenWRT, target, IP del router, **nombres de red WiFi** | ✅ Sí |
-| `secrets.enc.yaml` | **Contraseñas WiFi**, clave WireGuard, hash root | ✅ Sí (encryptado) |
+| `secrets.enc.yaml` | **Contraseñas WiFi**, claves privadas, hash root | ✅ Sí (encryptado) |
 | `~/.age/poc-openwrt-privkey.txt` | Clave privada age | ❌ Nunca |
 
 ## Estructura de secrets
@@ -29,6 +29,7 @@ environments/{dev,prod}/
 WIFI_KEY_24: ""           # Contraseña red 2.4 GHz
 WIFI_KEY_5: ""            # Contraseña red 5 GHz
 WIREGUARD_PRIVATE_KEY: "" # Clave privada WireGuard
+DROPBEAR_RSA_HOST_KEY: "" # Host key privada de Dropbear
 ROOT_PASSWORD_HASH: ""    # Hash SHA-512-crypt para /etc/shadow
 ```
 

@@ -277,7 +277,7 @@ if command -v mwan3 >/dev/null 2>&1; then
     mwan3 status 2>/dev/null || echo "  mwan3 instalado pero sin configurar"
 else
     echo "  mwan3 no instalado"
-    echo "  Para balanceo avanzado: opkg install mwan3"
+    echo "  Para balanceo avanzado: apk -U add mwan3"
 fi
 REMOTE
 }

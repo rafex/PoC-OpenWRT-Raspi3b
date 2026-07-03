@@ -13,7 +13,7 @@ state         = "todo"
 > _Tipo: feature_
 > _Repo: PEQUEÑO (10 archivos, 852 líneas)_
 
-## Plan: Compilación personalizada de OpenWRT 25.12.2 para TP-Link TL-WDR3600 v1.0
+## Plan: Compilación personalizada de OpenWRT 25.12.5 para TP-Link TL-WDR3600 v1.0
 
 **Tipo:** feature  
 **Complejidad estimada:** media  
@@ -21,7 +21,7 @@ state         = "todo"
 
 ### Contexto
 
-El repositorio actual está vacío (solo contiene LICENSE, .gitignore y AGENTS.md con requisitos del proyecto). Es necesario crear desde cero los scripts y documentación para compilar una imagen OpenWRT 25.12.2 personalizada con las siguientes características:
+El repositorio actual está vacío (solo contiene LICENSE, .gitignore y AGENTS.md con requisitos del proyecto). Es necesario crear desde cero los scripts y documentación para compilar una imagen OpenWRT 25.12.5 personalizada con las siguientes características:
 
 - **Sí incluir:** SSH con certificados, TLS/HTTPS, firewall, soporte USB (almacenamiento externo), VPN (OpenVPN/WireGuard), Wi-Fi dual-band (2.4/5 GHz), cliente Tor
 - **No incluir:** LuCi (interfaz web), uhttpd, rpcd
@@ -44,7 +44,7 @@ El repositorio actual está vacío (solo contiene LICENSE, .gitignore y AGENTS.m
 
 1. **Crear script de preparación de entorno** (`scripts/setup-build-env.sh`)
    - Verificar dependencias (build-essential, libncurses-dev, unzip, wget, etc.)
-   - Descargar OpenWRT Image Builder 25.12.2 para ath79/generic
+   - Descargar OpenWRT Image Builder 25.12.5 para ath79/generic
    - Extraer y verificar integridad
 
 2. **Definir configuración de paquetes** (`config/openwrt-packages.txt`)
@@ -91,7 +91,7 @@ El repositorio actual está vacío (solo contiene LICENSE, .gitignore y AGENTS.m
 ### Tests a escribir
 
 - **Test de integridad del script**: Verificar que `build-openwrt.sh` ejecuta sin errores de sintaxis
-- **Test de configuración**: Validar que todos los paquetes listados existen en los repositorios de OpenWRT 25.12.2
+- **Test de configuración**: Validar que todos los paquetes listados existen en los repositorios de OpenWRT 25.12.5
 - **Test de verificación**: Comprobar que `scripts/verify-image.sh` detecta correctamente una imagen válida/inválida
 
 ### Riesgos
@@ -99,7 +99,7 @@ El repositorio actual está vacío (solo contiene LICENSE, .gitignore y AGENTS.m
 - **Espacio en disco**: El entorno de compilación requiere ~5-10GB de espacio libre
 - **Compatibilidad de paquetes**: Algunas combinaciones de paquetes pueden generar conflictos de dependencias
 - **Tamaño de imagen**: Incluir demasiados paquetes puede exceder el flash disponible (8MB en TL-WDR3600)
-- **Versión de OpenWRT**: La versión 25.12.2 debe ser verificada si existe (la última estable es 23.05)
+- **Versión de OpenWRT**: La versión 25.12.5 debe ser verificada antes de compilar
 
 ### Criterio de aceptación
 

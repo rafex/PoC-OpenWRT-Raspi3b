@@ -1,6 +1,6 @@
 # PoC-OpenWRT-Raspi3b
 
-Prueba de concepto para compilar una imagen personalizada de **OpenWRT 25.12.2** para el router **TP-Link TL-WDR3600 v1.0**, con administración vía SSH y sin interfaz web LuCi.
+Prueba de concepto para compilar una imagen personalizada de **OpenWRT 25.12.5** para el router **TP-Link TL-WDR3600 v1.0**, con administración vía SSH y sin interfaz web LuCi. La versión está fijada para reproducibilidad del PoC.
 
 ## Quick Start
 
@@ -44,8 +44,9 @@ just build-prod
 - ✅ SSH (`dropbear`) · TLS/HTTPS · Firewall (`nftables`)
 - ✅ USB Storage (`ext4`, `block-mount`)
 - ✅ VPN WireGuard · Wi-Fi Dual-Band (2.4/5 GHz)
-- ✅ Cliente Tor
-- ❌ LuCi, uhttpd, rpcd (excluidos — uhttpd disponible via post-install)
+- ✅ Integración Tor vía Raspberry Pi 3B (SOCKS y proxy transparente `.onion`)
+- ❌ LuCi, uhttpd y módulos LuCI de `rpcd` excluidos
+- ✅ `rpcd` base incluido para servicios del sistema (`ubus`/`netifd`)
 
 ## Gestión del router (vía SSH)
 
@@ -57,7 +58,7 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-setup-auth` | Copia clave SSH pública + contraseña root |
 | `just router-setup-extroot` | Configura USB como extroot (`/overlay`) |
 | `just router-setup-logs` | Logs persistentes en USB |
-| `just router-post-install` | Instala paquetes adicionales via `opkg` |
+| `just router-post-install` | Instala paquetes adicionales via `apk`/`opkg` |
 | `just router-captive-setup` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
 | `just router-wifi-ap` | Configura AP interactivo (detecta radios libres) |
 | `just router-wifi-client` | Conecta como cliente WiFi (selección de banda interactiva) |

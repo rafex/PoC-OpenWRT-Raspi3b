@@ -11,10 +11,14 @@ compile_image() {
     local builder="$1"
     local packages="$2"
     local profile="${3:-tplink_tl-wdr3600-v1}"
+    local overlay="${4:-}"
 
     log_step "Starting compilation..."
     log_info "Profile:  ${profile}"
     log_info "Builder:  ${builder}"
+    if [ -n "${overlay}" ]; then
+        log_info "Overlay:  ${overlay}"
+    fi
     echo ""
 
     if [ ! -f "${builder}/Makefile" ]; then
@@ -28,10 +32,21 @@ compile_image() {
     log_info "Running make image..."
     echo ""
 
-    # Run the build
-    # shellcheck disable=SC2086
-    make image PROFILE="${profile}" PACKAGES="${packages}" 2>&1 | \
-        tee "/tmp/openwrt-build-$$.log"
+    if [ -n "${overlay}" ] && [ ! -d "${overlay}" ]; then
+        log_error "Overlay directory not found: ${overlay}"
+        return 1
+    fi
+
+    # Run the build. FILES injects the generated OpenWRT overlay.
+    if [ -n "${overlay}" ]; then
+        # shellcheck disable=SC2086
+        make image PROFILE="${profile}" PACKAGES="${packages}" FILES="${overlay}" 2>&1 | \
+            tee "/tmp/openwrt-build-$$.log"
+    else
+        # shellcheck disable=SC2086
+        make image PROFILE="${profile}" PACKAGES="${packages}" 2>&1 | \
+            tee "/tmp/openwrt-build-$$.log"
+    fi
 
     local exit_code=${PIPESTATUS[0]}
 
@@ -52,5 +67,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     BUILDER="${1:-${BUILDER_DIR:-}}"
     PACKAGES="${2:-}"
     PROFILE="${3:-tplink_tl-wdr3600-v1}"
-    compile_image "${BUILDER}" "${PACKAGES}" "${PROFILE}"
+    OVERLAY="${4:-${OVERLAY_DIR:-}}"
+    compile_image "${BUILDER}" "${PACKAGES}" "${PROFILE}" "${OVERLAY}"
 fi

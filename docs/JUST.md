@@ -77,7 +77,7 @@ La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto 
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just router-post-install [group=] [ip=] [env=]` | Instala paquetes adicionales via `opkg` (lee `openwrt-router-post-install-packages.toml`) |
+| `just router-post-install [group=] [ip=] [env=]` | Instala paquetes adicionales via `apk`/`opkg` (lee `openwrt-post-install-packages.toml`) |
 
 Ejemplo:
 ```bash

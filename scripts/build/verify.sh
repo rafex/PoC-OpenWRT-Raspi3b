@@ -31,6 +31,7 @@ check_size() {
 
     if [ "${size_mb}" -gt "${REQUIRED_SIZE_MB}" ]; then
         log_error "${label}: ${size_mb} MB exceeds ${REQUIRED_SIZE_MB} MB flash limit"
+        errors=$((errors + 1))
     else
         log_info "${label}: size OK (${size_mb} MB)"
     fi

@@ -29,7 +29,7 @@ scripts/
 │   └── show-packages.sh        # Muestra paquetes configurados agrupados
 ├── router/                     # Administración del router via SSH
 │   ├── update.sh               # Actualiza firmware via sysupgrade
-│   ├── post-install.sh         # Instala paquetes adicionales via opkg
+│   ├── post-install.sh         # Instala paquetes adicionales via apk/opkg
 │   ├── setup-auth.sh           # Copia clave SSH pública + contraseña root
 │   ├── setup-extroot.sh        # Configura USB como extroot (/overlay)
 │   ├── setup-logs-ram.sh       # Buffer de logs en RAM (64 KB, sin USB)
@@ -108,7 +108,7 @@ Valida la imagen compilada (tamaño, checksums):
 
 ### router/post-install.sh
 
-Instala paquetes adicionales en el router vía `opkg` post-flash. Lee `config/openwrt-post-install-packages.toml`, que agrupa los paquetes por funcionalidad.
+Instala paquetes adicionales en el router post-flash. En OpenWRT 25.12+ usa `apk`; si el router expone `opkg`, cae a `opkg` para compatibilidad. Lee `config/openwrt-post-install-packages.toml`, que agrupa los paquetes por funcionalidad.
 
 ```bash
 scripts/router/post-install.sh                          # Instala todos los grupos

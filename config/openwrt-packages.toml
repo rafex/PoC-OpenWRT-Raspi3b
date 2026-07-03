@@ -1,5 +1,5 @@
 # ============================================================================
-# OpenWRT 25.12.2 Package Configuration
+# OpenWRT 25.12.5 Package Configuration
 # ============================================================================
 # Profile: tplink_tl-wdr3600-v1
 # Target:  ath79/generic
@@ -56,7 +56,7 @@ ram_mb = 64
 "System Tools" = []
 
 [categories.rpcd]
-"RPC Daemon (base)" = [
+"RPC Daemon (base, system services)" = [
   "rpcd",
   "rpcd-mod-file",
   "rpcd-mod-iwinfo"
@@ -100,6 +100,7 @@ ram_mb = 64
 
 [warnings]
 tor = "Consumes 50-80 MB RAM on 64 MB device. High OOM risk — removed from build."
+tor_integration = "Tor runs on the Raspberry Pi 3B; OpenWRT only manages forwarding/proxy rules."
 flash_limit = "TL-WDR3600 has 8 MB flash. Keep total squashfs < 5.5 MB compressed."
 
 [notes]

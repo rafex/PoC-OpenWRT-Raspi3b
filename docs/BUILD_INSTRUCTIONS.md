@@ -1,6 +1,6 @@
-# Build Instructions — OpenWRT 25.12.2 for TP-Link TL-WDR3600
+# Build Instructions — OpenWRT 25.12.5 for TP-Link TL-WDR3600
 
-Guía completa para compilar una imagen personalizada de OpenWRT 25.12.2 para el router TP-Link TL-WDR3600 v1.0 (N600 Wireless Dual Band Gigabit Router).
+Guía completa para compilar una imagen personalizada de OpenWRT 25.12.5 para el router TP-Link TL-WDR3600 v1.0 (N600 Wireless Dual Band Gigabit Router). La versión está fijada en el proyecto para reproducibilidad; revisa `environments/<env>/.env.public` si quieres subir a otra versión.
 
 ## Requisitos del sistema
 
@@ -43,7 +43,7 @@ just setup           # Instala herramientas, genera clave age, crea environments
 ./scripts/install/setup-env.sh
 ```
 
-Esto descargará `openwrt-imagebuilder-25.12.2-ath79-generic.Linux-x86_64.tar.zst` y lo extraerá en el directorio `openwrt-builder/`.
+Esto descargará `openwrt-imagebuilder-25.12.5-ath79-generic.Linux-x86_64.tar.zst` y lo extraerá en el directorio `openwrt-builder/`.
 
 ### 3. Revisar configuración de paquetes
 
@@ -63,17 +63,16 @@ just refresh-packages
 - `dnsmasq`, `firewall4` — DNS/DHCP + Firewall
 - `kmod-nft-core`, `kmod-nft-nat` — nftables backend
 - `wpad-basic-mbedtls` — Wi-Fi WPA2/3
-- `uclient-fetch`, `libustream-mbedtls`, `ca-bundle`, `ca-certificates` — TLS/HTTPS
-- `kmod-usb-*`, `kmod-scsi-*`, `kmod-fs-ext4`, `kmod-nls-*`, `block-mount`, `e2fsprogs` — USB storage
+- `uclient-fetch`, `libustream-mbedtls`, `ca-bundle` — TLS/HTTPS
+- `kmod-usb-*`, `kmod-scsi-core`, `kmod-fs-ext4`, `block-mount` — USB storage ext4
 - `wireguard-tools`, `kmod-wireguard` — VPN WireGuard
-- `rpcd`, `rpcd-mod-file`, `rpcd-mod-iwinfo` — RPC daemon (requerido por ubus/netifd)
-- `htop`, `usbutils`, `nano`, `logrotate` — Herramientas de sistema
+- `rpcd`, `rpcd-mod-file`, `rpcd-mod-iwinfo` — RPC daemon base para servicios del sistema
 
 **Paquetes excluidos:**
 - `luci*` — Interfaz web (administración solo por SSH)
 - `uhttpd*` — Servidor web
-- `rpcd-mod-luci`, `rpcd-mod-rpcsys`, `rpcd-mod-rrdns`, `rpcd-mod-ucode` — Solo módulos LuCI de rpcd
-- `tor` — Consume 50-80 MB RAM en dispositivo de 64 MB (riesgo OOM)
+- `rpcd-mod-luci`, `rpcd-mod-rpcsys`, `rpcd-mod-rrdns`, `rpcd-mod-ucode` — módulos LuCI de rpcd
+- `tor` — no va en el firmware; corre en la Raspberry Pi 3B por límite de RAM del TL-WDR3600
 
 ### 4. Compilar la imagen
 
@@ -107,7 +106,7 @@ just build --profile tplink_tl-wdr3600-v1
 
 ```bash
 # Recomendado: con just
-just flash prod      # Compila + verifica + prepara para flashear
+just build-prod      # Compila + verifica
 
 # O con script modular:
 ./scripts/build/verify.sh openwrt-builder/openwrt-imagebuilder-*/bin/targets/ath79/generic
@@ -117,7 +116,6 @@ El script verifica:
 - Existencia de los archivos de imagen
 - Tamaño (debe caber en los 8 MB de flash del TL-WDR3600)
 - Checksums SHA256
-- Presencia de paquetes requeridos (best-effort)
 
 ## Artefactos generados
 

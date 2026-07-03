@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../commons/logging.sh"
 
-OPENWRT_VERSION="${OPENWRT_VERSION:-25.12.2}"
+OPENWRT_VERSION="${OPENWRT_VERSION:-25.12.5}"
 TARGET="${TARGET:-ath79}"
 SUBTARGET="${SUBTARGET:-generic}"
 BUILD_DIR="${BUILD_DIR:-$(pwd)/openwrt-builder}"

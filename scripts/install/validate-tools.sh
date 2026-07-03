@@ -49,12 +49,10 @@ validate_all_tools() {
     echo ""
 
     local missing=()
-    local all_ok=true
 
     for tool in "${REQUIRED_TOOLS[@]}"; do
         if ! validate_tool "${tool}"; then
             missing+=("${tool}")
-            all_ok=false
         fi
     done
 

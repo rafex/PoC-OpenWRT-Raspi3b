@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================================
-# post-install.sh — Instala paquetes adicionales en el router via opkg
+# post-install.sh — Instala paquetes adicionales en el router
 #
-# Lee openwrt-post-install-packages.toml y ejecuta opkg en el router.
+# Lee openwrt-post-install-packages.toml y ejecuta apk/opkg en el router.
 # Estos paquetes NO van compilados en la imagen — se instalan post-flash.
 #
 # Uso:
@@ -144,7 +144,7 @@ _ssh() {
 # Main
 # ---------------------------------------------------------------------------
 echo "============================================="
-echo " Post-Install — Instalación via opkg"
+echo " Post-Install — Instalación de paquetes"
 echo "============================================="
 echo "   Router: root@${ROUTER_IP}:${SSH_PORT}"
 [ -n "${_GROUP}" ] && echo "   Grupo:  ${_GROUP}" || echo "   Grupos: todos"
@@ -194,12 +194,22 @@ if [ "${answer}" != "s" ] && [ "${answer}" != "si" ]; then
 fi
 
 echo ""
-log_step "Actualizando listas de paquetes (opkg update)..."
-_ssh "opkg update"
+pkg_manager=$(_ssh "if command -v apk >/dev/null 2>&1; then echo apk; elif command -v opkg >/dev/null 2>&1; then echo opkg; fi")
+if [ -z "${pkg_manager}" ]; then
+    log_error "No se encontró apk ni opkg en el router."
+    exit 1
+fi
 
-log_step "Instalando paquetes..."
-# shellcheck disable=SC2086
-_ssh "opkg install ${all_packages}"
+log_step "Instalando paquetes con ${pkg_manager}..."
+if [ "${pkg_manager}" = "apk" ]; then
+    # OpenWRT 25.12+ usa apk. -U actualiza índices antes de instalar.
+    # shellcheck disable=SC2086
+    _ssh "apk -U add ${all_packages}"
+else
+    _ssh "opkg update"
+    # shellcheck disable=SC2086
+    _ssh "opkg install ${all_packages}"
+fi
 
 echo ""
 log_info "✅ Paquetes instalados: ${all_packages}"

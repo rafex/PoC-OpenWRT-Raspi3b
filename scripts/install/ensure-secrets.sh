@@ -5,7 +5,7 @@
 # Flujo:
 #   1. Si no existe la clave age → crearla + guiar al usuario a llenar secrets
 #   2. Si existe pero no descifra → informar que la clave no corresponde
-#   3. Si descifra → reportar campos vacíos (no son error) y exportar variables
+#   3. Si descifra → reportar campos vacíos (no son error)
 #
 # Uso: source scripts/install/ensure-secrets.sh <ENV>
 #      O ejecutado directamente para verificar.

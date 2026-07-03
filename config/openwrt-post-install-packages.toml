@@ -1,14 +1,14 @@
 # ============================================================================
 # openwrt-post-install-packages.toml
 #
-# Paquetes instalados en el router post-flash via opkg.
+# Paquetes instalados en el router post-flash via apk/opkg.
 # NO se compilan en la imagen firmware — se instalan según necesidad.
 #
 # Uso:
-#   just post-install group=captive_portal   # instala un grupo
-#   just post-install                        # instala todos los grupos
+#   just router-post-install group=captive_portal   # instala un grupo
+#   just router-post-install                         # instala todos los grupos
 #
-# Requiere conectividad a internet en el router (repositorios opkg activos).
+# Requiere conectividad a internet en el router (repositorios apk/opkg activos).
 # ============================================================================
 
 [captive_portal]

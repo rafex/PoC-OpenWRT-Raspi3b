@@ -472,11 +472,11 @@ _install() {
     # Verificar uhttpd
     log_step "Verificando uhttpd..."
     if ! _ssh "command -v uhttpd >/dev/null 2>&1"; then
-        log_warn "uhttpd no encontrado — instalando via opkg..."
-        _ssh "opkg update && opkg install uhttpd" || {
+        log_warn "uhttpd no encontrado — instalando con el gestor de paquetes disponible..."
+        _ssh "if command -v apk >/dev/null 2>&1; then apk -U add uhttpd; else opkg update && opkg install uhttpd; fi" || {
             log_error "No se pudo instalar uhttpd."
             echo "   Opciones:"
-            echo "   1. Añadir 'uhttpd' al firmware: just build-prod y just update"
+            echo "   1. Instalar el grupo post-flash: just router-post-install group=captive_portal"
             echo "   2. Verificar conectividad a internet del router"
             exit 1
         }

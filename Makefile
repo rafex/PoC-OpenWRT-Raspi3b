@@ -16,7 +16,7 @@ validate: shellcheck
 ## shellcheck: Ejecutar shellcheck en todos los scripts
 shellcheck:
 	@echo "=== shellcheck ==="
-	shellcheck scripts/**/*.sh build-openwrt.sh
+	shellcheck -x --severity=error scripts/**/*.sh build-openwrt.sh
 
 ## clean: Limpiar artefactos de compilación
 clean:
