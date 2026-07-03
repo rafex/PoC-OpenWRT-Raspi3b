@@ -143,6 +143,7 @@ scripts/router/post-install.sh --list
 |--------|-----|-------------|
 | `router-status` | `just router-status [--ip <IP>] [--env <env>]` | Diagnóstico general: sistema, firmware, memoria, almacenamiento, red, WiFi, dispositivos, portal cautivo, servicios y salud. |
 | `router-clients` | `just router-clients [--ip <IP>] [--env <env>]` | Lista leases DHCP y tabla ARP. |
+| `router-lan-doctor` | `just router-lan-doctor [--ip <IP>] [--source local\|user@host] [--target <IP>]` | Valida comunicación interna router→clientes y origen→clientes. |
 | `router-backup` | `just router-backup [--ip <IP>] [--env <env>] [--dir <dir>]` | Descarga backup de configuración a `./backups/`. |
 | `router-restore` | `just router-restore --file <backup.tar.gz> [--ip <IP>] [--env <env>]` | Restaura backup y reinicia router. |
 | `router-backup-list` | `just router-backup-list [--dir <dir>]` | Lista backups locales disponibles. |
@@ -153,6 +154,10 @@ Ejemplos:
 ```bash
 just router-status --ip 192.168.1.1
 just router-clients --ip 192.168.1.1
+just router-lan-doctor --ip 192.168.1.1
+just router-lan-doctor --ip 192.168.1.1 --source local
+just router-lan-doctor --ip 192.168.1.1 --source rafex@192.168.3.143
+just router-lan-doctor --ip 192.168.1.1 --source local --target 192.168.1.146 --target 192.168.1.167 --target 192.168.1.139
 just router-backup --ip 192.168.1.1
 just router-backup-list
 just router-restore --file backups/router-192.168.1.1-20260703.tar.gz

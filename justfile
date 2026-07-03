@@ -932,6 +932,13 @@ router-clients *args='':
     # shellcheck disable=SC2086
     scripts/router/show-clients.sh {{args}}
 
+# router-lan-doctor: Valida comunicación interna LAN desde router y un origen opcional
+# Uso: just router-lan-doctor [--ip 192.168.x.x] [--source local|user@host] [--target IP]
+router-lan-doctor *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/lan-doctor.sh {{args}}
+
 # ---------------------------------------------------------------------------
 # SOCKS Forward (Raspi3b / Tor)
 # ---------------------------------------------------------------------------
