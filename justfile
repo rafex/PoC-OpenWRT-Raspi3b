@@ -612,15 +612,11 @@ router-setup-auth ip="" env="prod" key="":
     scripts/router/setup-auth.sh ${ARGS}
 
 # router-copy-keys: Copiar clave SSH pública a Dropbear sin cambiar contraseña root
-# Uso: just router-copy-keys [ip=<IP>] [env=<env>] [key=<path>]
-router-copy-keys ip="" env="prod" key="":
+# Uso: just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]
+router-copy-keys *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="--env {{ env }} --keys-only"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
-    if [ -n "{{ key }}" ]; then ARGS="${ARGS} --key {{ key }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-auth.sh ${ARGS}
+    scripts/router/setup-auth.sh --keys-only {{args}}
 
 # router-post-install: Instala paquetes adicionales en el router via opkg (post-flash)
 # Lee config/openwrt-router-post-install-packages.toml

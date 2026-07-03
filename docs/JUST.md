@@ -70,7 +70,7 @@ La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto 
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just router-copy-keys [ip=] [env=] [key=]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
+| `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
 | `just router-setup-extroot [ip=] [device=] [env=]` | Configura USB como extroot (`/overlay`) para ampliar almacenamiento |
 | `just router-setup-logs-ram [ip=] [env=]` | Buffer de logs en RAM (64 KB) — sin USB, no persisten entre reinicios |
 | `just router-setup-logs-file [ip=] [env=]` | Logs persistentes en archivo (`/overlay/log/messages`) — requiere extroot activo |
