@@ -35,6 +35,7 @@ just build-prod
 |------|-------------|
 | [Configuración de Build](docs/CONFIGURACION_BUILD.md) | Dónde cambiar versión, modelo, paquetes, secrets y overlay |
 | [Uso de Just](docs/JUST.md) | Todas las recipes del task manager |
+| [Casos de Uso](docs/uses-case/README.md) | Flujos operativos con ejemplos y diagramas Mermaid |
 | [Scripts](docs/SCRIPTS.md) | Referencia de scripts modulares |
 | [Compilación](docs/BUILD_INSTRUCTIONS.md) | Guía completa de compilación |
 | [Flasheo](docs/FLASH_INSTRUCTIONS.md) | Instalación en el router |
