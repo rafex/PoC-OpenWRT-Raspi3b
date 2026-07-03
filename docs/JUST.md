@@ -186,6 +186,61 @@ just router-wifi-disable radio1
 just router-wifi-enable radio0
 ```
 
+### Activar AP en 5 GHz
+
+Si el router ya usa `radio0`/2.4 GHz como cliente WiFi hacia una red externa, puedes levantar el AP en la otra banda usando `radio1`/5 GHz. Esto mantiene el cliente WiFi de 2.4 GHz y crea/activa una interfaz AP en `lan`.
+
+1. Verifica el estado actual:
+
+```bash
+just router-wifi-status 192.168.1.1
+```
+
+Debes ver algo similar:
+
+```text
+radio0 ... mode=sta ssid=netup net=wwan activa
+radio1 ... mode=ap  ...       net=lan  deshabilitada
+```
+
+2. Configura el AP en 5 GHz:
+
+```bash
+just router-wifi-ap --ip 192.168.1.1 --radio 5g --ssid OpenWrt-5G --channel 36
+```
+
+El comando pedirá la contraseña WPA2 si no pasas `--password`. La contraseña debe tener al menos 8 caracteres.
+
+También puedes pasarla en el comando:
+
+```bash
+just router-wifi-ap --ip 192.168.1.1 --radio 5g --ssid OpenWrt-5G --password 'clave-segura-123' --channel 36
+```
+
+Para un AP abierto, sin contraseña:
+
+```bash
+just router-wifi-ap --ip 192.168.1.1 --radio 5g --ssid OpenWrt-5G --open --channel 36
+```
+
+3. Confirma con `s` cuando muestre el resumen:
+
+```text
+Radio:   radio1
+SSID:    OpenWrt-5G
+Cifrado: psk2
+Canal:   36
+```
+
+4. Verifica que quedó activo:
+
+```bash
+just router-wifi-status 192.168.1.1
+just router-status --ip 192.168.1.1
+```
+
+5 GHz usa `radio1`. Los canales comunes son `36`, `40`, `44` y `48`; `36` es una opción conservadora para evitar DFS.
+
 ## Portal Cautivo
 
 Requiere instalar el grupo post-flash `captive_portal` para tener `uhttpd`:
