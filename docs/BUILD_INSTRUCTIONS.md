@@ -97,7 +97,7 @@ just build --profile tplink_tl-wdr3600-v1
 # Con scripts modulares:
 ./scripts/build/openwrt.sh --profile tplink_tl-wdr3600-v1 \
                    --packages config/openwrt-packages.txt \
-                   --builder openwrt-builder/openwrt-imagebuilder-*/
+                   --builder "openwrt-builder/openwrt-imagebuilder-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}.Linux-x86_64"
 ```
 
 **Tiempo estimado:** 5–15 minutos (dependiendo del hardware).
@@ -109,7 +109,7 @@ just build --profile tplink_tl-wdr3600-v1
 just build-prod      # Compila + verifica
 
 # O con script modular:
-./scripts/build/verify.sh openwrt-builder/openwrt-imagebuilder-*/bin/targets/ath79/generic
+ENV=prod ./scripts/build/verify.sh
 ```
 
 El script verifica:

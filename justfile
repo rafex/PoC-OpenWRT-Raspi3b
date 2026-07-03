@@ -500,7 +500,7 @@ build-prod:
     scripts/install/ensure-secrets.sh prod || exit 1
     just generate-config prod
     ENV=prod make build
-    ./scripts/build/verify.sh openwrt-builder/*/bin/targets/ath79/generic || true
+    ENV=prod ./scripts/build/verify.sh || true
     echo ""
     echo "✅ Imagen lista. Siguiente paso: ver docs/FLASH_INSTRUCTIONS.md"
 

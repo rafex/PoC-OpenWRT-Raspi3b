@@ -7,8 +7,25 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SCRIPT_DIR}/../commons/logging.sh"
+source "${SCRIPT_DIR}/../commons/utils.sh"
 
-BIN_DIR="${1:-${REPO_ROOT}/openwrt-builder/*/bin/targets/ath79/generic}"
+if [ -n "${ENV:-}" ] && [ -f "${REPO_ROOT}/environments/${ENV}/.env.public" ]; then
+    # shellcheck source=/dev/null
+    source "${REPO_ROOT}/environments/${ENV}/.env.public"
+fi
+
+TARGET="${TARGET:-ath79}"
+SUBTARGET="${SUBTARGET:-generic}"
+if [ $# -gt 0 ]; then
+    BIN_DIR="$1"
+else
+    builder=$(find_builder "${BUILDER_DIR:-}") || {
+        log_error "Image Builder no encontrado. Ejecuta: just setup-env ${ENV:-prod}"
+        exit 1
+    }
+    BIN_DIR="${builder}/bin/targets/${TARGET}/${SUBTARGET}"
+fi
+
 REQUIRED_SIZE_MB=8
 PROFILE="${PROFILE:-tplink_tl-wdr3600-v1}"
 

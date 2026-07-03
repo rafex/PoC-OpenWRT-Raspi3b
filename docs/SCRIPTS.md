@@ -103,7 +103,7 @@ Conversor standalone: lee `config/openwrt-packages.toml` y genera el `.txt` here
 Valida la imagen compilada (tamaño, checksums):
 
 ```bash
-./scripts/build/verify.sh openwrt-builder/*/bin/targets/ath79/generic
+ENV=prod ./scripts/build/verify.sh
 ```
 
 ### router/post-install.sh
