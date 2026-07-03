@@ -75,7 +75,7 @@ Si ya tienes OpenWRT instalado y solo actualizas, usa las recipes `router-update
 just router-update
 
 # Actualizar con IP distinta
-just router-update ip=192.168.0.1
+just router-update --ip 192.168.0.1
 
 # Actualizar borrando configuración del router (vuelve a defaults de OpenWRT)
 just router-update-force

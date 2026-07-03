@@ -475,7 +475,15 @@ edit-secrets ENV:
         sops --encrypt --in-place "$SECRETS_FILE"
         echo "✅ Archivo encriptado. Abriendo editor..."
     fi
+    set +e
     sops "$SECRETS_FILE"
+    status=$?
+    set -e
+    if [ "${status}" -eq 200 ]; then
+        echo "ℹ️  Secrets sin cambios."
+        exit 0
+    fi
+    exit "${status}"
 
 # ─────────────────────────────────────────────────────
 # Git hooks
@@ -551,29 +559,15 @@ validate:
 # ─────────────────────────────────────────────────────
 
 # router-update: Actualizar firmware del router via sysupgrade (mantiene configuración)
-# Uso: just router-update [ip=<IP>] [env=<dev|prod>]
+# Uso: just router-update [--ip <IP>] [--env <dev|prod>]
 # La IP se infiere de environments/<env>/.env.public o usa 192.168.1.1 por defecto
-router-update ip="" env="prod":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="--env {{ env }}"
-    if [ -n "{{ ip }}" ]; then
-        ARGS="${ARGS} --ip {{ ip }}"
-    fi
-    # shellcheck disable=SC2086
-    scripts/router/update.sh ${ARGS}
+router-update *args='':
+    @scripts/router/update.sh {{args}}
 
 # router-update-force: Actualizar firmware borrando la configuración del router
-# Uso: just router-update-force [ip=<IP>] [env=<dev|prod>]
-router-update-force ip="" env="prod":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="--env {{ env }} --force"
-    if [ -n "{{ ip }}" ]; then
-        ARGS="${ARGS} --ip {{ ip }}"
-    fi
-    # shellcheck disable=SC2086
-    scripts/router/update.sh ${ARGS}
+# Uso: just router-update-force [--ip <IP>] [--env <dev|prod>]
+router-update-force *args='':
+    @scripts/router/update.sh --force {{args}}
 
 # router-setup-extroot: Configurar USB como extroot en el router via SSH
 # Monta el USB, copia /overlay, configura fstab y reinicia.

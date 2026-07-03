@@ -61,8 +61,8 @@ just <recipe>                  # Ejecutar una recipe
 
 | Recipe | Descripción |
 |--------|-------------|
-| `just router-update [ip=<IP>] [env=<env>]` | Actualizar firmware via sysupgrade **manteniendo** configuración |
-| `just router-update-force [ip=<IP>] [env=<env>]` | Actualizar firmware **borrando** configuración del router |
+| `just router-update [--ip <IP>] [--env <env>]` | Actualizar firmware via sysupgrade **manteniendo** configuración |
+| `just router-update-force [--ip <IP>] [--env <env>]` | Actualizar firmware **borrando** configuración del router |
 
 La IP se infiere de `environments/<env>/.env.public` (`ROUTER_IP`). Por defecto `192.168.1.1`.
 
