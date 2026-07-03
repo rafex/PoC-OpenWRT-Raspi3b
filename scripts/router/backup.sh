@@ -82,17 +82,17 @@ _ssh() {
 }
 
 _scp_get() {
-    scp -P "${SSH_PORT}" \
+    ssh -p "${SSH_PORT}" \
         -o ConnectTimeout=10 \
         -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}:$1" "$2"
+        "root@${ROUTER_IP}" "cat '$1'" > "$2"
 }
 
 _scp_put() {
-    scp -P "${SSH_PORT}" \
+    ssh -p "${SSH_PORT}" \
         -o ConnectTimeout=10 \
         -o StrictHostKeyChecking=accept-new \
-        "$1" "root@${ROUTER_IP}:$2"
+        "root@${ROUTER_IP}" "cat > '$2'" < "$1"
 }
 
 _check_ssh() {
