@@ -100,6 +100,15 @@ report_results() {
 main() {
     parse_args "$@"
 
+    if [ -n "${ENV}" ]; then
+        local env_file="${REPO_ROOT}/environments/${ENV}/.env.public"
+        if [ -f "${env_file}" ]; then
+            # shellcheck disable=SC1090
+            set -a; source "${env_file}"; set +a
+            PROFILE="${PROFILE:-tplink_tl-wdr3600-v1}"
+        fi
+    fi
+
     echo "==============================================="
     echo " OpenWRT Custom Build"
     echo " Profile: ${PROFILE}"

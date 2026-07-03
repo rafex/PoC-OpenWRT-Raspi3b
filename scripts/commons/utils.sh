@@ -12,10 +12,23 @@
 # ---------------------------------------------------------------------------
 find_builder() {
     local builder_dir="${1:-}"
+    local version="${OPENWRT_VERSION:-}"
+    local target="${TARGET:-}"
+    local subtarget="${SUBTARGET:-}"
 
     if [ -n "${builder_dir}" ] && [ -d "${builder_dir}" ]; then
         echo "${builder_dir}"
         return
+    fi
+
+    if [ -n "${version}" ] && [ -n "${target}" ] && [ -n "${subtarget}" ]; then
+        local expected="${REPO_ROOT}/openwrt-builder/openwrt-imagebuilder-${version}-${target}-${subtarget}.Linux-x86_64"
+        if [ -d "${expected}" ] && [ -f "${expected}/Makefile" ]; then
+            echo "${expected}"
+            return
+        fi
+        echo "ERROR: Image Builder not found for ${version} ${target}/${subtarget}: ${expected}" >&2
+        return 1
     fi
 
     local candidates=(

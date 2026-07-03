@@ -78,16 +78,29 @@ fi
 # CLI tiene precedencia sobre .env.public; .env.public tiene precedencia sobre default
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
+OPENWRT_VERSION="${OPENWRT_VERSION:-}"
+PROFILE="${PROFILE:-tplink_tl-wdr3600-v1}"
 
 # ---------------------------------------------------------------------------
 # Encontrar imagen sysupgrade
 # ---------------------------------------------------------------------------
 _find_sysupgrade() {
     local bin
-    bin=$(find "${REPO_ROOT}/openwrt-builder" -name "*-squashfs-sysupgrade.bin" 2>/dev/null \
-          | sort -r | head -1)
+    if [ -n "${OPENWRT_VERSION}" ]; then
+        bin=$(find "${REPO_ROOT}/openwrt-builder" \
+              -name "openwrt-${OPENWRT_VERSION}-*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
+              | sort -r | head -1)
+    else
+        bin=""
+    fi
+
     if [ -z "${bin}" ]; then
-        log_error "No se encontró imagen sysupgrade en openwrt-builder/"
+        bin=$(find "${REPO_ROOT}/openwrt-builder" -name "*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
+              | sort -r | head -1)
+    fi
+
+    if [ -z "${bin}" ]; then
+        log_error "No se encontró imagen sysupgrade para ${PROFILE}${OPENWRT_VERSION:+ en OpenWRT ${OPENWRT_VERSION}}"
         echo "   Solución: just build-prod"
         exit 1
     fi
