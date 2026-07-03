@@ -427,6 +427,17 @@ edit-secrets ENV:
     #!/usr/bin/env bash
     set -euo pipefail
     export SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt"
+    if [ -z "${SOPS_EDITOR:-}" ]; then
+        CURRENT_EDITOR="${EDITOR:-}"
+        if [ -z "${CURRENT_EDITOR}" ] || { [ -z "${DISPLAY:-}" ] && [[ "${CURRENT_EDITOR}" =~ (^|/)(gedit|code|codium|subl|atom)( |$) ]]; }; then
+            for editor in nano vim vi; do
+                if command -v "${editor}" &>/dev/null; then
+                    export EDITOR="${editor}"
+                    break
+                fi
+            done
+        fi
+    fi
 
     # ── Pre-flight: verificar sops ──────────────────────────────────
     if ! command -v sops &>/dev/null; then
