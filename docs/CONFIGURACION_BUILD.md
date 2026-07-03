@@ -117,13 +117,13 @@ Para regenerar el `.txt` usado por el Image Builder:
 just refresh-packages
 ```
 
-No edites manualmente:
+No edites manualmente ni lo agregues a git:
 
 ```bash
 config/openwrt-packages.txt
 ```
 
-Ese archivo se genera desde el TOML.
+Ese archivo se genera desde el TOML durante `just refresh-packages` y también durante el build. Está ignorado por `.gitignore`.
 
 ## Paquetes Post-Flash
 

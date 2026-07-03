@@ -45,6 +45,7 @@ logs/
 
 # ── Config overlay generado ──
 config/overlay/
+config/openwrt-packages.txt
 
 # ── Secrets temporales generados por scripts ──
 /tmp/secrets-*.yaml

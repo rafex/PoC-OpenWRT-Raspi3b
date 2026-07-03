@@ -85,7 +85,7 @@ repo/
 ├── build-openwrt.sh               # Wrapper → scripts/build/openwrt.sh
 ├── config/
 │   ├── openwrt-packages.toml      # Fuente de verdad de paquetes
-│   ├── openwrt-packages.txt       # Generado desde TOML
+│   ├── openwrt-packages.txt       # Generado desde TOML, no versionado
 │   └── openwrt-post-install-packages.toml
 ├── environments/{dev,prod}/       # Secrets por entorno
 ├── scripts/

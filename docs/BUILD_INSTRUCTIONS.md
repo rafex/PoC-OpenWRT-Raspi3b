@@ -48,7 +48,7 @@ Esto descargará `openwrt-imagebuilder-25.12.5-ath79-generic.Linux-x86_64.tar.zs
 ### 3. Revisar configuración de paquetes
 
 La configuración de paquetes se define en **`config/openwrt-packages.toml`** (formato TOML, fuente de verdad).
-El archivo `config/openwrt-packages.txt` se genera automáticamente desde el TOML — **no se edita manualmente**.
+El archivo `config/openwrt-packages.txt` se genera automáticamente desde el TOML, está ignorado por git y **no se edita manualmente**.
 
 ```bash
 # Ver la config fuente con display estructurado
