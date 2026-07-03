@@ -141,7 +141,7 @@ scripts/router/post-install.sh --list
 
 | Recipe | Uso | Descripción |
 |--------|-----|-------------|
-| `router-status` | `just router-status [--ip <IP>] [--env <env>]` | Diagnóstico general: sistema, firmware, memoria, almacenamiento, red, WiFi, dispositivos, portal cautivo, servicios y salud. |
+| `router-status` | `just router-status [--ip <IP>] [--env <env>]` | Diagnóstico general: sistema, firmware, memoria, almacenamiento, USB/extroot, red, WiFi, dispositivos, portal cautivo, servicios y salud. |
 | `router-clients` | `just router-clients [--ip <IP>] [--env <env>]` | Lista leases DHCP y tabla ARP. |
 | `router-lan-doctor` | `just router-lan-doctor [--ip <IP>] [--source local\|user@host] [--target <IP>]` | Valida comunicación interna router→clientes y origen→clientes. |
 | `router-backup` | `just router-backup [--ip <IP>] [--env <env>] [--dir <dir>]` | Descarga backup de configuración a `./backups/`. |

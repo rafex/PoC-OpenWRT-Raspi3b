@@ -180,16 +180,39 @@ sep
 echo "ALMACENAMIENTO"
 sep
 df -h /rom / /overlay /tmp 2>/dev/null | awk 'NR>1 {printf "  %-12s %6s / %-6s  %s\n", $6, $3, $2, $5}' || true
-if mount | grep -q ' on /overlay '; then
-    overlay_src=$(mount | awk '$3 == "/overlay" {print $1; exit}')
-    overlay_type=$(mount | awk '$3 == "/overlay" {print $5; exit}')
-    printf "  Extroot   : %s (%s)\n" "$(ok activo)" "${overlay_src:-?}, ${overlay_type:-?}"
+
+usb_devices=$(block info 2>/dev/null | awk -F: '/^\/dev\/sd[a-z][0-9]/{print $1}' | sort)
+if [ -n "${usb_devices}" ]; then
+    printf "  USB       : %s\n" "$(ok detectado)"
+    printf "    %-12s %-8s %-36s %s\n" "Dispositivo" "FS" "UUID" "Montado"
+    echo "${usb_devices}" | while read -r usb_dev; do
+        [ -n "${usb_dev}" ] || continue
+        usb_info=$(block info "${usb_dev}" 2>/dev/null || true)
+        usb_type=$(echo "${usb_info}" | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2)
+        usb_uuid=$(echo "${usb_info}" | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
+        usb_mount=$(awk -v dev="${usb_dev}" '$1 == dev {print $2; exit}' /proc/mounts 2>/dev/null)
+        printf "    %-12s %-8s %-36s %s\n" "${usb_dev}" "${usb_type:--}" "${usb_uuid:--}" "${usb_mount:--}"
+    done
+else
+    printf "  USB       : %s\n" "$(warn no detectado)"
+fi
+
+overlay_src=$(awk '$2 == "/overlay" {print $1; exit}' /proc/mounts 2>/dev/null)
+overlay_type=$(awk '$2 == "/overlay" {print $3; exit}' /proc/mounts 2>/dev/null)
+if [ -n "${overlay_src}" ]; then
+    case "${overlay_src}" in
+        /dev/sd*) printf "  Extroot   : %s (%s)\n" "$(ok activo)" "${overlay_src}, ${overlay_type:-?}" ;;
+        *)        printf "  Extroot   : %s (%s)\n" "$(warn no es USB)" "${overlay_src}, ${overlay_type:-?}" ;;
+    esac
 else
     printf "  Extroot   : %s\n" "$(warn no detectado)"
 fi
 if [ -f /etc/config/fstab ]; then
     extroot_enabled=$(uci -q get fstab.extroot.enabled 2>/dev/null || echo "0")
-    printf "  fstab     : extroot enabled=%s\n" "${extroot_enabled}"
+    extroot_target=$(uci -q get fstab.extroot.target 2>/dev/null || echo "-")
+    extroot_uuid=$(uci -q get fstab.extroot.uuid 2>/dev/null || echo "-")
+    extroot_device=$(uci -q get fstab.extroot.device 2>/dev/null || echo "-")
+    printf "  fstab     : extroot enabled=%s target=%s uuid=%s device=%s\n" "${extroot_enabled}" "${extroot_target}" "${extroot_uuid}" "${extroot_device}"
 fi
 
 # ── Red ────────────────────────────────────────────────
