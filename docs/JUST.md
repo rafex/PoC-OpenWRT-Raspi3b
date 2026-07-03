@@ -117,7 +117,7 @@ Usa `router-update-force` solo cuando quieras que la configuración incluida en 
 |--------|-----|-------------|
 | `router-copy-keys` | `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root. |
 | `router-setup-auth` | `just router-setup-auth [IP] [env] [key]` | Copia clave SSH y configura contraseña root. |
-| `router-setup-extroot` | `just router-setup-extroot [IP] [device] [env]` | Configura USB como extroot. Requiere USB ext4. |
+| `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | Configura USB como extroot. Requiere USB ext4. |
 | `router-setup-logs-ram` | `just router-setup-logs-ram [IP] [env]` | Configura buffer de logs en RAM; no persiste reinicios. |
 | `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | Configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
 | `router-post-install` | `just router-post-install [grupo] [IP] [env]` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
@@ -127,7 +127,7 @@ Ejemplos:
 ```bash
 just router-copy-keys --ip 192.168.1.1
 just router-setup-auth 192.168.1.1
-just router-setup-extroot 192.168.1.1 /dev/sda1
+just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
 just router-post-install captive_portal
 ```
 

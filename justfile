@@ -572,15 +572,11 @@ router-update-force *args='':
 # router-setup-extroot: Configurar USB como extroot en el router via SSH
 # Monta el USB, copia /overlay, configura fstab y reinicia.
 # Prerrequisito: USB formateado como ext4 antes de conectar al router.
-# Uso: just router-setup-extroot [ip=<IP>] [device=<dev>] [env=<env>]
-router-setup-extroot ip="" device="" env="prod":
+# Uso: just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]
+router-setup-extroot *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="--env {{ env }}"
-    if [ -n "{{ ip }}" ];     then ARGS="${ARGS} --ip {{ ip }}"; fi
-    if [ -n "{{ device }}" ]; then ARGS="${ARGS} --device {{ device }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-extroot.sh ${ARGS}
+    scripts/router/setup-extroot.sh {{args}}
 
 # router-setup-logs-ram: Buffer de logs en RAM (64 KB, sin USB ni extroot)
 # Los logs NO persisten entre reinicios.
