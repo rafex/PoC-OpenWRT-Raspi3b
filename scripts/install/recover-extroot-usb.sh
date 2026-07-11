@@ -11,6 +11,11 @@
 # ============================================================================
 set -euo pipefail
 
+# Non-root SSH sessions on some Debian installations omit administrative
+# binary directories from PATH, although the tools are installed there.
+PATH="/usr/local/sbin:/usr/sbin:/sbin:${PATH:-/usr/local/bin:/usr/bin:/bin}"
+export PATH
+
 _DEVICE=""
 _BACKUP_DIR="${HOME}/openwrt-extroot-backups"
 _YES=false
