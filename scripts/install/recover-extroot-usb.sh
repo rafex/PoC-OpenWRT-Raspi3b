@@ -151,7 +151,23 @@ echo "[STEP] Desmontando ${_DEVICE} si estaba montado..."
 sudo umount "${_DEVICE}" 2>/dev/null || true
 
 echo "[STEP] Reparando ext4 con e2fsck..."
+set +e
 sudo e2fsck -f -y "${_DEVICE}"
+_E2FSCK_STATUS=$?
+set -e
+
+case "${_E2FSCK_STATUS}" in
+    0)
+        echo "[INFO] e2fsck no encontró errores pendientes."
+        ;;
+    1)
+        echo "[INFO] e2fsck corrigió errores del filesystem."
+        ;;
+    *)
+        echo "[ERROR] e2fsck terminó con código ${_E2FSCK_STATUS}; no se montará el USB ni se generará backup." >&2
+        exit "${_E2FSCK_STATUS}"
+        ;;
+esac
 
 echo "[STEP] Montando read-only..."
 sudo mkdir -p "${_MNT}"
