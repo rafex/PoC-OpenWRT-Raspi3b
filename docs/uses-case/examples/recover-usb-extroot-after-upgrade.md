@@ -169,10 +169,13 @@ ssh bastion-wifi
 cd /opt/repository/github/PoC-OpenWRT-Raspi3b
 git pull --ff-only
 just host-format-extroot-usb --list
+just host-recover-extroot-usb --device /dev/sdX1
 just host-format-extroot-usb --device /dev/sdX1
 ```
 
-La recipe exige confirmacion textual antes de borrar. Reemplaza `/dev/sdX1` por la particion USB real que muestre `--list`.
+Primero intenta `host-recover-extroot-usb`: ejecuta `e2fsck`, monta el USB read-only y crea un backup `.tar.gz` en `~/openwrt-extroot-backups`. Si el backup sale bien y decides borrar, usa `host-format-extroot-usb`.
+
+La recipe de formateo exige confirmacion textual antes de borrar. Reemplaza `/dev/sdX1` por la particion USB real que muestre `--list`.
 
 Despues conecta el USB al router y prepara extroot:
 

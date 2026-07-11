@@ -587,6 +587,15 @@ host-format-extroot-usb *args='':
     # shellcheck disable=SC2086
     scripts/install/format-extroot-usb.sh {{args}}
 
+# host-recover-extroot-usb: Repara ext4 y respalda un USB extroot local
+# Ejecutar desde la máquina donde está conectado el USB, ej. ssh bastion-wifi
+# Uso: just host-recover-extroot-usb --list
+# Uso: just host-recover-extroot-usb --device /dev/sdX1 [--backup-dir <dir>] [--yes]
+host-recover-extroot-usb *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/install/recover-extroot-usb.sh {{args}}
+
 # router-setup-logs-ram: Buffer de logs en RAM (64 KB, sin USB ni extroot)
 # Los logs NO persisten entre reinicios.
 # Uso: just router-setup-logs-ram [ip=<IP>] [env=<env>]
