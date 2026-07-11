@@ -239,7 +239,29 @@ fi
 # 2. Limpiar si se confirmó localmente
 if [ "\${DO_CLEAN}" = "yes" ]; then
     echo "[2/5] Limpiando archivos anteriores del USB..."
-    find "\${MNT}" -mindepth 1 -maxdepth 1 -exec rm -rf '{}'  ';'
+    if ! find "\${MNT}" -mindepth 1 -maxdepth 1 -exec rm -rf '{}' ';'; then
+        echo "      ❌ No se pudo limpiar el USB."
+        echo "      El sistema de archivos puede estar corrupto; desmontando."
+        sync
+        umount "\${MNT}" 2>/dev/null || true
+        echo ""
+        echo "      Repara o reformatea el USB en una máquina Linux:"
+        echo "        sudo e2fsck -f \${DEVICE}"
+        echo "        # o, si vas a borrar todo:"
+        echo "        sudo mkfs.ext4 -F \${DEVICE}"
+        exit 1
+    fi
+
+    REMAINING=\$(find "\${MNT}" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
+    if [ "\${REMAINING}" -ne 0 ]; then
+        echo "      ❌ La limpieza terminó, pero todavía quedan \${REMAINING} entrada(s)."
+        echo "      Esto normalmente indica corrupción en el filesystem ext4 del USB."
+        sync
+        umount "\${MNT}" 2>/dev/null || true
+        echo ""
+        echo "      Repara o reformatea el USB fuera del router antes de continuar."
+        exit 1
+    fi
     echo "      ✅ USB limpiado"
 else
     echo "[2/5] USB vacío — sin limpieza necesaria"
