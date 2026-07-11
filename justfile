@@ -578,6 +578,15 @@ router-setup-extroot *args='':
     # shellcheck disable=SC2086
     scripts/router/setup-extroot.sh {{args}}
 
+# host-format-extroot-usb: Borra/formatea un USB local como ext4 para extroot
+# Ejecutar desde la máquina donde está conectado el USB, ej. ssh bastion-wifi
+# Uso: just host-format-extroot-usb --list
+# Uso: just host-format-extroot-usb --device /dev/sdX1 [--label openwrt-extroot] [--yes]
+host-format-extroot-usb *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/install/format-extroot-usb.sh {{args}}
+
 # router-setup-logs-ram: Buffer de logs en RAM (64 KB, sin USB ni extroot)
 # Los logs NO persisten entre reinicios.
 # Uso: just router-setup-logs-ram [ip=<IP>] [env=<env>]

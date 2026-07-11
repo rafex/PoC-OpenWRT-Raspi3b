@@ -160,6 +160,26 @@ just router-static-ip-add --ip 192.168.1.1 --mac 0c:4d:e9:bf:6e:91 --assign 192.
 just router-static-ip-list --ip 192.168.1.1
 ```
 
+## 9. Borrar y reformatear el USB desde bastion-wifi
+
+Si el USB ya muestra errores como `Bad message`, `can't stat` o `can't remove old file`, no sigas intentando copiar encima. Retira el USB del router, conéctalo al bastion y formatealo desde ahi:
+
+```bash
+ssh bastion-wifi
+cd /opt/repository/github/PoC-OpenWRT-Raspi3b
+git pull --ff-only
+just host-format-extroot-usb --list
+just host-format-extroot-usb --device /dev/sdX1
+```
+
+La recipe exige confirmacion textual antes de borrar. Reemplaza `/dev/sdX1` por la particion USB real que muestre `--list`.
+
+Despues conecta el USB al router y prepara extroot:
+
+```bash
+just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
+```
+
 ## Cuando si usar `router-setup-extroot`
 
 Usa este comando cuando vas a preparar un USB nuevo o quieres copiar el overlay actual al USB:
