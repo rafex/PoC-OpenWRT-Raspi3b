@@ -94,6 +94,37 @@ ssh root@192.168.1.1 "sysupgrade -v /tmp/openwrt-*-sysupgrade.bin"
 ssh root@192.168.1.1 "sysupgrade -n -v /tmp/openwrt-*-sysupgrade.bin"
 ```
 
+### Reinstalacion limpia despues de `apk upgrade`
+
+Si se ejecuto `apk upgrade` antes de activar extroot, los paquetes actualizados quedaron en el overlay interno. Para volver a una imagen conocida y liberar ese espacio:
+
+```bash
+just router-backup --ip 192.168.1.1
+just build-prod
+just router-update-force --ip 192.168.1.1
+```
+
+`router-update-force` borra los cambios persistentes del router mediante `sysupgrade -n`: contrasena root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente. Los valores que `build-prod` haya incluido en la imagen vuelven a aplicarse. No formatea el USB externo.
+
+Despues del reinicio, recupera el USB desde `bastion-wifi` antes de volver a usarlo como extroot:
+
+```bash
+cd /opt/repository/github/PoC-OpenWRT-Raspi3b
+just host-recover-extroot-usb --list
+just host-recover-extroot-usb --device /dev/sdb1
+```
+
+La recipe repara ext4 y crea un backup en `~/openwrt-extroot-backups/`. Si el backup es valido, puedes reutilizar el USB. Si necesitas una instalacion vacia, formatealo con `host-format-extroot-usb` y confirma la eliminacion.
+
+Conecta de nuevo el USB al router y prepara extroot:
+
+```bash
+just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
+just router-status --ip 192.168.1.1
+```
+
+No ejecutes `apk upgrade` ni instales paquetes post-flash hasta que `router-status` muestre `Extroot : activo`.
+
 ## Configuración inicial post-flasheo
 
 ### 1. Conexión inicial

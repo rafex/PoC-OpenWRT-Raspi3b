@@ -14,6 +14,7 @@ Esta carpeta documenta flujos operativos completos construidos con las herramien
 | Port forwarding del proxy SOCKS de Tor | [examples/socks-forward-to-raspi.md](examples/socks-forward-to-raspi.md) |
 | Backup, build y actualización segura | [examples/backup-build-update.md](examples/backup-build-update.md) |
 | Recuperar USB extroot despues de actualizar firmware | [examples/recover-usb-extroot-after-upgrade.md](examples/recover-usb-extroot-after-upgrade.md) |
+| Reinstalacion limpia despues de `apk upgrade` y reconstruccion de extroot | [examples/clean-reinstall-and-extroot-after-apk-upgrade.md](examples/clean-reinstall-and-extroot-after-apk-upgrade.md) |
 
 ## Convenciones
 

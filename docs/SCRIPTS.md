@@ -206,7 +206,7 @@ Características:
 - Modo portal externo: redirige al portal con `?return=<callback>`, el portal autentica y devuelve al router
 - El CGI usa `REMOTE_ADDR` (IP TCP real), no parámetros URL
 
-Prerrequisito: `just router-post-install group=captive_portal` (instala `uhttpd`).
+Prerrequisito: `just router-post-install captive_portal` (instala `uhttpd`).
 
 ### router/setup-wifi.sh
 

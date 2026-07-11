@@ -60,6 +60,8 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-copy-keys` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
 | `just router-setup-auth` | Copia clave SSH pública + contraseña root |
 | `just router-setup-extroot` | Configura USB como extroot (`/overlay`) |
+| `just host-recover-extroot-usb` | Repara ext4 y respalda un USB extroot desde el host |
+| `just host-format-extroot-usb` | Formatea una particion USB como ext4 para extroot |
 | `just router-setup-logs` | Logs persistentes en USB |
 | `just router-post-install` | Instala paquetes adicionales via `apk`/`opkg` |
 | `just router-captive-setup` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
@@ -71,6 +73,7 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-dns-set` / `just router-dns-show` / `just router-dns-reset` | Servidores DNS upstream de dnsmasq |
 | `just router-clients` | Lista dispositivos conectados: leases DHCP activos + tabla ARP |
 | `just router-status` | Diagnóstico general: versión, salud, RAM, almacenamiento, red, WiFi, DHCP y servicios |
+| `just router-lan-doctor` | Valida conectividad entre router, bastion y clientes LAN |
 | `just router-backup` / `just router-restore` / `just router-backup-list` | Backup y restauración de configuración (`/etc/config`) |
 | `just router-reboot` / `just router-reboot --wait` | Reinicia el router; `--wait` bloquea hasta reconexión |
 | `just router-update` / `just router-update-force` | Actualiza firmware via sysupgrade |

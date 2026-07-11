@@ -109,7 +109,11 @@ just router-update --ip 192.168.1.1
 just router-update-force --ip 192.168.1.1
 ```
 
-Usa `router-update-force` solo cuando quieras que la configuración incluida en la imagen reemplace lo persistido en `/overlay`, por ejemplo para forzar `/etc/shadow` nuevo.
+`router-update` mantiene la configuración persistente actual. `router-update-force` usa `sysupgrade -n`: borra el `/overlay` persistente del router y aplica la configuración incluida en la imagen. Se perderán los cambios persistentes de contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`; los valores que `build-prod` haya incluido en la imagen volverán a aplicarse.
+
+`router-update-force` no formatea un USB externo. Si usas extroot, el USB se debe reparar, respaldar o formatear por separado y después volver a configurar con `router-setup-extroot`. Consulta el caso completo en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
+
+Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexion SSH se interrumpira durante el reinicio.
 
 ## Setup Inicial del Router
 
@@ -118,8 +122,8 @@ Usa `router-update-force` solo cuando quieras que la configuración incluida en 
 | `router-copy-keys` | `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root. |
 | `router-setup-auth` | `just router-setup-auth [IP] [env] [key]` | Copia clave SSH y configura contraseña root. |
 | `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | Configura USB como extroot. Requiere USB ext4. |
-| `host-format-extroot-usb` | `just host-format-extroot-usb --list` o `--device /dev/sdX1` | Borra/formatea un USB local como ext4 para extroot. Ejecutar desde `bastion-wifi` o la máquina con el USB conectado. |
-| `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `--device /dev/sdX1` | Intenta reparar ext4 con `e2fsck`, monta read-only y crea backup `.tar.gz` del USB extroot local. |
+| `host-format-extroot-usb` | `just host-format-extroot-usb --list` o `just host-format-extroot-usb --device /dev/sdX1` | Borra/formatea una particion USB local como ext4 para extroot. Ejecutar desde `bastion-wifi` o la maquina con el USB conectado. |
+| `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `just host-recover-extroot-usb --device /dev/sdX1` | Repara ext4 con `e2fsck`, monta read-only y crea backup `.tar.gz` del USB extroot local. No formatea. |
 | `router-setup-logs-ram` | `just router-setup-logs-ram [IP] [env]` | Configura buffer de logs en RAM; no persiste reinicios. |
 | `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | Configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
 | `router-post-install` | `just router-post-install [grupo] [IP] [env]` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
@@ -136,11 +140,33 @@ just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
 just router-post-install captive_portal
 ```
 
-Nota: `router-post-install --list` no funciona como flag directo porque esta recipe usa parámetros `just`; para listar grupos usa el script:
+En Debian, `host-recover-extroot-usb` necesita `e2fsck`, incluido en `e2fsprogs`:
+
+```bash
+sudo apt update
+sudo apt install -y e2fsprogs
+```
+
+La recipe agrega automaticamente `/usr/sbin` y `/sbin` al `PATH`, porque algunas sesiones SSH no incluyen esas rutas aunque el paquete este instalado.
+
+`router-post-install` recibe `grupo`, `IP` y `env` por posicion. Para listar grupos disponibles sin instalar, usa el script:
 
 ```bash
 scripts/router/post-install.sh --list
 ```
+
+## Reinstalacion limpia y extroot
+
+Cuando se actualizo el router con `apk upgrade` antes de montar el USB, usa este orden:
+
+```bash
+just router-status --ip 192.168.1.1
+just router-backup --ip 192.168.1.1
+just build-prod
+just router-update-force --ip 192.168.1.1
+```
+
+Despues recupera el USB desde el bastion con `host-recover-extroot-usb`, decide si lo reutilizas o formateas, ejecuta `router-setup-extroot` y confirma con `router-status` que `Extroot` este activo. El procedimiento completo esta en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
 
 ## Estado, Clientes, Backup y Reinicio
 

@@ -137,7 +137,7 @@ Ejemplos:
 
 ```bash
 just router-post-install
-just router-post-install group=captive_portal
+just router-post-install captive_portal
 ```
 
 En OpenWRT 25.12+ el script usa `apk`. Si el router expone `opkg`, lo usa como compatibilidad.

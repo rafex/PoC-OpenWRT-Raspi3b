@@ -2,6 +2,8 @@
 
 Caso: despues de actualizar OpenWrt, el router arranca bien pero el USB ya no aparece montado como `/overlay`. El sintoma tipico es que `router-status` muestra poco espacio en `/overlay`, el USB aparece como `/dev/sda1`, pero `Extroot` no esta activo.
 
+Si antes de montar extroot ejecutaste `apk upgrade` y quieres reinstalar la imagen desde cero, sigue [Reinstalacion limpia y extroot despues de `apk upgrade`](clean-reinstall-and-extroot-after-apk-upgrade.md). Ese caso incluye `router-update-force`, la recuperacion del USB y el orden seguro para volver a instalar paquetes.
+
 ```mermaid
 flowchart TD
     upgrade["Firmware actualizado"] --> status["just router-status"]
