@@ -2,14 +2,12 @@
 # ============================================================================
 # show-packages.sh — Display OpenWRT package configuration
 # ============================================================================
-# Reads config/openwrt-packages.toml and outputs a structured,
-# readable terminal display with validation.
+# Wrapper around unified toml_parser.py --mode=display
 # ============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-
 TOML_FILE="${REPO_ROOT}/config/openwrt-packages.toml"
 
 for arg in "$@"; do
@@ -24,4 +22,4 @@ if ! command -v python3 &>/dev/null; then
     exit 1
 fi
 
-exec python3 "${SCRIPT_DIR}/show-packages.py" --toml "${TOML_FILE}"
+exec python3 "${SCRIPT_DIR}/../commons/toml_parser.py" "${TOML_FILE}" --mode=display

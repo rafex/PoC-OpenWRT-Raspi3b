@@ -7,6 +7,12 @@
 # y la shell no ha recargado el perfil todavía.
 export PATH := env_var('HOME') + '/.local/bin:' + env_var('PATH')
 
+# Pinned tool versions (bump manually, update checksums in scripts/install/checksums.sha256)
+SOPS_VERSION := "3.9.4"
+AGE_VERSION := "1.2.1"
+YQ_VERSION := "4.45.1"
+JUST_VERSION := "1.39.0"
+
 # Variables de entorno definidas por recipes (ENV=dev por defecto)
 
 # ─────────────────────────────────────────────────────
@@ -30,13 +36,17 @@ setup force="false":
 
 # install-tools: Verificar herramientas faltantes y ofrecer instalarlas
 # force=true: reinstalar aunque la herramienta ya exista
+# Usa versiones pinnadas (var at top); elimina eval y curl|bash
 install-tools force="false":
     #!/usr/bin/env bash
     set -euo pipefail
     FORCE="{{ force }}"
-    echo "Verificando herramientas..."
+    SOPS_VERSION="{{ SOPS_VERSION }}"
+    AGE_VERSION="{{ AGE_VERSION }}"
+    YQ_VERSION="{{ YQ_VERSION }}"
+    JUST_VERSION="{{ JUST_VERSION }}"
+    echo "Verificando herramientas (versiones pinnadas: sops=${SOPS_VERSION} age=${AGE_VERSION} yq=${YQ_VERSION} just=${JUST_VERSION})..."
 
-    # Determinar qué instalar
     if [ "$FORCE" = "true" ]; then
         echo "(modo force: se reinstalarán todas las herramientas)"
         missing=(just make gawk sops age yq)
@@ -57,53 +67,107 @@ install-tools force="false":
     echo "A instalar: ${missing[*]}"
     echo ""
 
-    # Construir comandos según SO
-    cmds=()
+    ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+    REPO_ROOT="$(cd "$(dirname "${0%/*}")" && pwd)"
+    CHECKSUMS_FILE="${REPO_ROOT}/scripts/install/checksums.sha256"
     path_hint=false
+
     case "$(uname -s)" in
         Darwin)
-            # gawk no es necesario en macOS (el Image Builder solo corre en Linux x86_64)
-            # pero se incluye por consistencia si alguien lo solicita explícitamente
-            cmds+=("brew install ${missing[*]}")
+            echo "  $ brew install ${missing[*]}"
+            read -r -p "¿Ejecutar? (s/N) " answer
+            if [ "${answer,,}" != "s" ] && [ "${answer,,}" != "si" ]; then exit 1; fi
+            # shellcheck disable=SC2086
+            brew install ${missing[*]}
             ;;
         Linux)
-            # Normalizar arquitectura: x86_64 → amd64, aarch64 → arm64
-            ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+            mkdir -p ~/.local/bin
+
             for tool in "${missing[@]}"; do
                 case "$tool" in
-                    make)  cmds+=("sudo apt-get install -y make") ;;
-                    gawk)  cmds+=("sudo apt-get install -y gawk") ;;  # GNU awk requerido por el Image Builder de OpenWRT
-                    just)  if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -rf ~/.local/bin/just")
-                           fi
-                           cmds+=("curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin")
-                           path_hint=true ;;
-                    sops)  cmds+=("mkdir -p ~/.local/bin")
-                           if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -rf ~/.local/bin/sops")
-                           fi
-                           cmds+=("SOPS_VER=\$(curl -s https://api.github.com/repos/getsops/sops/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
-                           cmds+=("curl -Lo ~/.local/bin/sops https://github.com/getsops/sops/releases/download/v\${SOPS_VER}/sops-v\${SOPS_VER}.linux.\${ARCH}")
-                           cmds+=("chmod +x ~/.local/bin/sops")
-                           path_hint=true ;;
-                     age)  cmds+=("mkdir -p ~/.local/bin")
-                           if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -rf ~/.local/bin/age ~/.local/bin/age-keygen")
-                           fi
-                           cmds+=("AGE_VER=\$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
-                           cmds+=("curl -Lo /tmp/age.tar.gz https://github.com/FiloSottile/age/releases/latest/download/age-v\${AGE_VER}-linux-${ARCH}.tar.gz")
-                           cmds+=("tar -xzf /tmp/age.tar.gz --strip-components=1 -C ~/.local/bin")
-                           cmds+=("chmod +x ~/.local/bin/age ~/.local/bin/age-keygen")
-                           cmds+=("rm /tmp/age.tar.gz")
-                           path_hint=true ;;
-                      yq)  cmds+=("mkdir -p ~/.local/bin")
-                           if [ "$FORCE" = "true" ]; then
-                               cmds+=("rm -rf ~/.local/bin/yq")
-                           fi
-                           cmds+=("YQ_VER=\$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -o '\"tag_name\": *\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/^v//')")
-                           cmds+=("curl -Lo ~/.local/bin/yq https://github.com/mikefarah/yq/releases/download/v\${YQ_VER}/yq_linux_\${ARCH}")
-                           cmds+=("chmod +x ~/.local/bin/yq")
-                           path_hint=true ;;
+                    make)  sudo apt-get install -y make ;;
+                    gawk)  sudo apt-get install -y gawk ;;
+                    just)
+                        echo "  → Descargando just ${JUST_VERSION}..."
+                        if [ "$FORCE" = "true" ]; then rm -f ~/.local/bin/just; fi
+                        curl -sSL "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+                            -o /tmp/just.tar.gz
+                        tar -xzf /tmp/just.tar.gz -C ~/.local/bin just
+                        rm /tmp/just.tar.gz
+                        chmod +x ~/.local/bin/just
+                        path_hint=true
+                        echo "  ✅ just ${JUST_VERSION}"
+                        ;;
+                    sops)
+                        echo "  → Descargando sops v${SOPS_VERSION}..."
+                        if [ "$FORCE" = "true" ]; then rm -f ~/.local/bin/sops; fi
+                        curl -sSL "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.${ARCH}" \
+                            -o ~/.local/bin/sops
+                        chmod +x ~/.local/bin/sops
+                        if [ -f "${CHECKSUMS_FILE}" ]; then
+                            echo "  → Verificando checksum..."
+                            EXPECTED_HASH=$(grep "sops-v${SOPS_VERSION}.linux.${ARCH}" "${CHECKSUMS_FILE}" 2>/dev/null | awk '{print $2}' || echo "")
+                            if [ -n "${EXPECTED_HASH}" ] && [ "${EXPECTED_HASH}" != "<UNKNOWN" ]; then
+                                ACTUAL_HASH=$(sha256sum ~/.local/bin/sops | awk '{print $1}')
+                                if [ "${ACTUAL_HASH}" != "${EXPECTED_HASH}" ]; then
+                                    echo "❌ Checksum mismatch para sops"
+                                    echo "   Esperado: ${EXPECTED_HASH}"
+                                    echo "   Obtenido: ${ACTUAL_HASH}"
+                                    rm -f ~/.local/bin/sops
+                                    exit 1
+                                fi
+                                echo "  ✅ Checksum verificado"
+                            fi
+                        fi
+                        path_hint=true
+                        echo "  ✅ sops v${SOPS_VERSION}"
+                        ;;
+                    age)
+                        echo "  → Descargando age v${AGE_VERSION}..."
+                        if [ "$FORCE" = "true" ]; then rm -f ~/.local/bin/age ~/.local/bin/age-keygen; fi
+                        curl -sSL "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-${ARCH}.tar.gz" \
+                            -o /tmp/age.tar.gz
+                        if [ -f "${CHECKSUMS_FILE}" ]; then
+                            echo "  → Verificando checksum..."
+                            EXPECTED_HASH=$(grep "age-v${AGE_VERSION}-linux-${ARCH}" "${CHECKSUMS_FILE}" 2>/dev/null | awk '{print $2}' || echo "")
+                            if [ -n "${EXPECTED_HASH}" ] && [ "${EXPECTED_HASH}" != "<UNKNOWN" ]; then
+                                ACTUAL_HASH=$(sha256sum /tmp/age.tar.gz | awk '{print $1}')
+                                if [ "${ACTUAL_HASH}" != "${EXPECTED_HASH}" ]; then
+                                    echo "❌ Checksum mismatch para age"
+                                    rm -f /tmp/age.tar.gz
+                                    exit 1
+                                fi
+                                echo "  ✅ Checksum verificado"
+                            fi
+                        fi
+                        tar -xzf /tmp/age.tar.gz --strip-components=1 -C ~/.local/bin
+                        chmod +x ~/.local/bin/age ~/.local/bin/age-keygen
+                        rm /tmp/age.tar.gz
+                        path_hint=true
+                        echo "  ✅ age v${AGE_VERSION}"
+                        ;;
+                    yq)
+                        echo "  → Descargando yq v${YQ_VERSION}..."
+                        if [ "$FORCE" = "true" ]; then rm -f ~/.local/bin/yq; fi
+                        curl -sSL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${ARCH}" \
+                            -o ~/.local/bin/yq
+                        chmod +x ~/.local/bin/yq
+                        if [ -f "${CHECKSUMS_FILE}" ]; then
+                            echo "  → Verificando checksum..."
+                            EXPECTED_HASH=$(grep "yq_linux_${ARCH}" "${CHECKSUMS_FILE}" 2>/dev/null | awk '{print $2}' || echo "")
+                            if [ -n "${EXPECTED_HASH}" ] && [ "${EXPECTED_HASH}" != "<UNKNOWN" ]; then
+                                ACTUAL_HASH=$(sha256sum ~/.local/bin/yq | awk '{print $1}')
+                                if [ "${ACTUAL_HASH}" != "${EXPECTED_HASH}" ]; then
+                                    echo "❌ Checksum mismatch para yq"
+                                    rm -f ~/.local/bin/yq
+                                    exit 1
+                                fi
+                                echo "  ✅ Checksum verificado"
+                            fi
+                        fi
+                        path_hint=true
+                        echo "  ✅ yq v${YQ_VERSION}"
+                        ;;
                 esac
             done
             ;;
@@ -117,58 +181,20 @@ install-tools force="false":
             ;;
     esac
 
-    # Mostrar comandos que se ejecutarán
-    echo "Se ejecutarán los siguientes comandos:"
-    echo "──────────────────────────────────────"
-    for cmd in "${cmds[@]}"; do
-        echo "  $ $cmd"
-    done
-    if [ "$path_hint" = true ]; then
-        echo ""
-        echo "  Nota: asegúrate de tener ~/.local/bin en tu PATH:"
-        echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
-    fi
-    echo "──────────────────────────────────────"
-    echo ""
-
-    # Pedir confirmación
-    read -r -p "¿Ejecutar estos comandos ahora? (s/N) " answer
-    if [ "${answer,,}" != "s" ] && [ "${answer,,}" != "si" ]; then
-        echo "Cancelado. Ejecuta los comandos manualmente y vuelve a intentar."
-        exit 1
-    fi
-
-    echo ""
-    echo "Ejecutando..."
-    for cmd in "${cmds[@]}"; do
-        echo "  $ $cmd"
-        eval "$cmd" || { echo "❌ Falló: $cmd"; exit 1; }
-    done
-
-    echo ""
-
-    # ── Post-download: verificar que binarios sean válidos ──────────
+    # Post-download: verificar que los binarios sean válidos
     if [ "$path_hint" = true ]; then
         export PATH="$HOME/.local/bin:$PATH"
     fi
-    for tool in "${missing[@]}"; do
-        if command -v "$tool" &>/dev/null; then
-            TPATH="$(command -v "$tool")"
-            if file "${TPATH}" 2>/dev/null | grep -qi 'text'; then
-                echo "❌ Error: '${tool}' en ${TPATH} no es un binario (parece texto/HTML)"
-                echo "   La descarga desde GitHub probablemente falló (error 404)."
-                echo "   Verifica la URL e inténtalo de nuevo."
-                exit 1
-            fi
-        fi
-    done
-    echo ""
-
-    # Re-verificar
     still_missing=()
     for tool in "${missing[@]}"; do
         if ! command -v "$tool" &>/dev/null; then
             still_missing+=("$tool")
+        else
+            TPATH="$(command -v "$tool")"
+            if file "${TPATH}" 2>/dev/null | grep -qi 'text'; then
+                echo "❌ Error: '${tool}' en ${TPATH} no es un binario (parece texto/HTML)"
+                still_missing+=("$tool")
+            fi
         fi
     done
     if [ ${#still_missing[@]} -eq 0 ]; then
@@ -191,119 +217,11 @@ create-password ENV:
 
 # generate-age-key: Generar clave age única del proyecto (si no existe)
 generate-age-key:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    KEYFILE="$HOME/.age/poc-openwrt-privkey.txt"
-    if [ -f "$KEYFILE" ]; then
-        echo "ℹ️  Clave age ya existe: $KEYFILE"
-        exit 0
-    fi
-
-    # ── Pre-flight: verificar age-keygen ────────────────────────────
-    if ! command -v age-keygen &>/dev/null; then
-        echo "❌ Error: 'age-keygen' no encontrado en PATH"
-        echo "   Buscando: age-keygen (necesario para generar clave age)"
-        echo "   Solución: just install-tools"
-        exit 1
-    fi
-    AGEPATH="$(command -v age-keygen)"
-    if file "${AGEPATH}" 2>/dev/null | grep -qi 'text'; then
-        echo "❌ Error: 'age-keygen' en ${AGEPATH} no es un binario válido"
-        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
-        echo "   Solución: just install-tools force=true"
-        exit 1
-    fi
-
-    mkdir -p "$(dirname "$KEYFILE")"
-    age-keygen -o "$KEYFILE"
-    chmod 600 "$KEYFILE"
-    echo "✅ Clave privada generada: $KEYFILE"
-    echo "⚠️  GUARDA ESTE ARCHIVO EN UN LUGAR SEGURO (NO en el repo)"
-    # Extraer clave pública para el repo
-    grep -oE 'age1[a-z0-9]+' "$KEYFILE" | head -1 > .age-pubkey.txt
-    chmod 644 .age-pubkey.txt
-    echo "✅ Clave pública guardada en .age-pubkey.txt (committeable)"
+    @bash scripts/install/generate-age-key.sh
 
 # create-environments: Crear estructura environments/ y secrets vacíos
 create-environments:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    O_VERSION="25.12.5"
-
-    # ── Pre-flight: verificar sops ──────────────────────────────────
-    if ! command -v sops &>/dev/null; then
-        echo "❌ Error: 'sops' no encontrado en PATH"
-        echo "   Buscando: sops (necesario para encriptar secrets)"
-        echo "   Solución: just install-tools"
-        exit 1
-    fi
-    SOPATH="$(command -v sops)"
-    if file "${SOPATH}" 2>/dev/null | grep -qi 'text'; then
-        echo "❌ Error: 'sops' en ${SOPATH} no es un binario válido"
-        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
-        echo "   Solución: just install-tools force=true"
-        exit 1
-    fi
-
-    mkdir -p environments/{dev,prod}
-
-    # Crear .env.public con valores de ejemplo si no existen
-    # Contiene: parámetros de build + SSID de WiFi (no contraseñas)
-    if [ ! -f environments/dev/.env.public ]; then
-        printf '%s\n' \
-            '# Variables públicas para entorno DEV' \
-            '# Estos valores son seguros de commitear' \
-            '' \
-            'ENV=dev' \
-            "OPENWRT_VERSION=${O_VERSION}" \
-            'TARGET=ath79' \
-            'SUBTARGET=generic' \
-            'PROFILE=tplink_tl-wdr3600-v1' \
-            'ROUTER_IP=192.168.1.1' \
-            'SSH_PORT=22' \
-            '' \
-            '# Red WiFi (nombres de red — no contraseñas)' \
-            'WIFI_SSID_24=TestWiFi24' \
-            'WIFI_SSID_5=TestWiFi5G' \
-            > environments/dev/.env.public
-        echo "✅ environments/dev/.env.public creado"
-    fi
-    if [ ! -f environments/prod/.env.public ]; then
-        printf '%s\n' \
-            '# Variables públicas para entorno PROD' \
-            '# Estos valores son seguros de commitear' \
-            '' \
-            'ENV=prod' \
-            "OPENWRT_VERSION=${O_VERSION}" \
-            'TARGET=ath79' \
-            'SUBTARGET=generic' \
-            'PROFILE=tplink_tl-wdr3600-v1' \
-            'ROUTER_IP=192.168.1.1' \
-            'SSH_PORT=22' \
-            '' \
-            '# Red WiFi (nombres de red — no contraseñas)' \
-            'WIFI_SSID_24=' \
-            'WIFI_SSID_5=' \
-            > environments/prod/.env.public
-        echo "✅ environments/prod/.env.public creado"
-    fi
-
-    # Crear secrets.enc.yaml vacíos (usuario los llena con just edit-secrets)
-    # Contiene SOLO contraseñas: WiFi keys, WireGuard, root hash
-    PUBKEY=$(cat .age-pubkey.txt 2>/dev/null || echo "")
-    if [ -z "$PUBKEY" ]; then
-        echo "⚠️  No se encontró .age-pubkey.txt. Ejecuta: just generate-age-key"
-        exit 1
-    fi
-    for env in dev prod; do
-        SECRETS_FILE="environments/${env}/secrets.enc.yaml"
-        if [ ! -f "$SECRETS_FILE" ]; then
-            printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nDROPBEAR_RSA_HOST_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "$SECRETS_FILE"
-            SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt" sops --config .sops.yaml --encrypt --in-place "$SECRETS_FILE"
-            echo "✅ environments/${env}/secrets.enc.yaml creado y encriptado"
-            echo "   Llena tus datos con: just edit-secrets ${env}"
-        fi
-    done
+    @bash scripts/install/create-environments.sh
 
 # setup-env: Descargar y extraer el OpenWRT Image Builder
 # Lee OPENWRT_VERSION, TARGET y SUBTARGET desde environments/<ENV>/.env.public
@@ -334,156 +252,18 @@ setup-env ENV="prod":
 # reinit-secrets: Re-encriptar secrets de un entorno con la clave age local
 # Útil cuando el repo fue clonado y los secrets están encriptados con otra clave.
 reinit-secrets ENV:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    KEYFILE="$HOME/.age/poc-openwrt-privkey.txt"
-
-    if [ ! -f "${KEYFILE}" ]; then
-        echo "❌ No se encontró clave age: ${KEYFILE}"
-        echo "   Solución: just generate-age-key"
-        exit 1
-    fi
-
-    PUBKEY=$(grep -oE 'age1[a-z0-9]+' "${KEYFILE}" | head -1)
-    if [ -z "${PUBKEY}" ]; then
-        echo "❌ No se pudo extraer la clave pública de: ${KEYFILE}"
-        exit 1
-    fi
-
-    echo "🔑 Clave pública local: ${PUBKEY}"
-    echo ""
-    echo "Esto va a:"
-    echo "  1. Actualizar .age-pubkey.txt con tu clave"
-    echo "  2. Actualizar .sops.yaml con tu clave"
-    echo "  3. Eliminar environments/{{ ENV }}/secrets.enc.yaml"
-    echo "  4. Crear nuevo secrets.enc.yaml vacío encriptado con tu clave"
-    echo ""
-    read -r -p "¿Continuar? (s/N) " answer
-    if [ "${answer,,}" != "s" ] && [ "${answer,,}" != "si" ]; then
-        echo "Cancelado."
-        exit 1
-    fi
-
-    echo "${PUBKEY}" > .age-pubkey.txt
-    echo "✅ .age-pubkey.txt actualizado"
-
-    printf 'creation_rules:\n  - path_regex: environments/(dev|prod)/secrets\\.enc\\.yaml$\n    key_groups:\n      - age:\n          - %s\n' "${PUBKEY}" > .sops.yaml
-    echo "✅ .sops.yaml actualizado"
-
-    SECRETS_FILE="environments/{{ ENV }}/secrets.enc.yaml"
-    rm -f "${SECRETS_FILE}"
-    printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nDROPBEAR_RSA_HOST_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "${SECRETS_FILE}"
-    SOPS_AGE_KEY_FILE="${KEYFILE}" sops --config .sops.yaml --encrypt --in-place "${SECRETS_FILE}"
-    echo "✅ ${SECRETS_FILE} re-creado con tu clave"
-    echo ""
-    echo "Llena tus secrets con:"
-    echo "   just edit-secrets {{ ENV }}"
-    echo "   just create-password {{ ENV }}"
+    @bash scripts/install/reinit-secrets.sh {{ ENV }}
 
 # decrypt-secrets: Desencriptar secrets para el entorno (ENV)
+# Usa la librería centralizada con mktemp + permisos 600
 decrypt-secrets ENV:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt"
-
-    # ── Pre-flight: verificar sops ──────────────────────────────────
-    if ! command -v sops &>/dev/null; then
-        echo "❌ Error: 'sops' no encontrado en PATH"
-        echo "   Buscando: sops (necesario para desencriptar secrets)"
-        echo "   Solución: just install-tools"
-        exit 1
-    fi
-    SOPATH="$(command -v sops)"
-    if file "${SOPATH}" 2>/dev/null | grep -qi 'text'; then
-        echo "❌ Error: 'sops' en ${SOPATH} no es un binario válido"
-        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
-        echo "   Solución: just install-tools force=true"
-        exit 1
-    fi
-
-    # ── Pre-flight: verificar clave age ─────────────────────────────
-    if [ ! -f "${SOPS_AGE_KEY_FILE}" ]; then
-        echo "❌ Error: clave age no encontrada"
-        echo "   Buscando: ${SOPS_AGE_KEY_FILE}"
-        echo "   Solución: just generate-age-key"
-        exit 1
-    fi
-
-    # ── Desencriptar ────────────────────────────────────────────────
-    SECRETS_FILE="environments/{{ ENV }}/secrets.enc.yaml"
-    if [ ! -f "$SECRETS_FILE" ]; then
-        echo "❌ Error: archivo de secrets no existe"
-        echo "   Buscando: ${SECRETS_FILE}"
-        echo "   Solución: just create-environments"
-        exit 1
-    fi
-    sops -d "$SECRETS_FILE" > /tmp/secrets-{{ ENV }}.yaml
-    echo "✅ Secrets desencriptados: /tmp/secrets-{{ ENV }}.yaml"
+    @bash scripts/install/ensure-secrets.sh {{ ENV }}
 
 # edit-secrets: Editar secrets del entorno especificado
 # Si el archivo no está encriptado, lo encripta automáticamente antes de abrir el editor.
 # Al cerrar el editor, sops re-encripta automáticamente.
 edit-secrets ENV:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt"
-    if [ -z "${SOPS_EDITOR:-}" ]; then
-        CURRENT_EDITOR="${EDITOR:-}"
-        if [ -z "${CURRENT_EDITOR}" ] || { [ -z "${DISPLAY:-}" ] && [[ "${CURRENT_EDITOR}" =~ (^|/)(gedit|code|codium|subl|atom)( |$) ]]; }; then
-            for editor in nano vim vi; do
-                if command -v "${editor}" &>/dev/null; then
-                    export EDITOR="${editor}"
-                    break
-                fi
-            done
-        fi
-    fi
-
-    # ── Pre-flight: verificar sops ──────────────────────────────────
-    if ! command -v sops &>/dev/null; then
-        echo "❌ Error: 'sops' no encontrado en PATH"
-        echo "   Buscando: sops (necesario para editar secrets)"
-        echo "   Solución: just install-tools"
-        exit 1
-    fi
-    SOPATH="$(command -v sops)"
-    if file "${SOPATH}" 2>/dev/null | grep -qi 'text'; then
-        echo "❌ Error: 'sops' en ${SOPATH} no es un binario válido"
-        echo "   Detectado: archivo de texto/HTML (probable error 404 de GitHub)"
-        echo "   Solución: just install-tools force=true"
-        exit 1
-    fi
-
-    # ── Pre-flight: verificar clave age ─────────────────────────────
-    if [ ! -f "${SOPS_AGE_KEY_FILE}" ]; then
-        echo "❌ Error: clave age no encontrada"
-        echo "   Buscando: ${SOPS_AGE_KEY_FILE}"
-        echo "   Solución: just generate-age-key"
-        exit 1
-    fi
-
-    SECRETS_FILE="environments/{{ ENV }}/secrets.enc.yaml"
-    if [ ! -f "$SECRETS_FILE" ]; then
-        echo "❌ Error: archivo de secrets no existe"
-        echo "   Buscando: ${SECRETS_FILE}"
-        echo "   Solución: just create-environments"
-        exit 1
-    fi
-    # Si el archivo no tiene metadata sops, encriptarlo primero
-    if ! grep -q 'sops:' "$SECRETS_FILE" && ! python3 -c "import json,sys; d=json.load(open('$SECRETS_FILE')); assert 'sops' in d" 2>/dev/null; then
-        echo "⚠️  El archivo no está encriptado. Encriptando antes de editar..."
-        sops --encrypt --in-place "$SECRETS_FILE"
-        echo "✅ Archivo encriptado. Abriendo editor..."
-    fi
-    set +e
-    sops "$SECRETS_FILE"
-    status=$?
-    set -e
-    if [ "${status}" -eq 200 ]; then
-        echo "ℹ️  Secrets sin cambios."
-        exit 0
-    fi
-    exit "${status}"
+    @bash scripts/install/edit-secrets.sh {{ ENV }}
 
 # ─────────────────────────────────────────────────────
 # Git hooks
@@ -504,8 +284,9 @@ build-dev:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "=== Build DEV ==="
-    scripts/install/ensure-secrets.sh dev || exit 1
-    just generate-config dev
+    SECRETS_TMP=$(scripts/install/ensure-secrets.sh dev) || exit 1
+    ./scripts/templates/generate.sh dev "${SECRETS_TMP}"
+    rm -f "${SECRETS_TMP}"
     ENV=dev make build
 
 # build-prod: Compilar imagen para producción y verificar resultado
@@ -516,8 +297,9 @@ build-prod:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "=== Build PROD ==="
-    scripts/install/ensure-secrets.sh prod || exit 1
-    just generate-config prod
+    SECRETS_TMP=$(scripts/install/ensure-secrets.sh prod) || exit 1
+    ./scripts/templates/generate.sh prod "${SECRETS_TMP}"
+    rm -f "${SECRETS_TMP}"
     ENV=prod make build
     ENV=prod ./scripts/build/verify.sh || true
     echo ""
@@ -553,6 +335,41 @@ refresh-packages:
 # validate: Ejecutar shellcheck en todos los scripts
 validate:
     make validate
+
+# ─────────────────────────────────────────────────────
+# Router — Gestión SSH y known_hosts
+# ─────────────────────────────────────────────────────
+
+# router-add-known-host: Registrar host key del router (verifica fingerprint manualmente)
+# El fingerprint se guarda en environments/<ENV>/.router-known-hosts
+# Las conexiones subsecuentes verifican contra esta key automáticamente.
+router-add-known-host ENV="prod" ip="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ENV="{{ ENV }}"
+    ROUTER_IP="{{ ip }}"
+    KNOWN_HOSTS_FILE="environments/${ENV}/.router-known-hosts"
+    if [ -z "${ROUTER_IP}" ]; then
+        ENV_FILE="environments/${ENV}/.env.public"
+        if [ -f "${ENV_FILE}" ]; then
+            ROUTER_IP=$(grep 'ROUTER_IP=' "${ENV_FILE}" | cut -d= -f2 | tr -d '"' || echo "192.168.1.1")
+        else
+            ROUTER_IP="192.168.1.1"
+        fi
+    fi
+    SSH_PORT=$(grep 'SSH_PORT=' "environments/${ENV}/.env.public" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "22")
+    echo "Obteniendo host key de ${ROUTER_IP}:${SSH_PORT}..."
+    if ! ssh-keyscan -p "${SSH_PORT}" "${ROUTER_IP}" > "${KNOWN_HOSTS_FILE}" 2>/dev/null; then
+        if [ -f "${KNOWN_HOSTS_FILE}" ]; then rm -f "${KNOWN_HOSTS_FILE}"; fi
+        echo "❌ No se pudo obtener la host key."
+        echo "   Verifica que el router esté accesible en ${ROUTER_IP}:${SSH_PORT}"
+        exit 1
+    fi
+    FINGERPRINT=$(ssh-keygen -l -f "${KNOWN_HOSTS_FILE}" 2>/dev/null | awk '{print $1, $2, $4}')
+    echo "✅ Host key registrada en: ${KNOWN_HOSTS_FILE}"
+    echo "   Fingerprint: ${FINGERPRINT}"
+    echo ""
+    echo "   Las conexiones SSH ahora verificarán esta key automáticamente."
 
 # ─────────────────────────────────────────────────────
 # Update / Flasheo
