@@ -32,11 +32,11 @@
 #   setup-tor-onion.sh doctor    [--ip <router>] [--dns-port 5300] [--trans-port 9040]
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 _NFT_FILE="/etc/nftables.d/tor-onion.nft"
 _UCI_INCLUDE="tor_onion_nft"
@@ -45,8 +45,8 @@ _DEFAULT_DNS_PORT="5300"
 _DEFAULT_TRANS_PORT="9040"
 
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _RASPI_IP=""
 _DNS_PORT=""
 _TRANS_PORT=""
@@ -95,8 +95,8 @@ _SUBCMD="$1"; shift
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)         _CLI_IP="${2:?--ip requiere argumento}";         shift 2 ;;
-        --env)        _ENV="${2:?--env requiere argumento}";           shift 2 ;;
+        --ip)         _ROUTER_IP_CLI="${2:?--ip requiere argumento}";         shift 2 ;;
+        --env)        ROUTER_ENV="${2:?--env requiere argumento}";           shift 2 ;;
         --raspi-ip)   _RASPI_IP="${2:?--raspi-ip requiere argumento}"; shift 2 ;;
         --dns-port)   _DNS_PORT="${2:?--dns-port requiere argumento}"; shift 2 ;;
         --trans-port) _TRANS_PORT="${2:?--trans-port requiere argumento}"; shift 2 ;;
@@ -108,32 +108,16 @@ done
 # ---------------------------------------------------------------------------
 # Entorno y SSH
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 # shellcheck disable=SC1090
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
-    log_info "Conectado a ${ROUTER_IP}"
-}
-
 # Lee la IP asignada a raspi-tor en DHCP (si existe)
 _get_raspi_tor_ip() {
-    _ssh sh << 'REMOTE'
+    router_ssh sh << 'REMOTE'
 idx=0
 while uci -q get "dhcp.@host[${idx}]" >/dev/null 2>&1; do
     hname=$(uci -q get "dhcp.@host[${idx}].name" 2>/dev/null || true)
@@ -150,7 +134,7 @@ REMOTE
 # enable
 # ---------------------------------------------------------------------------
 _enable() {
-    _check_ssh
+    router_check_ssh
 
     # Raspi IP: auto-detectar desde DHCP o pedir
     if [ -z "${_RASPI_IP}" ]; then
@@ -193,7 +177,7 @@ _enable() {
     # El outer heredoc (EOF sin comillas) expande variables locales.
     # El inner heredoc (NFTEOF con comillas) se envía literal al shell remoto,
     # que ve los valores ya sustituidos por el outer heredoc.
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RASPI_IP="${raspi_ip}"
 DNS_PORT="${dns_port}"
@@ -308,13 +292,13 @@ EOF
 # disable — elimina DNAT, conserva entrada dnsmasq
 # ---------------------------------------------------------------------------
 _disable() {
-    _check_ssh
+    router_check_ssh
     log_step "Desactivando DNAT .onion (firewall include + archivo nftables)..."
 
     local nft_file="${_NFT_FILE}"
     local uci_include="${_UCI_INCLUDE}"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 NFT_FILE="${nft_file}"
 UCI_INCLUDE="${uci_include}"
@@ -357,7 +341,7 @@ EOF
 # uninstall — elimina DNAT + entrada dnsmasq
 # ---------------------------------------------------------------------------
 _uninstall() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
@@ -377,7 +361,7 @@ _uninstall() {
     local nft_file="${_NFT_FILE}"
     local uci_include="${_UCI_INCLUDE}"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 NFT_FILE="${nft_file}"
 UCI_INCLUDE="${uci_include}"
@@ -448,7 +432,7 @@ EOF
 # status
 # ---------------------------------------------------------------------------
 _status() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
@@ -458,7 +442,7 @@ _status() {
     local nft_file="${_NFT_FILE}"
     local uci_include="${_UCI_INCLUDE}"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 NFT_FILE="${nft_file}"
 UCI_INCLUDE="${uci_include}"
@@ -514,7 +498,7 @@ EOF
 # doctor — diagnostica el stack completo capa por capa
 # ---------------------------------------------------------------------------
 _doctor() {
-    _check_ssh
+    router_check_ssh
 
     local nft_file="${_NFT_FILE}"
     local uci_include="${_UCI_INCLUDE}"
@@ -527,7 +511,7 @@ _doctor() {
     echo "============================================="
 
     local _rc=0
-    _ssh sh - << EOF || _rc=$?
+    router_ssh sh - << EOF || _rc=$?
 NFT_FILE="${nft_file}"
 UCI_INCLUDE="${uci_include}"
 DNS_PORT="${dns_port}"

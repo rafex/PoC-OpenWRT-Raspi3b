@@ -21,6 +21,8 @@
 #   --keys-only    Solo copia claves a Dropbear; no cambia contraseña root
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -29,8 +31,8 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _KEY=""
 _KEYS_ONLY=false
 
@@ -40,11 +42,11 @@ _KEYS_ONLY=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --ip)
-            _CLI_IP="${2:?--ip requiere un argumento}"
+            _ROUTER_IP_CLI="${2:?--ip requiere un argumento}"
             shift 2
             ;;
         --env)
-            _ENV="${2:?--env requiere un argumento}"
+            ROUTER_ENV="${2:?--env requiere un argumento}"
             shift 2
             ;;
         --key)
@@ -75,7 +77,7 @@ done
 # ---------------------------------------------------------------------------
 # Cargar variables del entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a; source "${ENV_FILE}"; set +a
@@ -87,45 +89,10 @@ SSH_PORT="${SSH_PORT:-22}"
 # ---------------------------------------------------------------------------
 # Helper SSH (sin BatchMode: primer arranque no tiene contraseña)
 # ---------------------------------------------------------------------------
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
 
 # ---------------------------------------------------------------------------
 # Verificar conectividad SSH
 # ---------------------------------------------------------------------------
-_check_ssh() {
-    log_step "Verificando conectividad SSH con el router..."
-    if ssh -q -p "${SSH_PORT}" \
-            -o ConnectTimeout=5 \
-            -o StrictHostKeyChecking=accept-new \
-            -o BatchMode=yes \
-            "root@${ROUTER_IP}" "exit" 2>/dev/null; then
-        log_info "✅ Conectado con clave SSH a root@${ROUTER_IP}"
-        return 0
-    fi
-
-    log_warn "La clave SSH todavía no funciona; se intentará conexión interactiva."
-    echo "   Si el router pide contraseña, escríbela una vez para instalar la clave."
-
-    if ! ssh -q -p "${SSH_PORT}" \
-            -o ConnectTimeout=10 \
-            -o StrictHostKeyChecking=accept-new \
-            "root@${ROUTER_IP}" "exit"; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        echo ""
-        echo "   Verifica:"
-        echo "   • El router está encendido y conectado por cable Ethernet"
-        echo "   • La IP es correcta (usa --ip <IP>)"
-        echo "   • SSH está habilitado en el router"
-        echo "   • La contraseña root es correcta si el router la solicita"
-        exit 1
-    fi
-    log_info "✅ Conectado a root@${ROUTER_IP}"
-}
 
 # ---------------------------------------------------------------------------
 # Auto-detectar clave SSH pública
@@ -166,7 +133,7 @@ _copy_ssh_key() {
     log_info "   Clave: ${key_file}"
 
     # Inyectar clave en heredoc (expansión local), verificar duplicados en router
-_ssh sh - <<REMOTE
+router_ssh sh - <<REMOTE
 set -eu
 KEY="${pub_key}"
 AUTHKEYS="/etc/dropbear/authorized_keys"
@@ -198,7 +165,7 @@ _verify_key_login() {
     log_step "Verificando acceso SSH sin contraseña..."
     if ssh -q -p "${SSH_PORT}" \
             -o ConnectTimeout=5 \
-            -o StrictHostKeyChecking=accept-new \
+            -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no \
             -o BatchMode=yes \
             "root@${ROUTER_IP}" "exit" 2>/dev/null; then
         log_info "✅ Acceso por clave funcionando"
@@ -223,7 +190,7 @@ _set_password() {
     # -t fuerza asignación de PTY para que passwd pueda leer del terminal
     ssh -t -p "${SSH_PORT}" \
         -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no \
         "root@${ROUTER_IP}" passwd
 
     log_info "✅ Contraseña establecida"
@@ -238,7 +205,7 @@ main() {
     echo "==============================================="
     echo ""
 
-    _check_ssh
+    router_check_ssh
 
     local key_file
     key_file=$(_find_ssh_key)

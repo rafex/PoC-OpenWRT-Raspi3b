@@ -15,19 +15,19 @@
 #   scripts/router/setup-logs-ram.sh [--ip <IP>] [--env <env>]
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)  _CLI_IP="${2:?}"; shift 2 ;;
-        --env) _ENV="${2:?}";    shift 2 ;;
+        --ip)  _ROUTER_IP_CLI="${2:?}"; shift 2 ;;
+        --env) ROUTER_ENV="${2:?}";    shift 2 ;;
         -h|--help)
             echo "Uso: setup-logs-ram.sh [--ip <IP>] [--env <env>]"
             echo ""
@@ -41,26 +41,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 
-_ssh() {
-    ssh -q -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-if ! _ssh exit 2>/dev/null; then
+if ! router_ssh exit 2>/dev/null; then
     log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
     exit 1
 fi
 
 log_step "Configurando buffer de logs en RAM (64 KB)..."
 
-_ssh sh - << 'REMOTE'
+router_ssh sh - << 'REMOTE'
 set -eu
 
 # Eliminar configuración de log a archivo si existía

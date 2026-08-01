@@ -16,6 +16,8 @@
 #   --list           Lista los grupos y paquetes disponibles sin instalar
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -26,8 +28,8 @@ readonly TOML_FILE="${REPO_ROOT}/config/openwrt-post-install-packages.toml"
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _GROUP=""
 _LIST_ONLY=false
 
@@ -37,8 +39,8 @@ _LIST_ONLY=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --group)  _GROUP="${2:?--group requiere argumento}"; shift 2 ;;
-        --ip)     _CLI_IP="${2:?--ip requiere argumento}"; shift 2 ;;
-        --env)    _ENV="${2:?--env requiere argumento}"; shift 2 ;;
+        --ip)     _ROUTER_IP_CLI="${2:?--ip requiere argumento}"; shift 2 ;;
+        --env)    ROUTER_ENV="${2:?--env requiere argumento}"; shift 2 ;;
         --list)   _LIST_ONLY=true; shift ;;
         -h|--help)
             echo "Uso: $0 [--group <grupo>] [--ip <IP>] [--env <env>] [--list]"
@@ -124,7 +126,7 @@ fi
 # ---------------------------------------------------------------------------
 # Cargar entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a; source "${ENV_FILE}"; set +a
@@ -132,13 +134,6 @@ fi
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
-
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
 
 # ---------------------------------------------------------------------------
 # Main
@@ -152,7 +147,7 @@ echo ""
 
 # Verificar SSH
 if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-        -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" "exit" 2>/dev/null; then
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no "root@${ROUTER_IP}" "exit" 2>/dev/null; then
     log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
     exit 1
 fi
@@ -194,7 +189,7 @@ if [ "${answer}" != "s" ] && [ "${answer}" != "si" ]; then
 fi
 
 echo ""
-pkg_manager=$(_ssh "if command -v apk >/dev/null 2>&1; then echo apk; elif command -v opkg >/dev/null 2>&1; then echo opkg; fi")
+pkg_manager=$(router_ssh "if command -v apk >/dev/null 2>&1; then echo apk; elif command -v opkg >/dev/null 2>&1; then echo opkg; fi")
 if [ -z "${pkg_manager}" ]; then
     log_error "No se encontró apk ni opkg en el router."
     exit 1
@@ -204,11 +199,11 @@ log_step "Instalando paquetes con ${pkg_manager}..."
 if [ "${pkg_manager}" = "apk" ]; then
     # OpenWRT 25.12+ usa apk. -U actualiza índices antes de instalar.
     # shellcheck disable=SC2086
-    _ssh "apk -U add ${all_packages}"
+    router_ssh "apk -U add ${all_packages}"
 else
-    _ssh "opkg update"
+    router_ssh "opkg update"
     # shellcheck disable=SC2086
-    _ssh "opkg install ${all_packages}"
+    router_ssh "opkg install ${all_packages}"
 fi
 
 echo ""

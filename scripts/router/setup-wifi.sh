@@ -29,6 +29,8 @@
 #   --env <env>          Entorno (default: prod)
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -38,8 +40,8 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 # Parsear subcomando y opciones
 # ---------------------------------------------------------------------------
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _RADIO=""
 _SSID=""
 _PASSWORD=""
@@ -94,8 +96,8 @@ esac
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)         _CLI_IP="${2:?}"; shift 2 ;;
-        --env)        _ENV="${2:?}"; shift 2 ;;
+        --ip)         _ROUTER_IP_CLI="${2:?}"; shift 2 ;;
+        --env)        ROUTER_ENV="${2:?}"; shift 2 ;;
         --radio)      _RADIO="${2:?}"; shift 2 ;;
         --ssid)       _SSID="${2:?}"; shift 2 ;;
         --password)   _PASSWORD="${2:?}"; shift 2 ;;
@@ -123,40 +125,18 @@ _RADIO=$(_normalize_radio "${_RADIO}")
 # ---------------------------------------------------------------------------
 # Cargar entorno y SSH
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
-
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    local retries=3 delay=4
-    local i=1
-    while [ "${i}" -le "${retries}" ]; do
-        if ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-                -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-            return 0
-        fi
-        [ "${i}" -lt "${retries}" ] && { log_warn "SSH no disponible, reintentando en ${delay}s... (${i}/${retries})"; sleep "${delay}"; }
-        i=$((i + 1))
-    done
-    log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-    exit 1
-}
 
 # ---------------------------------------------------------------------------
 # _fetch_radio_info — Consulta al router qué radios existen y cuáles están libres
 # Salida: una línea por radio → "radio0 2.4GHz libre" o "radio1 5GHz sta"
 # ---------------------------------------------------------------------------
 _fetch_radio_info() {
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 set -eu
 STA=""
 I=0
@@ -193,7 +173,7 @@ _ap() {
     local _fully_interactive=false
     [ -z "${_SSID}" ] && _fully_interactive=true
 
-    _check_ssh
+    router_check_ssh
 
     # --- Paso 1: Radio ---
     if [ -z "${radio}" ]; then
@@ -293,7 +273,7 @@ _ap() {
     local encryption="${_ENCRYPTION}"
     local channel="${_CHANNEL}"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RADIO="${radio}"
 SSID="${ssid}"
@@ -378,7 +358,7 @@ _client() {
     local radio="${_RADIO:-}"   # vacío si el usuario no especificó --radio
     local _bssid_asked=false
 
-    _check_ssh
+    router_check_ssh
 
     # Modo interactivo: si no se pasó --ssid, guiar paso a paso
     if [ -z "${_SSID}" ]; then
@@ -457,7 +437,7 @@ _client() {
     local encryption="${_ENCRYPTION}"
     local bssid="${_BSSID}"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RADIO="${radio}"
 SSID="${ssid}"
@@ -552,13 +532,13 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# _do_scan — escanea redes y muestra tabla (sin _check_ssh, sin encabezado)
+# _do_scan — escanea redes y muestra tabla (sin router_check_ssh, sin encabezado)
 # Uso: _do_scan <radio>
 # ---------------------------------------------------------------------------
 _do_scan() {
     local radio="$1"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RADIO="${radio}"
 
@@ -659,7 +639,7 @@ EOF
 # Subcomando: scan
 # ---------------------------------------------------------------------------
 _scan() {
-    _check_ssh
+    router_check_ssh
     if [ -n "${_RADIO}" ]; then
         log_step "Escaneando redes WiFi en ${_RADIO}..."
         _do_scan "${_RADIO}"
@@ -679,14 +659,14 @@ _scan() {
 # Subcomando: status
 # ---------------------------------------------------------------------------
 _status() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
     echo " WiFi — Estado de radios e interfaces"
     echo "============================================="
 
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 set -eu
 
 echo ""
@@ -744,9 +724,9 @@ REMOTE
 # Subcomando: list
 # ---------------------------------------------------------------------------
 _list() {
-    _check_ssh
+    router_check_ssh
     echo ""
-    _ssh "uci show wireless"
+    router_ssh "uci show wireless"
 }
 
 # ---------------------------------------------------------------------------
@@ -755,13 +735,13 @@ _list() {
 _disconnect() {
     local radio="${_RADIO:-}"
 
-    _check_ssh
+    router_check_ssh
 
     echo "============================================="
     echo " Desconectar cliente WiFi"
     echo "============================================="
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 TARGET_RADIO="${radio}"
 
@@ -832,12 +812,12 @@ _toggle() {
         exit 1
     fi
 
-    _check_ssh
+    router_check_ssh
 
     local val="0"
     [ "${action}" = "disable" ] && val="1"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RADIO="${radio}"
 VAL="${val}"

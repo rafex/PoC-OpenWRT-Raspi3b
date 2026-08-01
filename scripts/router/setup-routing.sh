@@ -28,6 +28,8 @@
 #     mediante un hotplug script en /etc/hotplug.d/iface/50-routing-pins
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -37,8 +39,8 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 # Defaults
 # ---------------------------------------------------------------------------
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _PRIORITY=""
 _FROM=""
 _VIA=""
@@ -90,8 +92,8 @@ _SUBCMD="$1"; shift
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)    _CLI_IP="${2:?--ip requiere argumento}"; shift 2 ;;
-        --env)   _ENV="${2:?--env requiere argumento}"; shift 2 ;;
+        --ip)    _ROUTER_IP_CLI="${2:?--ip requiere argumento}"; shift 2 ;;
+        --env)   ROUTER_ENV="${2:?--env requiere argumento}"; shift 2 ;;
         --from)  _FROM="${2:?--from requiere argumento}"; shift 2 ;;
         --via)   _VIA="${2:?--via requiere argumento}"; shift 2 ;;
         wan|wifi|equal) _PRIORITY="$1"; shift ;;
@@ -103,29 +105,13 @@ done
 # ---------------------------------------------------------------------------
 # Cargar entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     set -a; source "${ENV_FILE}"; set +a
 fi
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
-
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" "exit" 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
-    log_info "Conectado a ${ROUTER_IP}"
-}
 
 # ---------------------------------------------------------------------------
 # Validar IP (POSIX)
@@ -193,7 +179,7 @@ HOTPLUG
 # _apply_pins_now — aplica inmediatamente las reglas del fichero de pins
 # ---------------------------------------------------------------------------
 _apply_pins_now() {
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 PINS="/etc/routing-pins.conf"
 [ -f "${PINS}" ] || { echo "Sin pins que aplicar."; exit 0; }
 
@@ -232,7 +218,7 @@ _status() {
     echo "============================================="
     echo " Routing Status — ${ROUTER_IP}"
     echo "============================================="
-    _ssh sh << 'REMOTE'
+    router_ssh sh << 'REMOTE'
 echo ""
 echo "=== Rutas por defecto ==="
 ip route show default
@@ -304,7 +290,7 @@ _priority() {
     echo "   wwan metric: ${wwan_metric}"
     echo ""
 
-    _ssh sh - << REMOTE
+    router_ssh sh - << REMOTE
 set -eu
 if ! uci -q get network.wwan >/dev/null 2>&1; then
     echo "AVISO: interfaz wwan no configurada."
@@ -331,13 +317,13 @@ _pin() {
     echo "============================================="
 
     # Instalar hotplug si no existe
-    if ! _ssh "[ -f '${_HOTPLUG_FILE}' ]" 2>/dev/null; then
+    if ! router_ssh "[ -f '${_HOTPLUG_FILE}' ]" 2>/dev/null; then
         log_step "Instalando script hotplug de persistencia..."
-        _gen_hotplug | _ssh "mkdir -p /etc/hotplug.d/iface && cat > '${_HOTPLUG_FILE}' && chmod +x '${_HOTPLUG_FILE}'"
+        _gen_hotplug | router_ssh "mkdir -p /etc/hotplug.d/iface && cat > '${_HOTPLUG_FILE}' && chmod +x '${_HOTPLUG_FILE}'"
     fi
 
     # Guardar pin en el fichero del router
-    _ssh sh - << REMOTE
+    router_ssh sh - << REMOTE
 set -eu
 PINS="${_PINS_FILE}"
 FROM="${_FROM}"
@@ -365,7 +351,7 @@ _unpin() {
 
     log_step "Eliminando pin para ${_FROM}"
 
-    _ssh sh - << REMOTE
+    router_ssh sh - << REMOTE
 set -eu
 PINS="${_PINS_FILE}"
 FROM="${_FROM}"
@@ -391,7 +377,7 @@ REMOTE
 }
 
 _list_pins() {
-    _ssh sh << 'REMOTE'
+    router_ssh sh << 'REMOTE'
 PINS="/etc/routing-pins.conf"
 echo ""
 if [ ! -f "${PINS}" ] || [ ! -s "${PINS}" ]; then
@@ -417,7 +403,7 @@ _reset() {
     echo " Reset — Eliminar pins y restaurar WAN"
     echo "============================================="
 
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 set -eu
 # Eliminar reglas ip rule de pins (priority 100-299)
 i=100
@@ -450,12 +436,12 @@ REMOTE
 # Main
 # ---------------------------------------------------------------------------
 case "${_SUBCMD}" in
-    status)   _check_ssh; _status ;;
-    priority) _check_ssh; _priority ;;
-    pin)      _check_ssh; _pin ;;
-    unpin)    _check_ssh; _unpin ;;
-    pins)     _check_ssh; _list_pins ;;
-    reset)    _check_ssh; _reset ;;
+    status)   router_check_ssh; _status ;;
+    priority) router_check_ssh; _priority ;;
+    pin)      router_check_ssh; _pin ;;
+    unpin)    router_check_ssh; _unpin ;;
+    pins)     router_check_ssh; _list_pins ;;
+    reset)    router_check_ssh; _reset ;;
     -h|--help) _show_help ;;
     *) log_error "Subcomando desconocido: ${_SUBCMD}"; _show_help; exit 1 ;;
 esac

@@ -19,15 +19,15 @@
 #   setup-wireguard.sh peer-remove --pubkey <key>
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _PUBKEY=""
 _ENDPOINT=""
 _ALLOWED_IPS=""
@@ -75,8 +75,8 @@ esac
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)           _CLI_IP="${2:?}";       shift 2 ;;
-        --env)          _ENV="${2:?}";           shift 2 ;;
+        --ip)           _ROUTER_IP_CLI="${2:?}";       shift 2 ;;
+        --env)          ROUTER_ENV="${2:?}";           shift 2 ;;
         --pubkey)       _PUBKEY="${2:?}";        shift 2 ;;
         --endpoint)     _ENDPOINT="${2:?}";      shift 2 ;;
         --allowed-ips)  _ALLOWED_IPS="${2:?}";   shift 2 ;;
@@ -86,40 +86,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    local retries=3 delay=4 i=1
-    while [ "${i}" -le "${retries}" ]; do
-        if ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-                -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-            return 0
-        fi
-        [ "${i}" -lt "${retries}" ] && {
-            log_warn "SSH no disponible, reintentando en ${delay}s... (${i}/${retries})"
-            sleep "${delay}"
-        }
-        i=$((i + 1))
-    done
-    log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-    exit 1
-}
-
 # ---------------------------------------------------------------------------
 _status() {
-    _check_ssh
+    router_check_ssh
     echo ""
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 echo "══════════════════════════════════════════════"
 echo "  WireGuard — Estado"
 echo "══════════════════════════════════════════════"
@@ -155,9 +131,9 @@ REMOTE
 
 # ---------------------------------------------------------------------------
 _enable() {
-    _check_ssh
+    router_check_ssh
     log_step "Activando WireGuard (wg0)..."
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 uci set network.wg0.disabled='0'
 uci commit network
 ifup wg0 2>/dev/null || ip link set wg0 up 2>/dev/null || true
@@ -167,9 +143,9 @@ REMOTE
 
 # ---------------------------------------------------------------------------
 _disable() {
-    _check_ssh
+    router_check_ssh
     log_step "Desactivando WireGuard (wg0)..."
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 uci set network.wg0.disabled='1'
 uci commit network
 ifdown wg0 2>/dev/null || ip link set wg0 down 2>/dev/null || true
@@ -179,11 +155,11 @@ REMOTE
 
 # ---------------------------------------------------------------------------
 _peer_list() {
-    _check_ssh
+    router_check_ssh
     echo ""
     echo "Peers WireGuard configurados en UCI:"
     echo "──────────────────────────────────────────────"
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 found=0
 for peer in $(uci show network | grep "=wireguard_wg0" | cut -d= -f1); do
     found=1
@@ -207,7 +183,7 @@ _peer_add() {
     [ -z "${_PUBKEY}" ]       && { log_error "Falta --pubkey"; exit 1; }
     [ -z "${_ALLOWED_IPS}" ]  && { log_error "Falta --allowed-ips"; exit 1; }
 
-    _check_ssh
+    router_check_ssh
 
     local pubkey="${_PUBKEY}"
     local endpoint_host="" endpoint_port=""
@@ -220,7 +196,7 @@ _peer_add() {
 
     log_step "Añadiendo peer '${peer_name}'..."
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 uci add network wireguard_wg0
 uci set network.@wireguard_wg0[-1].public_key='${pubkey}'
 uci set network.@wireguard_wg0[-1].description='${peer_name}'
@@ -239,12 +215,12 @@ EOF
 _peer_remove() {
     [ -z "${_PUBKEY}" ] && { log_error "Falta --pubkey"; exit 1; }
 
-    _check_ssh
+    router_check_ssh
 
     local pubkey="${_PUBKEY}"
     log_step "Eliminando peer con pubkey: ${pubkey:0:16}..."
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 found=0
 for idx in \$(uci show network | grep "=wireguard_wg0" | grep -n "" | tac | cut -d: -f1); do
     peer_section=\$(uci show network | grep "=wireguard_wg0" | sed -n "\${idx}p" | cut -d= -f1)

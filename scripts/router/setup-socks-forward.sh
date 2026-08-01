@@ -25,19 +25,19 @@
 #   setup-socks-forward.sh status    [--ip <router>] [--env <env>]
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 # Nombre fijo de la regla UCI — usado para encontrarla y eliminarla
 _RULE_NAME="tor_socks_fwd"
 _DEFAULT_PORT="9050"
 
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _RASPI_IP=""
 _PORT=""
 
@@ -81,8 +81,8 @@ _SUBCMD="$1"; shift
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)       _CLI_IP="${2:?--ip requiere argumento}";       shift 2 ;;
-        --env)      _ENV="${2:?--env requiere argumento}";         shift 2 ;;
+        --ip)       _ROUTER_IP_CLI="${2:?--ip requiere argumento}";       shift 2 ;;
+        --env)      ROUTER_ENV="${2:?--env requiere argumento}";         shift 2 ;;
         --raspi-ip) _RASPI_IP="${2:?--raspi-ip requiere argumento}"; shift 2 ;;
         --port)     _PORT="${2:?--port requiere argumento}";       shift 2 ;;
         -h|--help)  _show_help; exit 0 ;;
@@ -93,34 +93,18 @@ done
 # ---------------------------------------------------------------------------
 # Cargar entorno y SSH
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 # shellcheck disable=SC1090
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
-    log_info "Conectado a ${ROUTER_IP}"
-}
-
 # ---------------------------------------------------------------------------
 # enable — activa el port forwarding
 # ---------------------------------------------------------------------------
 _enable() {
-    _check_ssh
+    router_check_ssh
 
     # Paso 1: IP de la Raspi
     if [ -z "${_RASPI_IP}" ]; then
@@ -140,7 +124,7 @@ _enable() {
     log_step "Buscando MAC de ${_RASPI_IP} en la tabla ARP del router..."
     local raspi_ip="${_RASPI_IP}"
     local raspi_mac
-    raspi_mac=$(_ssh sh - << EOF
+    raspi_mac=$(router_ssh sh - << EOF
 grep "^${raspi_ip}[[:space:]]" /proc/net/arp 2>/dev/null | awk '{print \$4}' | head -1 || true
 EOF
 )
@@ -155,7 +139,7 @@ EOF
 
     # Paso 4: obtener IP wwan del router para mostrarla al final
     local wwan_ip
-    wwan_ip=$(_ssh "uci -q get network.wwan.ipaddr 2>/dev/null || true" 2>/dev/null || true)
+    wwan_ip=$(router_ssh "uci -q get network.wwan.ipaddr 2>/dev/null || true" 2>/dev/null || true)
 
     # Resumen
     echo ""
@@ -183,7 +167,7 @@ EOF
             --assign "${_RASPI_IP}" \
             --name "raspi-tor" \
             --ip "${ROUTER_IP}" \
-            --env "${_ENV}"
+            --env "${ROUTER_ENV}"
     else
         log_warn "Omitiendo asignación de IP estática (MAC no disponible)."
     fi
@@ -191,7 +175,7 @@ EOF
     # Paso 6: crear regla de port forwarding en el firewall
     log_step "Creando regla de port forwarding (${_RULE_NAME})..."
     local rule_name="${_RULE_NAME}"
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RULE_NAME="${rule_name}"
 RASPI_IP="${_RASPI_IP}"
@@ -246,11 +230,11 @@ EOF
 # disable — desactiva el port forwarding
 # ---------------------------------------------------------------------------
 _disable() {
-    _check_ssh
+    router_check_ssh
     log_step "Desactivando port forwarding '${_RULE_NAME}'..."
 
     local rule_name="${_RULE_NAME}"
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RULE_NAME="${rule_name}"
 
@@ -283,7 +267,7 @@ EOF
 # uninstall — elimina la regla DNAT y la IP estática de la Raspi en DHCP
 # ---------------------------------------------------------------------------
 _uninstall() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
@@ -300,7 +284,7 @@ _uninstall() {
     echo ""
 
     local rule_name="${_RULE_NAME}"
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RULE_NAME="${rule_name}"
 
@@ -357,14 +341,14 @@ EOF
 # status — muestra el estado del forwarding y la IP estática
 # ---------------------------------------------------------------------------
 _status() {
-    _check_ssh
+    router_check_ssh
     echo ""
     echo "============================================="
     echo " Estado — SOCKS Forward (${_RULE_NAME})"
     echo "============================================="
 
     local rule_name="${_RULE_NAME}"
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 RULE_NAME="${rule_name}"
 

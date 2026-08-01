@@ -12,6 +12,8 @@
 #                 Sin --force: mantiene la configuración actual (default)
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -20,8 +22,8 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _FORCE=false
 
 # ---------------------------------------------------------------------------
@@ -34,7 +36,7 @@ while [[ $# -gt 0 ]]; do
                 log_error "--ip requiere un argumento: --ip <IP>"
                 exit 1
             fi
-            _CLI_IP="$2"
+            _ROUTER_IP_CLI="$2"
             shift 2
             ;;
         --force)
@@ -46,7 +48,7 @@ while [[ $# -gt 0 ]]; do
                 log_error "--env requiere un argumento: --env <dev|prod>"
                 exit 1
             fi
-            _ENV="$2"
+            ROUTER_ENV="$2"
             shift 2
             ;;
         -h|--help)
@@ -69,7 +71,7 @@ done
 # ---------------------------------------------------------------------------
 # Cargar variables del entorno (.env.public) para ROUTER_IP y SSH_PORT
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a; source "${ENV_FILE}"; set +a
@@ -93,8 +95,8 @@ _find_sysupgrade() {
         if [ -z "${bin}" ]; then
             log_error "No se encontró imagen sysupgrade para ${PROFILE} en OpenWRT ${OPENWRT_VERSION}" >&2
             echo "   Solución:" >&2
-            echo "     just setup-env ${_ENV}" >&2
-            echo "     just build-${_ENV}" >&2
+            echo "     just setup-env ${ROUTER_ENV}" >&2
+            echo "     just build-${ROUTER_ENV}" >&2
             echo "" >&2
             echo "   No se usará una imagen de otra versión." >&2
             exit 1
@@ -115,19 +117,6 @@ _find_sysupgrade() {
 # ---------------------------------------------------------------------------
 # Verificar conectividad SSH con el router
 # ---------------------------------------------------------------------------
-_check_ssh() {
-    if ! ssh -q -o ConnectTimeout=5 -o BatchMode=yes -p "${SSH_PORT}" \
-         "root@${ROUTER_IP}" "exit" 2>/dev/null; then
-        log_error "No se puede conectar al router: root@${ROUTER_IP}:${SSH_PORT}"
-        echo ""
-        echo "   Verifica:"
-        echo "   • El router está encendido y conectado por cable Ethernet"
-        echo "   • La IP es correcta (usa --ip <IP> para sobreescribir)"
-        echo "   • SSH está habilitado en el router"
-        echo "   • Tu clave SSH está autorizada en el router"
-        exit 1
-    fi
-}
 
 # ---------------------------------------------------------------------------
 # Main
@@ -170,7 +159,7 @@ main() {
 
     echo ""
     log_step "Verificando conectividad SSH..."
-    _check_ssh
+    router_check_ssh
     log_info "✅ Conectado a root@${ROUTER_IP}"
 
     echo ""

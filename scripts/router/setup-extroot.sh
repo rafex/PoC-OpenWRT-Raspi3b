@@ -21,6 +21,8 @@
 #   --no-reboot      No reiniciar el router al final (para verificar antes)
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -29,8 +31,8 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _DEVICE=""
 _NO_REBOOT=false
 
@@ -40,7 +42,7 @@ _NO_REBOOT=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --ip)
-            _CLI_IP="${2:?--ip requiere un argumento}"
+            _ROUTER_IP_CLI="${2:?--ip requiere un argumento}"
             shift 2
             ;;
         --device)
@@ -48,7 +50,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --env)
-            _ENV="${2:?--env requiere un argumento}"
+            ROUTER_ENV="${2:?--env requiere un argumento}"
             shift 2
             ;;
         --no-reboot)
@@ -78,7 +80,7 @@ done
 # ---------------------------------------------------------------------------
 # Cargar variables del entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a; source "${ENV_FILE}"; set +a
@@ -90,29 +92,10 @@ SSH_PORT="${SSH_PORT:-22}"
 # ---------------------------------------------------------------------------
 # Helper: ejecutar comando en el router via SSH
 # ---------------------------------------------------------------------------
-_ssh() {
-    ssh -q -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
 
 # ---------------------------------------------------------------------------
 # Verificar conectividad SSH
 # ---------------------------------------------------------------------------
-_check_ssh() {
-    log_step "Verificando conectividad SSH con el router..."
-    if ! _ssh "exit" 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        echo ""
-        echo "   Verifica:"
-        echo "   • El router está encendido y conectado por cable Ethernet"
-        echo "   • La IP es correcta (usa --ip <IP>)"
-        echo "   • SSH está habilitado en el router"
-        exit 1
-    fi
-    log_info "✅ Conectado a root@${ROUTER_IP}"
-}
 
 # ---------------------------------------------------------------------------
 # Detectar o validar dispositivo USB
@@ -120,10 +103,10 @@ _check_ssh() {
 _find_device() {
     if [ -n "${_DEVICE}" ]; then
         # Validar que el dispositivo exista en el router
-        if ! _ssh "test -b '${_DEVICE}'" 2>/dev/null; then
+        if ! router_ssh "test -b '${_DEVICE}'" 2>/dev/null; then
             log_error "Dispositivo no encontrado en el router: ${_DEVICE}"
             echo "   Lista de dispositivos disponibles:"
-            _ssh "block info 2>/dev/null || ls /dev/sd* /dev/mmcblk* 2>/dev/null || echo '   (ninguno detectado)'"
+            router_ssh "block info 2>/dev/null || ls /dev/sd* /dev/mmcblk* 2>/dev/null || echo '   (ninguno detectado)'"
             exit 1
         fi
         echo "${_DEVICE}"
@@ -132,7 +115,7 @@ _find_device() {
 
     # Auto-detectar primer dispositivo USB (sda1, sdb1, etc.)
     local dev
-    dev=$(_ssh "block info 2>/dev/null | grep -o '^/dev/sd[a-z][0-9]' | head -1" 2>/dev/null || true)
+    dev=$(router_ssh "block info 2>/dev/null | grep -o '^/dev/sd[a-z][0-9]' | head -1" 2>/dev/null || true)
 
     if [ -z "${dev}" ]; then
         log_error "No se detectó ningún dispositivo USB en el router."
@@ -143,7 +126,7 @@ _find_device() {
         echo "   • Usa --device /dev/sda1 si el auto-detect falla"
         echo ""
         echo "   Dispositivos visibles:"
-        _ssh "ls /dev/sd* 2>/dev/null || echo '   (ninguno)'" || true
+        router_ssh "ls /dev/sd* 2>/dev/null || echo '   (ninguno)'" || true
         exit 1
     fi
 
@@ -156,7 +139,7 @@ _find_device() {
 _check_ext4() {
     local device="$1"
     local fstype
-    fstype=$(_ssh "block info '${device}' 2>/dev/null | grep -o 'TYPE=\"[^\"]*\"' | cut -d'\"' -f2" 2>/dev/null || true)
+    fstype=$(router_ssh "block info '${device}' 2>/dev/null | grep -o 'TYPE=\"[^\"]*\"' | cut -d'\"' -f2" 2>/dev/null || true)
 
     if [ "${fstype}" != "ext4" ]; then
         log_error "El dispositivo ${device} no está formateado como ext4."
@@ -176,7 +159,7 @@ _check_ext4() {
 _check_usb_files() {
     local device="$1"
     # Monta, lista, desmonta — todo en el router; salida capturada localmente
-    _ssh sh - <<REMOTE
+    router_ssh sh - <<REMOTE
 set -eu
 DEVICE="${device}"
 
@@ -212,7 +195,7 @@ _setup_extroot_on_router() {
     local device="$1"
     local do_clean="$2"   # "yes" o "no"
 
-    _ssh sh - <<REMOTE
+    router_ssh sh - <<REMOTE
 set -eu
 
 DEVICE="${device}"
@@ -318,7 +301,7 @@ main() {
     echo "   Si no lo está: sudo mkfs.ext4 /dev/sdX  (en otra máquina)"
     echo ""
 
-    _check_ssh
+    router_check_ssh
 
     echo ""
     log_step "Buscando dispositivo USB..."
@@ -379,7 +362,7 @@ main() {
         echo "   ssh root@${ROUTER_IP} reboot"
     else
         log_step "Reiniciando el router para activar extroot..."
-        _ssh "reboot" || true
+        router_ssh "reboot" || true
         echo ""
         log_info "✅ Router reiniciando. Espera ~2 minutos y verifica:"
         echo "   ssh root@${ROUTER_IP} 'df -h /overlay'"

@@ -17,14 +17,14 @@
 #   2. Tabla ARP: dispositivos que han enviado tráfico recientemente (incluye IPs estáticas)
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 
 _show_help() {
     cat << 'HELP'
@@ -48,8 +48,8 @@ HELP
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)      _CLI_IP="${2:?--ip requiere argumento}"; shift 2 ;;
-        --env)     _ENV="${2:?--env requiere argumento}";   shift 2 ;;
+        --ip)      _ROUTER_IP_CLI="${2:?--ip requiere argumento}"; shift 2 ;;
+        --env)     ROUTER_ENV="${2:?--env requiere argumento}";   shift 2 ;;
         -h|--help) _show_help; exit 0 ;;
         *) log_error "Argumento desconocido: $1"; _show_help; exit 1 ;;
     esac
@@ -58,32 +58,17 @@ done
 # ---------------------------------------------------------------------------
 # Cargar entorno y SSH
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 # shellcheck disable=SC1090
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
-}
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-_check_ssh
+router_check_ssh
 log_info "Consultando clientes en ${ROUTER_IP}..."
 
 echo ""
@@ -91,7 +76,7 @@ echo "============================================="
 echo " Clientes conectados — ${ROUTER_IP}"
 echo "============================================="
 
-_ssh sh << 'REMOTE'
+router_ssh sh << 'REMOTE'
 set -eu
 
 NOW=$(date +%s)

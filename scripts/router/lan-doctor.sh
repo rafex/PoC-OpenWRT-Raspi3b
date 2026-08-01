@@ -9,14 +9,14 @@
 # Si no se pasan targets, toma leases DHCP, reservas UCI y ARP LAN del router.
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _SOURCE=""
 _TARGETS=()
 
@@ -45,8 +45,8 @@ HELP
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)      _CLI_IP="${2:?--ip requiere argumento}"; shift 2 ;;
-        --env)     _ENV="${2:?--env requiere argumento}"; shift 2 ;;
+        --ip)      _ROUTER_IP_CLI="${2:?--ip requiere argumento}"; shift 2 ;;
+        --env)     ROUTER_ENV="${2:?--env requiere argumento}"; shift 2 ;;
         --source)  _SOURCE="${2:?--source requiere argumento}"; shift 2 ;;
         --target)  _TARGETS+=("${2:?--target requiere argumento}"); shift 2 ;;
         -h|--help) _show_help; exit 0 ;;
@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a; source "${ENV_FILE}"; set +a
@@ -66,13 +66,13 @@ SSH_PORT="${SSH_PORT:-22}"
 _ssh_router() {
     ssh -p "${SSH_PORT}" \
         -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no \
         "root@${ROUTER_IP}" "$@"
 }
 
 _check_router() {
     if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
+            -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no "root@${ROUTER_IP}" exit 2>/dev/null; then
         log_error "No se puede conectar a root@${ROUTER_IP}:${SSH_PORT}"
         exit 1
     fi
@@ -175,7 +175,7 @@ _source_probe() {
     else
         local remote_tmp="/tmp/lan-doctor-targets.$$"
         scp -q "${target_file}" "${_SOURCE}:${remote_tmp}"
-        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${_SOURCE}" \
+        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no "${_SOURCE}" \
             "sh -s '${remote_tmp}'; rm -f '${remote_tmp}'" << EOF
 ${_source_probe_script}
 EOF

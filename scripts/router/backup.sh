@@ -13,17 +13,17 @@
 #   backup.sh list    [--dir <dir>]
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 _DEFAULT_BACKUP_DIR="${REPO_ROOT}/backups"
 
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _FILE=""
 _DIR=""
 
@@ -59,8 +59,8 @@ esac
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)    _CLI_IP="${2:?}";  shift 2 ;;
-        --env)   _ENV="${2:?}";     shift 2 ;;
+        --ip)    _ROUTER_IP_CLI="${2:?}";  shift 2 ;;
+        --env)   ROUTER_ENV="${2:?}";     shift 2 ;;
         --dir)   _DIR="${2:?}";     shift 2 ;;
         --file)  _FILE="${2:?}";    shift 2 ;;
         -h|--help) _show_help; exit 0 ;;
@@ -68,53 +68,29 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 BACKUP_DIR="${_DIR:-${_DEFAULT_BACKUP_DIR}}"
 
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
 _scp_get() {
     ssh -p "${SSH_PORT}" \
         -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no \
         "root@${ROUTER_IP}" "cat '$1'" > "$2"
 }
 
 _scp_put() {
     ssh -p "${SSH_PORT}" \
         -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" -o CheckHostIP=no \
         "root@${ROUTER_IP}" "cat > '$2'" < "$1"
-}
-
-_check_ssh() {
-    local retries=3 delay=4 i=1
-    while [ "${i}" -le "${retries}" ]; do
-        if ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-                -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-            return 0
-        fi
-        [ "${i}" -lt "${retries}" ] && {
-            log_warn "SSH no disponible, reintentando en ${delay}s... (${i}/${retries})"
-            sleep "${delay}"
-        }
-        i=$((i + 1))
-    done
-    log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-    exit 1
 }
 
 # ---------------------------------------------------------------------------
 _backup() {
-    _check_ssh
+    router_check_ssh
     mkdir -p "${BACKUP_DIR}"
 
     local ts
@@ -123,11 +99,11 @@ _backup() {
     local local_file="${BACKUP_DIR}/router-${ROUTER_IP}-${ts}.tar.gz"
 
     log_step "Generando backup en el router..."
-    _ssh sysupgrade -b "${remote_file}"
+    router_ssh sysupgrade -b "${remote_file}"
 
     log_step "Descargando backup..."
     _scp_get "${remote_file}" "${local_file}"
-    _ssh rm -f "${remote_file}" 2>/dev/null || true
+    router_ssh rm -f "${remote_file}" 2>/dev/null || true
 
     echo ""
     log_info "✅ Backup guardado en: ${local_file}"
@@ -145,7 +121,7 @@ _restore() {
         exit 1
     fi
 
-    _check_ssh
+    router_check_ssh
 
     local remote_file="/tmp/router-restore.tar.gz"
     echo ""
@@ -157,7 +133,7 @@ _restore() {
     _scp_put "${_FILE}" "${remote_file}"
 
     log_step "Aplicando configuración..."
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 tar xzf ${remote_file} -C /
 rm -f ${remote_file}
 echo "Configuración restaurada. Reiniciando..."

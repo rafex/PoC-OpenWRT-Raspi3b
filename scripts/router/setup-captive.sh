@@ -37,6 +37,8 @@
 #   --iface <iface>    Interfaz LAN del router (default: auto-detectar)
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -83,8 +85,8 @@ msftncsi.com"
 # ---------------------------------------------------------------------------
 _SUBCMD=""
 _SUBCMD_ARG=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _TIMEOUT=30
 _PORTAL_URL=""
 _TOKEN=""
@@ -140,8 +142,8 @@ esac
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)         _CLI_IP="${2:?--ip requiere argumento}"; shift 2 ;;
-        --env)        _ENV="${2:?--env requiere argumento}"; shift 2 ;;
+        --ip)         _ROUTER_IP_CLI="${2:?--ip requiere argumento}"; shift 2 ;;
+        --env)        ROUTER_ENV="${2:?--env requiere argumento}"; shift 2 ;;
         --timeout)    _TIMEOUT="${2:?--timeout requiere argumento}"; shift 2 ;;
         --portal-url) _PORTAL_URL="${2:?--portal-url requiere argumento}"; shift 2 ;;
         --token)      _TOKEN="${2:?--token requiere argumento}"; shift 2 ;;
@@ -154,7 +156,7 @@ done
 # ---------------------------------------------------------------------------
 # Cargar variables del entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a; source "${ENV_FILE}"; set +a
@@ -168,24 +170,6 @@ _MODE="local"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" \
-            -o ConnectTimeout=5 \
-            -o StrictHostKeyChecking=accept-new \
-            -o BatchMode=yes \
-            "root@${ROUTER_IP}" "exit" 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
-    log_info "✅ Conectado a root@${ROUTER_IP}"
-}
 
 # Validación IP POSIX (adaptado de poc-openwrt-dietpi-raspi3b-raspi4b/scripts/lib/common.sh)
 _validate_ip() {
@@ -203,7 +187,7 @@ _validate_ip() {
 
 # Obtiene IP LAN e interfaz del router
 _router_lan_info() {
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 set -eu
 LAN_IP=$(uci -q get network.lan.ipaddr 2>/dev/null || \
          ip -4 addr show br-lan 2>/dev/null | grep -o 'inet [0-9.]*' | awk '{print $2}' | head -1 || \
@@ -455,7 +439,7 @@ _install() {
     [ "${_MODE}" = "external" ] && echo "   Portal:   ${_PORTAL_URL}"
     echo ""
 
-    _check_ssh
+    router_check_ssh
 
     # Detectar IP y interfaz LAN del router
     log_step "Detectando configuración LAN del router..."
@@ -471,9 +455,9 @@ _install() {
 
     # Verificar uhttpd
     log_step "Verificando uhttpd..."
-    if ! _ssh "command -v uhttpd >/dev/null 2>&1"; then
+    if ! router_ssh "command -v uhttpd >/dev/null 2>&1"; then
         log_warn "uhttpd no encontrado — instalando con el gestor de paquetes disponible..."
-        _ssh "if command -v apk >/dev/null 2>&1; then apk -U add uhttpd; else opkg update && opkg install uhttpd; fi" || {
+        router_ssh "if command -v apk >/dev/null 2>&1; then apk -U add uhttpd; else opkg update && opkg install uhttpd; fi" || {
             log_error "No se pudo instalar uhttpd."
             echo "   Opciones:"
             echo "   1. Instalar el grupo post-flash: just router-post-install group=captive_portal"
@@ -501,12 +485,12 @@ _install() {
 
     # Crear estructura de directorios en el router
     log_step "[1/6] Creando estructura en el router..."
-    _ssh "mkdir -p ${CAPTIVE_WWW}/cgi-bin"
+    router_ssh "mkdir -p ${CAPTIVE_WWW}/cgi-bin"
     log_info "      ✅ ${CAPTIVE_WWW}/cgi-bin"
 
     # Subir archivo de configuración
     log_step "[2/6] Subiendo configuración..."
-    cat << EOF | _ssh "cat > ${CAPTIVE_CFG}"
+    cat << EOF | router_ssh "cat > ${CAPTIVE_CFG}"
 CAPTIVE_TIMEOUT="${_TIMEOUT}m"
 CAPTIVE_MODE="${_MODE}"
 CAPTIVE_TOKEN="${_TOKEN}"
@@ -518,31 +502,31 @@ EOF
 
     # Subir reglas nftables
     log_step "[3/6] Subiendo reglas nftables..."
-    _gen_nft "${LAN_IP}" "${LAN_IFACE}" | _ssh "cat > ${CAPTIVE_NFT}"
-    _ssh "nft -f ${CAPTIVE_NFT}"
+    _gen_nft "${LAN_IP}" "${LAN_IFACE}" | router_ssh "cat > ${CAPTIVE_NFT}"
+    router_ssh "nft -f ${CAPTIVE_NFT}"
     log_info "      ✅ Tabla '${NFT_TABLE}' activa"
 
     # Subir archivos web
     log_step "[4/6] Subiendo portal web..."
 
     if [ "${_MODE}" = "local" ]; then
-        _gen_portal_html | _ssh "cat > ${CAPTIVE_WWW}/index.html"
+        _gen_portal_html | router_ssh "cat > ${CAPTIVE_WWW}/index.html"
         log_info "      ✅ index.html (portal local)"
     else
-        _gen_redirect_html "${LAN_IP}" | _ssh "cat > ${CAPTIVE_WWW}/index.html"
+        _gen_redirect_html "${LAN_IP}" | router_ssh "cat > ${CAPTIVE_WWW}/index.html"
         log_info "      ✅ index.html (redirect → portal externo)"
     fi
 
-    _gen_connected_html | _ssh "cat > ${CAPTIVE_WWW}/connected.html"
+    _gen_connected_html | router_ssh "cat > ${CAPTIVE_WWW}/connected.html"
     log_info "      ✅ connected.html"
 
-    _gen_cgi_accept | _ssh "cat > ${CAPTIVE_WWW}/cgi-bin/accept && chmod +x ${CAPTIVE_WWW}/cgi-bin/accept"
+    _gen_cgi_accept | router_ssh "cat > ${CAPTIVE_WWW}/cgi-bin/accept && chmod +x ${CAPTIVE_WWW}/cgi-bin/accept"
     log_info "      ✅ cgi-bin/accept (autorización de clientes)"
 
     # Subir y habilitar init.d
     log_step "[5/6] Configurando servicio de inicio..."
-    _gen_initd | _ssh "cat > ${CAPTIVE_INIT} && chmod +x ${CAPTIVE_INIT}"
-    _ssh "/etc/init.d/captive enable && /etc/init.d/captive start"
+    _gen_initd | router_ssh "cat > ${CAPTIVE_INIT} && chmod +x ${CAPTIVE_INIT}"
+    router_ssh "/etc/init.d/captive enable && /etc/init.d/captive start"
     log_info "      ✅ Servicio captive habilitado y arrancado"
 
     # Configurar dnsmasq: dominios de probe → IP del router
@@ -605,7 +589,7 @@ uci commit dhcp
 /etc/init.d/dnsmasq reload
 echo 'dnsmasq OK'"
 
-    printf '%s\n' "${uci_script}" | _ssh sh -
+    printf '%s\n' "${uci_script}" | router_ssh sh -
 
     local domain_count
     domain_count=$(printf '%s\n' "${PROBE_DOMAINS}" | grep -c '[a-z]')
@@ -618,7 +602,7 @@ _verify() {
     local ok=true
 
     # Tabla nftables activa
-    if _ssh "nft list table ${NFT_TABLE} >/dev/null 2>&1"; then
+    if router_ssh "nft list table ${NFT_TABLE} >/dev/null 2>&1"; then
         log_info "   ✅ nftables: tabla '${NFT_TABLE}' activa"
     else
         log_warn "   ⚠️  nftables: tabla no encontrada"
@@ -626,7 +610,7 @@ _verify() {
     fi
 
     # uhttpd escuchando en CAPTIVE_PORT
-    if _ssh "netstat -tlnp 2>/dev/null | grep -q ':${CAPTIVE_PORT}' || ss -tlnp 2>/dev/null | grep -q ':${CAPTIVE_PORT}'"; then
+    if router_ssh "netstat -tlnp 2>/dev/null | grep -q ':${CAPTIVE_PORT}' || ss -tlnp 2>/dev/null | grep -q ':${CAPTIVE_PORT}'"; then
         log_info "   ✅ uhttpd: escuchando en :${CAPTIVE_PORT}"
     else
         log_warn "   ⚠️  uhttpd: no escucha en :${CAPTIVE_PORT}"
@@ -635,7 +619,7 @@ _verify() {
 
     # Respuesta HTTP del portal
     local http_code
-    http_code=$(_ssh "curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://${lan_ip}:${CAPTIVE_PORT}/ 2>/dev/null || echo '000'")
+    http_code=$(router_ssh "curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://${lan_ip}:${CAPTIVE_PORT}/ 2>/dev/null || echo '000'")
     if [ "${http_code}" = "200" ] || [ "${http_code}" = "302" ]; then
         log_info "   ✅ HTTP portal: responde (${http_code})"
     else
@@ -647,7 +631,7 @@ _verify() {
     local first_domain
     first_domain=$(printf '%s\n' "${PROBE_DOMAINS}" | head -1)
     local resolved
-    resolved=$(_ssh "nslookup ${first_domain} 127.0.0.1 2>/dev/null | grep 'Address' | tail -1 | awk '{print \$2}'" 2>/dev/null || true)
+    resolved=$(router_ssh "nslookup ${first_domain} 127.0.0.1 2>/dev/null | grep 'Address' | tail -1 | awk '{print \$2}'" 2>/dev/null || true)
     if [ "${resolved}" = "${lan_ip}" ]; then
         log_info "   ✅ DNS: ${first_domain} → ${lan_ip}"
     else
@@ -668,7 +652,7 @@ _uninstall() {
     echo "============================================="
     echo ""
 
-    _check_ssh
+    router_check_ssh
 
     log_step "Detectando IP LAN del router..."
     local router_info
@@ -691,12 +675,12 @@ _uninstall() {
 
     # Detener y deshabilitar servicio
     log_step "[1/4] Deteniendo servicio captive..."
-    _ssh "/etc/init.d/captive stop 2>/dev/null; /etc/init.d/captive disable 2>/dev/null; rm -f ${CAPTIVE_INIT}" || true
+    router_ssh "/etc/init.d/captive stop 2>/dev/null; /etc/init.d/captive disable 2>/dev/null; rm -f ${CAPTIVE_INIT}" || true
     log_info "      ✅ Servicio detenido"
 
     # Eliminar tabla nftables
     log_step "[2/4] Eliminando reglas nftables..."
-    _ssh "nft delete table ${NFT_TABLE} 2>/dev/null || true"
+    router_ssh "nft delete table ${NFT_TABLE} 2>/dev/null || true"
     log_info "      ✅ Tabla eliminada"
 
     # Eliminar entradas dnsmasq
@@ -711,12 +695,12 @@ uci -q del_list dhcp.@dnsmasq[0].dhcp_option='252,http://${LAN_IP}:${CAPTIVE_POR
 uci -q set dhcp.@dnsmasq[0].filter_aaaa=0 2>/dev/null || true
 uci commit dhcp
 /etc/init.d/dnsmasq reload"
-    printf '%s\n' "${uci_clean}" | _ssh sh -
+    printf '%s\n' "${uci_clean}" | router_ssh sh -
     log_info "      ✅ Dominios de probe eliminados"
 
     # Eliminar archivos
     log_step "[4/4] Eliminando archivos del portal..."
-    _ssh "rm -rf ${CAPTIVE_DIR}"
+    router_ssh "rm -rf ${CAPTIVE_DIR}"
     log_info "      ✅ ${CAPTIVE_DIR} eliminado"
 
     echo ""
@@ -748,7 +732,7 @@ _allow() {
             ;;
     esac
 
-    _check_ssh
+    router_check_ssh
 
     # timeout 0 en nftables = elemento permanente (sin expiración)
     local nft_timeout timeout_label
@@ -761,12 +745,12 @@ _allow() {
     fi
 
     # Si ya está en el set, eliminarlo primero para actualizar el timeout
-    if _ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -qw '${target_ip}'"; then
+    if router_ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -qw '${target_ip}'"; then
         log_warn "${target_ip} ya autorizado — actualizando a: ${timeout_label}"
-        _ssh "nft delete element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} }' 2>/dev/null || true"
+        router_ssh "nft delete element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} }' 2>/dev/null || true"
     fi
 
-    _ssh "nft add element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} timeout ${nft_timeout} }'"
+    router_ssh "nft add element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} timeout ${nft_timeout} }'"
     log_info "✅ ${target_ip} autorizado — sesión: ${timeout_label}"
 }
 
@@ -787,14 +771,14 @@ _block() {
         exit 1
     fi
 
-    _check_ssh
+    router_check_ssh
 
-    if ! _ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -qw '${target_ip}'"; then
+    if ! router_ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -qw '${target_ip}'"; then
         log_warn "${target_ip} no estaba en el set (nada que hacer)"
         exit 0
     fi
 
-    _ssh "nft delete element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} }'"
+    router_ssh "nft delete element ${NFT_TABLE} ${NFT_SET} '{ ${target_ip} }'"
     log_info "✅ ${target_ip} bloqueado (vuelve al portal en su próxima petición HTTP)"
 }
 
@@ -802,10 +786,10 @@ _block() {
 # Subcomando: flush
 # ---------------------------------------------------------------------------
 _flush() {
-    _check_ssh
+    router_check_ssh
 
     local count
-    count=$(_ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -c 'elements' || echo 0" || echo 0)
+    count=$(router_ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep -c 'elements' || echo 0" || echo 0)
 
     echo ""
     log_warn "Se vaciarán TODOS los clientes autorizados del portal."
@@ -818,7 +802,7 @@ _flush() {
         exit 0
     fi
 
-    _ssh "nft flush set ${NFT_TABLE} ${NFT_SET} 2>/dev/null || true"
+    router_ssh "nft flush set ${NFT_TABLE} ${NFT_SET} 2>/dev/null || true"
     log_info "✅ Set vaciado — todos los dispositivos volverán al portal"
 }
 
@@ -826,7 +810,7 @@ _flush() {
 # Subcomando: list
 # ---------------------------------------------------------------------------
 _list() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
@@ -836,13 +820,13 @@ _list() {
     # Tabla nftables
     echo ""
     echo "--- Tabla nftables ---"
-    _ssh "nft list table ${NFT_TABLE} 2>/dev/null || echo '  (tabla no encontrada — portal no activo)'"
+    router_ssh "nft list table ${NFT_TABLE} 2>/dev/null || echo '  (tabla no encontrada — portal no activo)'"
 
     # Set de clientes autorizados con timeouts
     echo ""
     echo "--- Clientes autorizados (${NFT_SET}) ---"
     local set_output
-    set_output=$(_ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep 'elements' -A 99 | grep -v '^}' || true")
+    set_output=$(router_ssh "nft list set ${NFT_TABLE} ${NFT_SET} 2>/dev/null | grep 'elements' -A 99 | grep -v '^}' || true")
     if [ -z "${set_output}" ] || echo "${set_output}" | grep -q "elements { }"; then
         echo "  (sin clientes autorizados)"
     else
@@ -857,12 +841,12 @@ _list() {
     # Leases DHCP activos
     echo ""
     echo "--- Leases DHCP (/tmp/dhcp.leases) ---"
-    _ssh "[ -f /tmp/dhcp.leases ] && awk '{printf \"  %-18s %-17s %s\\n\", \$3, \$2, \$4}' /tmp/dhcp.leases | head -30 || echo '  (sin leases)'"
+    router_ssh "[ -f /tmp/dhcp.leases ] && awk '{printf \"  %-18s %-17s %s\\n\", \$3, \$2, \$4}' /tmp/dhcp.leases | head -30 || echo '  (sin leases)'"
 
     # Conexiones TCP activas port 80
     echo ""
     echo "--- Conexiones port 80 interceptadas ---"
-    _ssh "netstat -tn 2>/dev/null | grep ':80 ' | awk '{printf \"  %-22s → %s\\n\", \$4, \$5}' | head -10 || echo '  (sin conexiones activas o netstat no disponible)'"
+    router_ssh "netstat -tn 2>/dev/null | grep ':80 ' | awk '{printf \"  %-22s → %s\\n\", \$4, \$5}' | head -10 || echo '  (sin conexiones activas o netstat no disponible)'"
     echo ""
 }
 
@@ -870,7 +854,7 @@ _list() {
 # Subcomando: status
 # ---------------------------------------------------------------------------
 _status() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
@@ -888,11 +872,11 @@ _status() {
 
     echo ""
     echo "--- Configuración guardada ---"
-    _ssh "cat ${CAPTIVE_CFG} 2>/dev/null || echo '  (${CAPTIVE_CFG} no encontrado)'"
+    router_ssh "cat ${CAPTIVE_CFG} 2>/dev/null || echo '  (${CAPTIVE_CFG} no encontrado)'"
 
     echo ""
     echo "--- Servicio captive ---"
-    _ssh "/etc/init.d/captive status 2>/dev/null || echo '  (servicio no registrado)'"
+    router_ssh "/etc/init.d/captive status 2>/dev/null || echo '  (servicio no registrado)'"
     echo ""
 }
 

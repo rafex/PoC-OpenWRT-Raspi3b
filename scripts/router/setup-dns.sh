@@ -20,11 +20,11 @@
 #   --env <env>       Entorno (default: prod)
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 _DEFAULT_PRIMARY="1.1.1.1"
 _DEFAULT_SECONDARY="8.8.8.8"
@@ -33,8 +33,8 @@ _DEFAULT_SECONDARY="8.8.8.8"
 # Parsear subcomando y opciones
 # ---------------------------------------------------------------------------
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _PRIMARY=""
 _SECONDARY=""
 
@@ -73,8 +73,8 @@ fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)        _CLI_IP="${2:?}";    shift 2 ;;
-        --env)       _ENV="${2:?}";       shift 2 ;;
+        --ip)        _ROUTER_IP_CLI="${2:?}";    shift 2 ;;
+        --env)       ROUTER_ENV="${2:?}";       shift 2 ;;
         --primary)   _PRIMARY="${2:?}";   shift 2 ;;
         --secondary) _SECONDARY="${2:?}"; shift 2 ;;
         -h|--help)   _show_help; exit 0 ;;
@@ -85,33 +85,12 @@ done
 # ---------------------------------------------------------------------------
 # Cargar entorno y SSH
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 # shellcheck disable=SC1090
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
-
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    local retries=3 delay=4 i=1
-    while [ "${i}" -le "${retries}" ]; do
-        if ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-                -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-            return 0
-        fi
-        [ "${i}" -lt "${retries}" ] && { log_warn "SSH no disponible, reintentando en ${delay}s... (${i}/${retries})"; sleep "${delay}"; }
-        i=$((i + 1))
-    done
-    log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-    exit 1
-}
 
 # ---------------------------------------------------------------------------
 # Subcomando: set
@@ -120,7 +99,7 @@ _set() {
     local primary="${_PRIMARY:-${_DEFAULT_PRIMARY}}"
     local secondary="${_SECONDARY:-${_DEFAULT_SECONDARY}}"
 
-    _check_ssh
+    router_check_ssh
 
     echo ""
     log_step "Configurando servidores DNS:"
@@ -128,7 +107,7 @@ _set() {
     echo "   Secundario: ${secondary}"
     echo ""
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 set -eu
 PRIMARY="${primary}"
 SECONDARY="${secondary}"
@@ -167,14 +146,14 @@ EOF
 # Subcomando: show
 # ---------------------------------------------------------------------------
 _show() {
-    _check_ssh
+    router_check_ssh
 
     echo ""
     echo "============================================="
     echo " DNS — Configuración actual"
     echo "============================================="
 
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 set -eu
 
 echo ""

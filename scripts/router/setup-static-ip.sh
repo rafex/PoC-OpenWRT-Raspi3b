@@ -26,6 +26,8 @@
 #   BB:CC:DD:EE:FF:00,192.168.1.101,laptop
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -35,8 +37,8 @@ source "${SCRIPT_DIR}/../commons/logging.sh"
 # Defaults
 # ---------------------------------------------------------------------------
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _MAC=""
 _ASSIGN=""
 _NAME=""
@@ -88,8 +90,8 @@ _SUBCMD="$1"; shift
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)     _CLI_IP="${2:?--ip requiere argumento}"; shift 2 ;;
-        --env)    _ENV="${2:?--env requiere argumento}"; shift 2 ;;
+        --ip)     _ROUTER_IP_CLI="${2:?--ip requiere argumento}"; shift 2 ;;
+        --env)    ROUTER_ENV="${2:?--env requiere argumento}"; shift 2 ;;
         --mac)    _MAC="${2:?--mac requiere argumento}"; shift 2 ;;
         --assign) _ASSIGN="${2:?--assign requiere argumento}"; shift 2 ;;
         --name)   _NAME="${2:?--name requiere argumento}"; shift 2 ;;
@@ -102,29 +104,13 @@ done
 # ---------------------------------------------------------------------------
 # Cargar entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 if [ -f "${ENV_FILE}" ]; then
     set -a; source "${ENV_FILE}"; set +a
 fi
 
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
-
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    if ! ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" "exit" 2>/dev/null; then
-        log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-        exit 1
-    fi
-    log_info "Conectado a ${ROUTER_IP}"
-}
 
 # ---------------------------------------------------------------------------
 # Validaciones
@@ -164,7 +150,7 @@ _normalize_mac() {
 # _dnsmasq_restart — recarga dnsmasq en el router
 # ---------------------------------------------------------------------------
 _dnsmasq_restart() {
-    _ssh "/etc/init.d/dnsmasq restart" 2>/dev/null \
+    router_ssh "/etc/init.d/dnsmasq restart" 2>/dev/null \
         && log_info "dnsmasq reiniciado" \
         || log_warn "No se pudo reiniciar dnsmasq (continúa igual hasta próximo reinicio)"
 }
@@ -193,7 +179,7 @@ _add() {
     [ -n "${name}" ] && echo "   Nombre: ${name}"
     echo ""
 
-    _ssh sh - << REMOTE
+    router_ssh sh - << REMOTE
 set -eu
 MAC="${mac}"
 ASSIGN="${_ASSIGN}"
@@ -248,7 +234,7 @@ _remove() {
     [ -n "${_ASSIGN}" ] && echo "   IP:  ${_ASSIGN}"
     echo ""
 
-    _ssh sh - << REMOTE
+    router_ssh sh - << REMOTE
 set -eu
 TARGET_MAC="${mac}"
 TARGET_IP="${_ASSIGN}"
@@ -286,7 +272,7 @@ _list() {
     echo "============================================="
     echo " IPs Estáticas — ${ROUTER_IP}"
     echo "============================================="
-    _ssh sh << 'REMOTE'
+    router_ssh sh << 'REMOTE'
 echo ""
 idx=0
 count=0
@@ -330,7 +316,7 @@ _clear() {
         exit 0
     fi
 
-    _ssh sh << 'REMOTE'
+    router_ssh sh << 'REMOTE'
 set -eu
 deleted=0
 while uci -q get "dhcp.@host[0]" >/dev/null 2>&1; do
@@ -391,7 +377,7 @@ _import() {
         local normalized_ip="${csv_ip}"
         local normalized_name="${csv_name}"
 
-        _ssh sh - << REMOTE
+        router_ssh sh - << REMOTE
 set -eu
 MAC="${normalized_mac}"
 ASSIGN="${normalized_ip}"
@@ -433,11 +419,11 @@ REMOTE
 # Main
 # ---------------------------------------------------------------------------
 case "${_SUBCMD}" in
-    add)    _check_ssh; _add ;;
-    remove) _check_ssh; _remove ;;
-    list)   _check_ssh; _list ;;
-    clear)  _check_ssh; _clear ;;
-    import) _check_ssh; _import ;;
+    add)    router_check_ssh; _add ;;
+    remove) router_check_ssh; _remove ;;
+    list)   router_check_ssh; _list ;;
+    clear)  router_check_ssh; _clear ;;
+    import) router_check_ssh; _import ;;
     -h|--help) _show_help ;;
     *) log_error "Subcomando desconocido: ${_SUBCMD}"; _show_help; exit 1 ;;
 esac

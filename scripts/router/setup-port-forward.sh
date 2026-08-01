@@ -16,15 +16,15 @@
 #   setup-port-forward.sh status
 # ============================================================================
 set -euo pipefail
+ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# shellcheck source=../commons/logging.sh disable=SC1091
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 _SUBCMD=""
-_ENV="prod"
-_CLI_IP=""
+ROUTER_ENV="prod"
+_ROUTER_IP_CLI=""
 _NAME=""
 _PORT=""
 _DEST_IP=""
@@ -69,8 +69,8 @@ esac
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --ip)         _CLI_IP="${2:?}";    shift 2 ;;
-        --env)        _ENV="${2:?}";       shift 2 ;;
+        --ip)         _ROUTER_IP_CLI="${2:?}";    shift 2 ;;
+        --env)        ROUTER_ENV="${2:?}";       shift 2 ;;
         --name)       _NAME="${2:?}";      shift 2 ;;
         --port)       _PORT="${2:?}";      shift 2 ;;
         --dest-ip)    _DEST_IP="${2:?}";   shift 2 ;;
@@ -81,42 +81,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENV_FILE="${REPO_ROOT}/environments/${_ENV}/.env.public"
+ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
 [ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
 ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
 SSH_PORT="${SSH_PORT:-22}"
 
-_ssh() {
-    ssh -p "${SSH_PORT}" \
-        -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=accept-new \
-        "root@${ROUTER_IP}" "$@"
-}
-
-_check_ssh() {
-    local retries=3 delay=4 i=1
-    while [ "${i}" -le "${retries}" ]; do
-        if ssh -q -p "${SSH_PORT}" -o ConnectTimeout=5 -o BatchMode=yes \
-                -o StrictHostKeyChecking=accept-new "root@${ROUTER_IP}" exit 2>/dev/null; then
-            return 0
-        fi
-        [ "${i}" -lt "${retries}" ] && {
-            log_warn "SSH no disponible, reintentando en ${delay}s... (${i}/${retries})"
-            sleep "${delay}"
-        }
-        i=$((i + 1))
-    done
-    log_error "No se puede conectar: root@${ROUTER_IP}:${SSH_PORT}"
-    exit 1
-}
-
 # ---------------------------------------------------------------------------
 _list() {
-    _check_ssh
+    router_check_ssh
     echo ""
     echo "Port forwarding configurado en UCI:"
     echo "════════════════════════════════════════════════"
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 found=0
 for section in $(uci show firewall | grep "=redirect" | cut -d= -f1); do
     name=$(uci -q get "${section}.name" 2>/dev/null || echo "(sin nombre)")
@@ -149,11 +125,11 @@ _add() {
     local dest_ip="${_DEST_IP}"
     local proto="${_PROTO}"
 
-    _check_ssh
+    router_check_ssh
 
     log_step "Añadiendo regla '${name}': WAN:${src_port} → ${dest_ip}:${dest_port} [${proto}]"
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 # Verificar que no exista ya una regla con ese nombre
 existing=\$(uci show firewall | grep "\.name='${name}'" | cut -d= -f1 | head -1)
 if [ -n "\${existing}" ]; then
@@ -199,10 +175,10 @@ _remove() {
     [ -z "${_NAME}" ] && { log_error "Falta --name"; exit 1; }
 
     local name="${_NAME}"
-    _check_ssh
+    router_check_ssh
     log_step "Eliminando regla(s) '${name}'..."
 
-    _ssh sh - << EOF
+    router_ssh sh - << EOF
 found=0
 # Iterar en orden inverso para no romper índices al borrar
 sections=\$(uci show firewall | grep "=redirect" | cut -d= -f1)
@@ -228,11 +204,11 @@ EOF
 
 # ---------------------------------------------------------------------------
 _status() {
-    _check_ssh
+    router_check_ssh
     echo ""
     echo "Port forwarding — estado en vivo (nftables):"
     echo "════════════════════════════════════════════════"
-    _ssh sh - << 'REMOTE'
+    router_ssh sh - << 'REMOTE'
 # Listar reglas DNAT en la chain de prerouting
 nft list table inet fw4 2>/dev/null | grep -A2 "dnat\|redirect" | grep -v "^--$" || \
     echo "  (sin reglas DNAT activas en nftables)"
