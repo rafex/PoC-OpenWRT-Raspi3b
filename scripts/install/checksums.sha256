@@ -1,0 +1,18 @@
+# Binaries checksums — used by install-tools for integrity verification
+# Update these when bumping versions in justfile (SOPS_VERSION, AGE_VERSION, YQ_VERSION)
+
+# sops v3.9.4 — https://github.com/getsops/sops/releases/tag/v3.9.4
+sops-v3.9.4.linux.amd64  5488e32bc471de7982ad895dd054bbab3ab91c417a118426134551e9626e4e85
+sops-v3.9.4.linux.arm64  16564c6b181d88505d9e0dfef62771894293d85cde5884d9b1a843859eee174b
+
+# age v1.2.1 — https://github.com/FiloSottile/age/releases/tag/v1.2.1
+age-v1.2.1-linux-amd64.tar.gz  7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50
+age-v1.2.1-linux-arm64.tar.gz  57fd79a7ece5fe501f351b9dd51a82fbee1ea8db65a8839db17f5c080245e99f
+
+# yq v4.45.1 — https://github.com/mikefarah/yq/releases/tag/v4.45.1
+yq_linux_amd64  654d2943ca1d3be2024089eb4f270f4070f491a0610481d128509b2834870049
+yq_linux_arm64  ceea73d4c86f2e5c91926ee0639157121f5360da42beeb8357783d79c2cc6a1d
+
+# just v1.39.0 — https://github.com/casey/just/releases/tag/1.39.0
+# SHA256 of the tarball (install-tools extracts 'just' from it)
+just-1.39.0-x86_64-unknown-linux-musl.tar.gz  1c53fa85a8c021ce7b19814e1a5e1dc0aa10c04bddca75196f7ab6db6130d2cd

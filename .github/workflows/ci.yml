@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
+          scandir: scripts
+
+  validate-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets are encrypted
+        run: |
+          for env in dev prod; do
+            file="environments/${env}/secrets.enc.yaml"
+            if [ -f "$file" ]; then
+              echo "Checking $file..."
+              grep -q 'sops:' "$file" || {
+                echo "ERROR: $file is NOT encrypted (missing sops metadata)"
+                exit 1
+              }
+              echo "  ✓ $file is encrypted"
+            else
+              echo "  - $file not present (skipping)"
+            fi
+          done
+
+  validate-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test TOML parser
+        run: python3 tests/test_toml_parser.py
+
+  smoke-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify build scripts syntax
+        run: |
+          bash -n scripts/build/openwrt.sh
+          bash -n scripts/build/compile.sh
+          bash -n scripts/build/verify.sh
+          bash -n scripts/templates/generate.sh
+          bash -n scripts/commons/secrets.sh
+          bash -n scripts/commons/router-base.sh
