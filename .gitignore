@@ -47,6 +47,9 @@ logs/
 config/overlay/
 config/openwrt-packages.txt
 
+# ── Router known_hosts (auto-generados por ssh-keyscan) ──
+**/.router-known-hosts
+
 # ── Secrets temporales generados por scripts ──
 /tmp/secrets-*.yaml
 
