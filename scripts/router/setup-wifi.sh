@@ -32,9 +32,7 @@ set -euo pipefail
 ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 # ---------------------------------------------------------------------------
 # Parsear subcomando y opciones
@@ -125,11 +123,7 @@ _RADIO=$(_normalize_radio "${_RADIO}")
 # ---------------------------------------------------------------------------
 # Cargar entorno y SSH
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
-[ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
-
-ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
-SSH_PORT="${SSH_PORT:-22}"
+router_load_env "${ROUTER_ENV}"
 
 # ---------------------------------------------------------------------------
 # _fetch_radio_info — Consulta al router qué radios existen y cuáles están libres

@@ -226,24 +226,7 @@ create-environments:
 # setup-env: Descargar y extraer el OpenWRT Image Builder
 # Lee OPENWRT_VERSION, TARGET y SUBTARGET desde environments/<ENV>/.env.public
 setup-env ENV="prod":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    ENV_FILE="environments/{{ ENV }}/.env.public"
-    if [ ! -f "${ENV_FILE}" ]; then
-        echo "❌ No se encontró: ${ENV_FILE}"
-        echo "   Solución: just create-environments"
-        exit 1
-    fi
-    # Cargar variables del entorno
-    set -a; source "${ENV_FILE}"; set +a
-    OPENWRT_VERSION="${OPENWRT_VERSION:-25.12.5}"
-    TARGET="${TARGET:-ath79}"
-    SUBTARGET="${SUBTARGET:-generic}"
-    export OPENWRT_VERSION TARGET SUBTARGET
-    echo "=== Descargando Image Builder ==="
-    echo "   Versión: ${OPENWRT_VERSION} — Target: ${TARGET}/${SUBTARGET}"
-    echo ""
-    scripts/install/setup-env.sh
+    @bash scripts/install/setup-env-wrapper.sh {{ ENV }}
 
 # ─────────────────────────────────────────────────────
 # Secrets
@@ -335,6 +318,11 @@ refresh-packages:
 # validate: Ejecutar shellcheck en todos los scripts
 validate:
     make validate
+
+# test: Ejecutar todos los tests (TOML parser + integration)
+test:
+    python3 tests/test_toml_parser.py
+    bash tests/test_generate_config.sh
 
 # ─────────────────────────────────────────────────────
 # Router — Gestión SSH y known_hosts

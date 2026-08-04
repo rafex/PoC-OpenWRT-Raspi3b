@@ -24,9 +24,7 @@ set -euo pipefail
 ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-source "${SCRIPT_DIR}/../commons/logging.sh"
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -77,14 +75,7 @@ done
 # ---------------------------------------------------------------------------
 # Cargar variables del entorno
 # ---------------------------------------------------------------------------
-ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
-if [ -f "${ENV_FILE}" ]; then
-    # shellcheck disable=SC1090
-    set -a; source "${ENV_FILE}"; set +a
-fi
-
-ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
-SSH_PORT="${SSH_PORT:-22}"
+router_load_env "${ROUTER_ENV}"
 
 # ---------------------------------------------------------------------------
 # Helper SSH (sin BatchMode: primer arranque no tiene contraseña)

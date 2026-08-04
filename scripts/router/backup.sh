@@ -16,7 +16,6 @@ set -euo pipefail
 ROUTER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${ROUTER_SCRIPT_DIR}/../commons/router-base.sh"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 _DEFAULT_BACKUP_DIR="${REPO_ROOT}/backups"
@@ -68,10 +67,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENV_FILE="${REPO_ROOT}/environments/${ROUTER_ENV}/.env.public"
-[ -f "${ENV_FILE}" ] && { set -a; source "${ENV_FILE}"; set +a; }
-ROUTER_IP="${_CLI_IP:-${ROUTER_IP:-192.168.1.1}}"
-SSH_PORT="${SSH_PORT:-22}"
+router_load_env "${ROUTER_ENV}"
 BACKUP_DIR="${_DIR:-${_DEFAULT_BACKUP_DIR}}"
 
 _scp_get() {
