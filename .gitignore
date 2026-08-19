@@ -53,6 +53,9 @@ config/openwrt-packages.txt
 # ── Secrets temporales generados por scripts ──
 /tmp/secrets-*.yaml
 
+# ── Backups locales del router (no versionar) ──
+backups/
+
 # ── IDEs y editors ──
 .vscode/
 .idea/
