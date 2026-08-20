@@ -70,8 +70,10 @@ _ensure_age_key() {
 ensure_secrets() {
     local env="${1:-${ENV}}"
 
-    log_step "Verificando secrets para entorno: ${env}"
-    echo ""
+    # stdout is the function's machine-readable contract: only the temp path.
+    # Keep progress output on stderr so command substitution remains safe.
+    log_step "Verificando secrets para entorno: ${env}" >&2
+    echo "" >&2
 
     check_sops_binary || return 1
     _ensure_age_key || return 1
@@ -79,9 +81,9 @@ ensure_secrets() {
     local secrets_tmp
     secrets_tmp=$(decrypt_secrets "${env}" "${KEYFILE}") || return 1
 
-    log_info "✅ Secrets disponibles: ${secrets_tmp}"
-    report_empty_fields "${secrets_tmp}"
-    echo ""
+    log_info "✅ Secrets disponibles: ${secrets_tmp}" >&2
+    report_empty_fields "${secrets_tmp}" >&2
+    echo "" >&2
 
     echo "${secrets_tmp}"
 }

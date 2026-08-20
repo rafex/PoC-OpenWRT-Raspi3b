@@ -34,14 +34,22 @@ done
 # Test 9: ensure-secrets.sh syntax
 bash -n scripts/install/ensure-secrets.sh 2>&1 && pass "ensure-secrets.sh syntax" || fail "ensure-secrets.sh syntax"
 
-# Test 10: all router scripts pass bash -n
+# Test 10: ensure-secrets stdout is reserved for the temporary file path
+if grep -q 'log_step "Verificando secrets para entorno: \${env}" >&2' scripts/install/ensure-secrets.sh \
+    && grep -q 'report_empty_fields "\${secrets_tmp}" >&2' scripts/install/ensure-secrets.sh; then
+    pass "ensure-secrets stdout contract"
+else
+    fail "ensure-secrets stdout contract"
+fi
+
+# Test 11: all router scripts pass bash -n
 router_ok=true
 for f in scripts/router/*.sh; do
     bash -n "$f" 2>&1 || router_ok=false
 done
 $router_ok && pass "all router scripts syntax" || fail "all router scripts syntax"
 
-# Test 11: router_load_env present in all router scripts
+# Test 12: router_load_env present in all router scripts
 missing_env=""
 for f in scripts/router/*.sh; do
     grep -q 'router_load_env' "$f" || missing_env="$missing_env $(basename "$f")"
@@ -52,7 +60,7 @@ else
     fail "router_load_env missing in:$missing_env"
 fi
 
-# Test 12: no isolated accept-new (all have UserKnownHostsFile)
+# Test 13: no isolated accept-new (all have UserKnownHostsFile)
 bad_ssh=$(grep -rn 'StrictHostKeyChecking=accept-new' scripts/router/*.sh 2>/dev/null | grep -v 'UserKnownHostsFile' || true)
 if [ -z "$bad_ssh" ]; then
     pass "all accept-new coupled with UserKnownHostsFile"
@@ -60,14 +68,14 @@ else
     fail "isolated accept-new found"
 fi
 
-# Test 13: no _CLI_IP references remain
+# Test 14: no _CLI_IP references remain
 if grep -rq '\b_CLI_IP\b' scripts/router/*.sh 2>/dev/null; then
     fail "_CLI_IP references still present"
 else
     pass "no _CLI_IP references remain"
 fi
 
-# Test 14: no ENV_FILE in router scripts
+# Test 15: no ENV_FILE in router scripts
 if grep -rq 'ENV_FILE=' scripts/router/*.sh 2>/dev/null; then
     fail "ENV_FILE references still present in router/"
 else
