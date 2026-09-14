@@ -82,6 +82,22 @@ else
     pass "no ENV_FILE references in router/"
 fi
 
+# Test 16: router-setup-auth forwards flags without rewriting their values
+auth_dry_run=$(just --dry-run router-setup-auth --ip 192.168.1.1 2>&1)
+if printf '%s\n' "$auth_dry_run" | grep -Fq 'scripts/router/setup-auth.sh --ip 192.168.1.1'; then
+    pass "router-setup-auth forwards --ip"
+else
+    fail "router-setup-auth forwards --ip"
+fi
+
+# Test 17: auth manual is local and does not require router connectivity
+auth_manual=$(bash scripts/router/setup-auth.sh --man 2>&1)
+if printf '%s\n' "$auth_manual" | grep -Fq '## Setup Inicial del Router'; then
+    pass "router-setup-auth manual"
+else
+    fail "router-setup-auth manual"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ] || exit 1

@@ -35,10 +35,39 @@ _KEY=""
 _KEYS_ONLY=false
 
 # ---------------------------------------------------------------------------
+# Mostrar manual del flujo de autenticación
+# ---------------------------------------------------------------------------
+_show_manual() {
+    local manual_file="${REPO_ROOT}/docs/JUST.md"
+
+    if [ ! -f "${manual_file}" ]; then
+        log_error "Manual no encontrado: ${manual_file}"
+        return 1
+    fi
+
+    # En pipes/CI no usar un pager interactivo; imprimir el Markdown completo.
+    if [ ! -t 1 ]; then
+        cat "${manual_file}"
+    elif command -v bat >/dev/null 2>&1; then
+        bat --language markdown --style=plain --paging=always "${manual_file}"
+    elif command -v less >/dev/null 2>&1; then
+        less -R "${manual_file}"
+    elif command -v more >/dev/null 2>&1; then
+        more "${manual_file}"
+    else
+        cat "${manual_file}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Parsear argumentos
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --man)
+            _show_manual
+            exit 0
+            ;;
         --ip)
             _ROUTER_IP_CLI="${2:?--ip requiere un argumento}"
             shift 2
@@ -56,17 +85,18 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "Uso: $0 [--ip <IP>] [--env <env>] [--key <path>] [--keys-only]"
+            echo "Uso: $0 [--ip <IP>] [--env <env>] [--key <path>] [--keys-only] [--man]"
             echo ""
             echo "  --ip <IP>      IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)"
-            echo "  --env          Entorno para leer .env.public (default: prod)"
+            echo "  --env <env>    Entorno para leer .env.public (default: prod)"
             echo "  --key <path>   Ruta a clave pública SSH (default: auto-detectar)"
             echo "  --keys-only    Solo copia claves; no cambia contraseña root"
+            echo "  --man          Muestra el manual de uso en la terminal"
             exit 0
             ;;
         *)
             log_error "Argumento desconocido: $1"
-            echo "   Uso: $0 [--ip <IP>] [--env <env>] [--key <path>] [--keys-only]"
+            echo "   Uso: $0 [--ip <IP>] [--env <env>] [--key <path>] [--keys-only] [--man]"
             exit 1
             ;;
     esac

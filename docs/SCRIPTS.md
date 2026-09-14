@@ -174,9 +174,10 @@ ssh root@<router-ip> 'logread'                          # buffer RAM (funciona e
 Copia la clave SSH pública al router (`/etc/dropbear/authorized_keys`) y establece la contraseña de root de forma interactiva.
 
 ```bash
-scripts/router/setup-auth.sh --env prod
+scripts/router/setup-auth.sh --ip 192.168.1.1 --env prod
 scripts/router/setup-auth.sh --key ~/.ssh/id_ed25519.pub  # Clave explícita
 scripts/router/setup-auth.sh --keys-only                  # Solo copia claves
+scripts/router/setup-auth.sh --man                        # Manual completo
 ```
 
 Auto-detecta la clave pública local en orden: `id_ed25519.pub` > `id_ecdsa.pub` > `id_rsa.pub`. Previene duplicados con `grep -qF`.

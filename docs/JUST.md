@@ -120,7 +120,7 @@ Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexi
 | Recipe | Uso | Descripción |
 |--------|-----|-------------|
 | `router-copy-keys` | `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root. |
-| `router-setup-auth` | `just router-setup-auth [IP] [env] [key]` | Copia clave SSH y configura contraseña root. |
+| `router-setup-auth` | `just router-setup-auth [--ip <IP>] [--env <dev\|prod>] [--key <path>] [--man]` | Copia clave SSH y configura contraseña root. |
 | `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | Configura USB como extroot. Requiere USB ext4. |
 | `host-format-extroot-usb` | `just host-format-extroot-usb --list` o `just host-format-extroot-usb --device /dev/sdX1` | Borra/formatea una particion USB local como ext4 para extroot. Ejecutar desde `bastion-wifi` o la maquina con el USB conectado. |
 | `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `just host-recover-extroot-usb --device /dev/sdX1` | Repara ext4 con `e2fsck`, monta read-only y crea backup `.tar.gz` del USB extroot local. No formatea. |
@@ -128,11 +128,20 @@ Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexi
 | `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | Configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
 | `router-post-install` | `just router-post-install [grupo] [IP] [env]` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
 
+`--env` selecciona el perfil de despliegue. `prod` usa los valores de producción y `dev` los valores de desarrollo; no cambia el modo del router. Si ambos perfiles apuntan a `192.168.1.1`, ambos operan sobre el mismo router físico.
+
+Para consultar este manual directamente desde el flujo de autenticación:
+
+```bash
+just router-setup-auth --man
+```
+
 Ejemplos:
 
 ```bash
 just router-copy-keys --ip 192.168.1.1
-just router-setup-auth 192.168.1.1
+just router-setup-auth --ip 192.168.1.1 --env prod
+just router-setup-auth --ip 192.168.1.1 --key ~/.ssh/id_ed25519.pub
 just host-format-extroot-usb --list
 just host-recover-extroot-usb --device /dev/sdb1
 just host-format-extroot-usb --device /dev/sdb1

@@ -70,7 +70,7 @@ just router-copy-keys --ip 192.168.1.1
 Si tambien necesitas establecer la contrasena root manualmente:
 
 ```bash
-just router-setup-auth 192.168.1.1 prod
+just router-setup-auth --ip 192.168.1.1 --env prod
 ```
 
 ## 4. Recuperar el USB en `bastion-wifi`

@@ -425,15 +425,11 @@ router-setup-logs-file ip="" env="prod":
 
 # router-setup-auth: Copia clave SSH pública al router y establece contraseña root
 # Orden recomendado: primero copia la clave, luego pide contraseña (evita bloqueos)
-# Uso: just router-setup-auth [ip=<IP>] [env=<env>] [key=<path>]
-router-setup-auth ip="" env="prod" key="":
+# Uso: just router-setup-auth [--ip <IP>] [--env <env>] [--key <path>] [--man]
+router-setup-auth *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="--env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
-    if [ -n "{{ key }}" ]; then ARGS="${ARGS} --key {{ key }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-auth.sh ${ARGS}
+    scripts/router/setup-auth.sh {{args}}
 
 # router-copy-keys: Copiar clave SSH pública a Dropbear sin cambiar contraseña root
 # Uso: just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]
