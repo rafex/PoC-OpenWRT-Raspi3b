@@ -37,7 +37,7 @@ backend externo (portal cautivo) --HTTP+token--> router-agent (contenedor)
 ## Uso rápido
 
 ```bash
-just router-captive-setup portal-url=https://portal.example.com   # prerrequisito
+just router-captive-setup 192.168.1.1 prod 30 https://portal.example.com   # prerrequisito
 just router-agent-provision                                        # llave restringida
 just router-agent-build-go                                         # o router-agent-build-rust
 just router-agent-run-go                                           # levanta el contenedor

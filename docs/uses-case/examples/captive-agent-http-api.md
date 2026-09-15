@@ -22,9 +22,9 @@ flowchart LR
 
 ## Prerrequisitos
 
-1. Portal cautivo instalado en modo externo:
+1. Portal cautivo instalado en modo externo (recetas posicionales — `ip env timeout portal-url token`, ver [docs/JUST.md](../../JUST.md)):
    ```bash
-   just router-captive-setup portal-url=https://portal.example.com
+   just router-captive-setup 192.168.1.1 prod 30 https://portal.example.com
    ```
 2. Llave SSH restringida aprovisionada:
    ```bash
