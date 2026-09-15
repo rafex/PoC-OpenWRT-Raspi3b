@@ -1,0 +1,27 @@
+# mock-sshd — SSH server mínimo para benchmarks de alta concurrencia sin
+# martillar el router físico. Acepta la llave de benchmark, restringida por
+# forced-command al mismo mock-dispatch.sh, que simula la latencia real del
+# router (MOCK_LATENCY_MS).
+#
+# bench/run.sh genera un keypair de benchmark (fuera del repo) y copia
+# bench-key.pub a este directorio antes de construir la imagen — ese archivo
+# es un artefacto temporal, no se commitea (ver .gitignore).
+FROM alpine:3.20
+
+RUN apk add --no-cache openssh-server && ssh-keygen -A
+
+COPY mock-dispatch.sh /usr/local/bin/mock-dispatch.sh
+RUN chmod +x /usr/local/bin/mock-dispatch.sh
+
+# bench-key.pub se copia al contexto de build por run.sh antes de construir.
+COPY bench-key.pub /tmp/bench-key.pub
+RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
+    awk '{print "command=\"/usr/local/bin/mock-dispatch.sh\",no-pty,no-agent-forwarding,no-X11-forwarding,no-port-forwarding "$1" "$2}' \
+        /tmp/bench-key.pub > /root/.ssh/authorized_keys && \
+    chmod 600 /root/.ssh/authorized_keys && \
+    rm -f /tmp/bench-key.pub && \
+    sed -i 's/#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+ENV MOCK_LATENCY_MS=150
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]

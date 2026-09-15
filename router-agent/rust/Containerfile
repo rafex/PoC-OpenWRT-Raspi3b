@@ -1,0 +1,34 @@
+# router-agent (Rust) — multi-stage, musl static binary.
+#
+# rust:1-alpine's HOST triple already matches the build machine's arch
+# (x86_64-unknown-linux-musl on amd64, aarch64-unknown-linux-musl on arm64 —
+# it's a multi-arch image). Deliberately NOT pinning --target to a specific
+# triple: that would force a cross-compile on whichever arch doesn't match
+# the pin, needing extra targets/toolchains this image doesn't install.
+# Building without --target always uses the image's native host target,
+# which is musl either way — so the binary stays static and portable across
+# build hosts. The only extra packages needed are a C toolchain for the
+# `ring` crate (our SSH crate, russh, links it for crypto; ring itself is
+# not pure-Rust, but it is a small, well-audited, statically-linkable
+# dependency with no dynamic OpenSSL requirement, which is what actually
+# matters for a scratch image). See README.md for the full SSH crate decision.
+FROM rust:1-alpine AS build
+RUN apk add --no-cache musl-dev gcc perl make
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN cargo build --release && \
+    strip target/release/router-agent
+
+# Final stage: no shell, no package manager, no libc other than what's
+# statically linked into the binary — the smallest possible attack surface
+# for an image that holds a restricted SSH private key.
+#
+# USER 65532:65532 — same numeric nonroot UID/GID as the Go sibling's
+# gcr.io/distroless/static-debian12:nonroot base, for identical security
+# posture. `scratch` has no /etc/passwd, so a numeric UID (which needs no
+# name resolution) is required here instead of a username.
+FROM scratch
+COPY --from=build /src/target/release/router-agent /router-agent
+USER 65532:65532
+ENTRYPOINT ["/router-agent"]

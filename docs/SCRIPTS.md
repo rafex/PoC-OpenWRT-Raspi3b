@@ -35,7 +35,9 @@ scripts/
 │   ├── setup-logs-ram.sh       # Buffer de logs en RAM (64 KB, sin USB)
 │   ├── setup-logs-file.sh      # Logs persistentes en archivo (USB/extroot)
 │   ├── setup-captive.sh        # Portal cautivo nftables + uhttpd
+│   ├── setup-captive-agent.sh  # Llave SSH restringida para el router-agent HTTP
 │   ├── setup-wifi.sh           # Gestión WiFi (AP interactivo, cliente, scan, disconnect)
+│   ├── setup-usb-tether.sh     # Uplink via tethering USB (teléfono RNDIS/CDC-Ethernet)
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
 │   ├── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
 │   ├── setup-dns.sh            # Servidores DNS upstream de dnsmasq
@@ -209,6 +211,28 @@ Características:
 
 Prerrequisito: `just router-post-install captive_portal` (instala `uhttpd`).
 
+### router/setup-captive-agent.sh
+
+Aprovisiona una **segunda** llave SSH en el router, independiente de la llave admin (`setup-auth.sh`), restringida vía forced-command de Dropbear (`command="..."` en `authorized_keys`) a solo poder invocar el dispatcher `/etc/captive/agent-dispatch.sh` — que a su vez solo acepta `allow <ip> [timeout]`, `block <ip>`, `list` o `status` sobre el set nftables `allowed_clients` del portal cautivo. Esta llave es la que usa `router-agent/{go,rust}` para exponer una API HTTP a un backend externo sin darle nunca shell ni acceso root.
+
+```bash
+scripts/router/setup-captive-agent.sh install                # Genera y aprovisiona la llave
+scripts/router/setup-captive-agent.sh install --env dev
+scripts/router/setup-captive-agent.sh rotate-key              # Rota sin ventana de bloqueo
+scripts/router/setup-captive-agent.sh uninstall                # Retira llave + dispatcher
+scripts/router/setup-captive-agent.sh status                   # Verifica instalación
+```
+
+Prerrequisito: portal cautivo instalado (`just router-captive-setup`) — este script no crea la tabla nftables `ip captive`, solo añade una puerta de entrada adicional y más angosta para operarla.
+
+`install` genera un keypair ed25519 local, sube el dispatcher, añade la línea `authorized_keys` con `command=,no-pty,no-agent-forwarding,no-X11-forwarding,no-port-forwarding`, y corre un **self-test** que verifica en runtime (no por asunción) que Dropbear realmente fuerza el comando: prueba que un comando no permitido (`id`) no devuelve salida de shell real, y que `status` sí responde con la salida estructurada del dispatcher. Si el self-test falla, revierte la instalación.
+
+La llave privada se guarda en `environments/<env>/secrets.enc.yaml` (clave `CAPTIVE_AGENT_SSH_PRIVATE_KEY`, vía `sops set`, mismo flujo que `WIREGUARD_PRIVATE_KEY`); la pública se commitea como `environments/<env>/captive-agent-key.pub`. Ver [docs/SECRETS.md](SECRETS.md).
+
+`rotate-key` instala la llave nueva junto a la anterior, la verifica, y solo entonces retira la vieja — evita quedarte sin acceso si algo falla a mitad de camino. `uninstall` retira únicamente esta llave y el dispatcher; nunca toca la tabla nftables del portal (eso lo gestiona `setup-captive.sh`).
+
+Ver [router-agent/README.md](../router-agent/README.md) para el servicio HTTP que consume esta llave, y [docs/uses-case/examples/captive-agent-http-api.md](uses-case/examples/captive-agent-http-api.md) para el flujo completo con un portal cautivo externo.
+
 ### router/setup-wifi.sh
 
 Gestión completa de la configuración WiFi del router via UCI.
@@ -252,6 +276,26 @@ Alias de radio: `radio0`, `radio1`, `2g`, `5g`, `2.4ghz`, `5ghz`.
 - BSSID: pregunta `¿Especificar BSSID? (s/N)` — solo pide el valor si responde `s`.
 
 Modo cliente crea la interfaz `wwan` (protocolo DHCP), la añade a la zona WAN del firewall y acepta DNS del upstream (`peerdns=1`).
+
+### router/setup-usb-tether.sh
+
+Usa un teléfono conectado por USB (con tethering/"Compartir internet" activado) como uplink alternativo, igual que `setup-wifi.sh client` hace con WiFi pero para el dispositivo de red que expone el teléfono via USB (RNDIS o CDC-Ethernet).
+
+```bash
+scripts/router/setup-usb-tether.sh enable    # detecta el dispositivo USB y lo configura como uplink
+scripts/router/setup-usb-tether.sh status    # dispositivo detectado + estado del uplink (IP, gateway)
+scripts/router/setup-usb-tether.sh disable   # retira el uplink (no toca el dispositivo/teléfono)
+```
+
+Subcomandos: `enable`, `disable`, `status`.
+
+**Prerrequisito:** activar tethering/"Compartir internet" USB en el teléfono antes de `enable` — con el teléfono en modo carga/almacenamiento no aparece ningún dispositivo de red para detectar. Requiere `kmod-usb-net-rndis`/`kmod-usb-net-cdc-ether` en el firmware (ver `config/openwrt-packages.toml`, categoría `usb`).
+
+**Detección por driver, no por nombre fijo:** el nombre de interfaz que asigna el kernel (`usb0`, típicamente) puede no ser estable entre reconexiones. El script busca el dispositivo cuyo driver sea `rndis_host` o `cdc_ether` en `/sys/class/net/*/device/uevent`, en vez de asumir un nombre.
+
+`enable` crea la interfaz UCI `usbwan` (`proto=dhcp`, `device=<detectado>`) y la añade a la zona firewall `wan` — mismo patrón que `wwan`. Convive con otros uplinks (WAN físico, `wwan`) ya configurados; cuál de ellos gana como ruta por defecto lo decide el kernel por métrica, igual que hoy conviven WAN y `wwan`. Para fijar prioridad explícita, usar `setup-routing.sh`.
+
+`status` consulta el estado real via `ifstatus <interfaz>` (ubus), no `ip addr show usbwan` — `usbwan` es un nombre lógico UCI, no un dispositivo de kernel, así que hay que preguntarle a netifd (mismo patrón que ya usa `scripts/router/status.sh`).
 
 ### router/setup-dns.sh
 

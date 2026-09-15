@@ -1,0 +1,14 @@
+# Multi-stage build producing a static router-agent binary with no shell in
+# the final image. The image holds a mounted, restricted SSH private key at
+# runtime, so we minimize what an RCE in the Go process could pivot to:
+# distroless "static" has no shell, no package manager, no coreutils.
+
+FROM golang:1.23-alpine AS build
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/router-agent ./cmd/router-agent
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/router-agent /router-agent
+USER nonroot:nonroot
+ENTRYPOINT ["/router-agent"]

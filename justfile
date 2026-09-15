@@ -535,6 +535,114 @@ router-captive-status ip="" env="prod":
     scripts/router/setup-captive.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
+# Router Agent (API HTTP externa allow/block sobre el portal cautivo)
+# Prerrequisito: portal cautivo instalado (just router-captive-setup).
+# Llave SSH separada de la admin, restringida por forced-command en Dropbear.
+# ---------------------------------------------------------------------------
+
+# router-agent-provision: Genera y aprovisiona la llave SSH restringida del agente
+# Uso: just router-agent-provision [ip=] [env=]
+router-agent-provision ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="install --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-captive-agent.sh ${ARGS}
+
+# router-agent-rotate-key: Rota la llave SSH restringida sin ventana de bloqueo
+# Uso: just router-agent-rotate-key [ip=] [env=]
+router-agent-rotate-key ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="rotate-key --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-captive-agent.sh ${ARGS}
+
+# router-agent-uninstall: Retira la llave restringida y el dispatcher del router
+# Uso: just router-agent-uninstall [ip=] [env=]
+router-agent-uninstall ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="uninstall --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-captive-agent.sh ${ARGS}
+
+# router-agent-status: Verifica el estado de la llave restringida y el dispatcher
+# Uso: just router-agent-status [ip=] [env=]
+router-agent-status ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="status --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-captive-agent.sh ${ARGS}
+
+# router-agent-build-go: Construye la imagen Podman del agente (Go)
+# --network=host solo para el build (descarga de módulos Go) — la imagen
+# final no hereda esto, corre con el networking que le des en `podman run`.
+router-agent-build-go tag="router-agent-go:dev":
+    podman build --network=host -t {{ tag }} -f router-agent/go/Containerfile router-agent/go
+
+# router-agent-build-rust: Construye la imagen Podman del agente (Rust)
+# --network=host solo para el build (descarga de crates) — idem arriba.
+router-agent-build-rust tag="router-agent-rust:dev":
+    podman build --network=host -t {{ tag }} -f router-agent/rust/Containerfile router-agent/rust
+
+# router-agent-run-go: Corre el contenedor del agente Go localmente para pruebas
+# Extrae la llave privada de secrets solo en memoria/tmp — nunca la commitea.
+# Uso: just router-agent-run-go [env=] [tag=]
+router-agent-run-go env="prod" tag="router-agent-go:dev":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source scripts/install/ensure-secrets.sh
+    SECRETS_TMP=$(ensure_secrets "{{ env }}")
+    KEY_TMP=$(mktemp)
+    trap 'rm -f "${KEY_TMP}"; cleanup_secrets' EXIT
+    get_secret_value "CAPTIVE_AGENT_SSH_PRIVATE_KEY" "${SECRETS_TMP}" > "${KEY_TMP}"
+    # 644, no 600: ambas imágenes corren como UID no-root (65532) dentro del
+    # contenedor, distinto al UID dueño de este archivo en el host — sin
+    # esto, sshclient falla con "permission denied" al leer la llave.
+    chmod 644 "${KEY_TMP}"
+    podman run --rm -it \
+        -p 8443:8443 \
+        -v "${KEY_TMP}:/secrets/captive-agent-key:ro" \
+        -v "$(pwd)/environments/{{ env }}/.router-known-hosts:/secrets/router-known-hosts:ro" \
+        -e ROUTER_AGENT_SSH_HOST="$(source environments/{{ env }}/.env.public; echo "${ROUTER_IP:-192.168.1.1}")" \
+        -e ROUTER_AGENT_SSH_KEY_PATH=/secrets/captive-agent-key \
+        -e ROUTER_AGENT_SSH_KNOWN_HOSTS_PATH=/secrets/router-known-hosts \
+        {{ tag }}
+
+# router-agent-run-rust: Corre el contenedor del agente Rust localmente para pruebas
+router-agent-run-rust env="prod" tag="router-agent-rust:dev":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source scripts/install/ensure-secrets.sh
+    SECRETS_TMP=$(ensure_secrets "{{ env }}")
+    KEY_TMP=$(mktemp)
+    trap 'rm -f "${KEY_TMP}"; cleanup_secrets' EXIT
+    get_secret_value "CAPTIVE_AGENT_SSH_PRIVATE_KEY" "${SECRETS_TMP}" > "${KEY_TMP}"
+    # 644, no 600: ambas imágenes corren como UID no-root (65532) dentro del
+    # contenedor, distinto al UID dueño de este archivo en el host — sin
+    # esto, sshclient falla con "permission denied" al leer la llave.
+    chmod 644 "${KEY_TMP}"
+    podman run --rm -it \
+        -p 8443:8443 \
+        -v "${KEY_TMP}:/secrets/captive-agent-key:ro" \
+        -v "$(pwd)/environments/{{ env }}/.router-known-hosts:/secrets/router-known-hosts:ro" \
+        -e ROUTER_AGENT_SSH_HOST="$(source environments/{{ env }}/.env.public; echo "${ROUTER_IP:-192.168.1.1}")" \
+        -e ROUTER_AGENT_SSH_KEY_PATH=/secrets/captive-agent-key \
+        -e ROUTER_AGENT_SSH_KNOWN_HOSTS_PATH=/secrets/router-known-hosts \
+        {{ tag }}
+
+# router-agent-bench: Corre el harness de benchmark Go vs Rust
+# Uso: just router-agent-bench [target=mock-sshd]
+router-agent-bench target="mock-sshd":
+    router-agent/bench/run.sh --target {{ target }}
+
+# ---------------------------------------------------------------------------
 # WiFi (APs y modo cliente)
 # ---------------------------------------------------------------------------
 
@@ -620,6 +728,41 @@ router-wifi-disable radio="" ip="" env="prod":
     if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
     scripts/router/setup-wifi.sh ${ARGS}
+
+# ---------------------------------------------------------------------------
+# Tethering USB (uplink via teléfono conectado por USB)
+# Prerrequisito: activar "Compartir internet"/USB tethering en el teléfono.
+# ---------------------------------------------------------------------------
+
+# router-usb-tether-enable: Detecta el dispositivo USB de red y lo usa como uplink
+# Uso: just router-usb-tether-enable [ip=] [env=]
+router-usb-tether-enable ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="enable --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-usb-tether.sh ${ARGS}
+
+# router-usb-tether-disable: Retira el uplink USB (no toca el dispositivo/teléfono)
+# Uso: just router-usb-tether-disable [ip=] [env=]
+router-usb-tether-disable ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="disable --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-usb-tether.sh ${ARGS}
+
+# router-usb-tether-status: Dispositivo USB detectado + estado del uplink
+# Uso: just router-usb-tether-status [ip=] [env=]
+router-usb-tether-status ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ARGS="status --env {{ env }}"
+    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
+    # shellcheck disable=SC2086
+    scripts/router/setup-usb-tether.sh ${ARGS}
 
 # ---------------------------------------------------------------------------
 # Routing (prioridad WAN vs WiFi cliente y source-based routing)

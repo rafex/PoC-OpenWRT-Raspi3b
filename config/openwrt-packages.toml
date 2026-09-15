@@ -45,6 +45,11 @@ ram_mb = 64
   "kmod-fs-ext4",
   "block-mount"
 ]
+"USB Networking (tethering)" = [
+  "kmod-usb-net",
+  "kmod-usb-net-rndis",
+  "kmod-usb-net-cdc-ether"
+]
 
 [categories.vpn]
 "WireGuard VPN" = ["wireguard-tools", "kmod-wireguard"]

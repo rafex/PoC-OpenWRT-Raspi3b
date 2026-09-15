@@ -26,11 +26,12 @@ environments/{dev,prod}/
 `secrets.enc.yaml` contiene **solo contraseñas y claves privadas**:
 
 ```yaml
-WIFI_KEY_24: ""           # Contraseña red 2.4 GHz
-WIFI_KEY_5: ""            # Contraseña red 5 GHz
-WIREGUARD_PRIVATE_KEY: "" # Clave privada WireGuard
-DROPBEAR_RSA_HOST_KEY: "" # Host key privada de Dropbear
-ROOT_PASSWORD_HASH: ""    # Hash SHA-512-crypt para /etc/shadow
+WIFI_KEY_24: ""                      # Contraseña red 2.4 GHz
+WIFI_KEY_5: ""                       # Contraseña red 5 GHz
+WIREGUARD_PRIVATE_KEY: ""            # Clave privada WireGuard
+DROPBEAR_RSA_HOST_KEY: ""            # Host key privada de Dropbear
+ROOT_PASSWORD_HASH: ""               # Hash SHA-512-crypt para /etc/shadow
+CAPTIVE_AGENT_SSH_PRIVATE_KEY: ""    # Clave privada SSH restringida del router-agent
 ```
 
 Los **nombres de red** (SSID) van en `.env.public` — no son secretos:
@@ -39,6 +40,12 @@ Los **nombres de red** (SSID) van en `.env.public` — no son secretos:
 WIFI_SSID_24=MiRed24
 WIFI_SSID_5=MiRed5G
 ```
+
+### Clave SSH restringida del router-agent
+
+`CAPTIVE_AGENT_SSH_PRIVATE_KEY` es una llave SSH **independiente** de la que usa `setup-auth.sh` (la llave admin, con shell completo). Esta llave está limitada en el router por un `command=` forced-command de Dropbear que solo permite `allow`/`block`/`list`/`status` sobre el set nftables del portal cautivo — nunca un shell. La genera y guarda `just router-agent-provision` (ver [docs/SCRIPTS.md](SCRIPTS.md#routersetup-captive-agentsh)); la usa el contenedor `router-agent/{go,rust}` para exponer una API HTTP a un backend externo (p.ej. un portal cautivo con lógica de negocio propia) sin que ese backend externo reciba nunca la llave admin.
+
+La llave pública correspondiente se commitea sin encryptar como `environments/<env>/captive-agent-key.pub` (no es secreta, igual que `.age-pubkey.txt`).
 
 ## Setup inicial (una sola vez)
 

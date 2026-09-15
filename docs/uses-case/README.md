@@ -7,9 +7,11 @@ Esta carpeta documenta flujos operativos completos construidos con las herramien
 | Caso | Archivo |
 |------|---------|
 | Uplink WiFi 2.4 GHz + AP 5 GHz | [examples/wifi-uplink-24ghz-ap-5ghz.md](examples/wifi-uplink-24ghz-ap-5ghz.md) |
+| Uplink via tethering USB (datos móviles de un teléfono) | [examples/usb-tether-uplink.md](examples/usb-tether-uplink.md) |
 | Reservas DHCP e inventario de clientes | [examples/static-dhcp-and-inventory.md](examples/static-dhcp-and-inventory.md) |
 | Diagnóstico de comunicación LAN | [examples/lan-connectivity-doctor.md](examples/lan-connectivity-doctor.md) |
 | Portal cautivo local | [examples/captive-portal-local.md](examples/captive-portal-local.md) |
+| API HTTP para portal cautivo externo (router-agent) | [examples/captive-agent-http-api.md](examples/captive-agent-http-api.md) |
 | Proxy Tor transparente para `.onion` | [examples/tor-onion-transparent-proxy.md](examples/tor-onion-transparent-proxy.md) |
 | Port forwarding del proxy SOCKS de Tor | [examples/socks-forward-to-raspi.md](examples/socks-forward-to-raspi.md) |
 | Backup, build y actualización segura | [examples/backup-build-update.md](examples/backup-build-update.md) |

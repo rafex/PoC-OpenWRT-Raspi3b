@@ -1,0 +1,215 @@
+openapi: 3.0.3
+info:
+  title: router-agent
+  version: "1.0.0"
+  description: >
+    Puente HTTP-a-SSH angosto para autorizar/revocar IPs en el set nftables
+    "allowed_clients" del portal cautivo (scripts/router/setup-captive.sh),
+    sin exponer la llave SSH admin del router. Las implementaciones Go y Rust
+    en router-agent/{go,rust}/ deben cumplir este contrato de forma idéntica.
+servers:
+  - url: http://localhost:8443
+security:
+  - RouterAgentToken: []
+paths:
+  /v1/allow:
+    post:
+      summary: Autoriza una IP en el portal cautivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip:
+                  type: string
+                  format: ipv4
+                  example: "192.168.1.146"
+                timeout_min:
+                  type: integer
+                  minimum: 0
+                  default: 30
+                  description: "Minutos de sesión. 0 = permanente (sin expiración)."
+      responses:
+        "200":
+          description: IP autorizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllowResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/RouterCommandFailed"
+        "504":
+          $ref: "#/components/responses/RouterTimeout"
+  /v1/block:
+    post:
+      summary: Revoca la autorización de una IP (idempotente)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip:
+                  type: string
+                  format: ipv4
+                  example: "192.168.1.146"
+      responses:
+        "200":
+          description: "IP bloqueada (o ya no estaba presente — idempotente, nunca 404)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/RouterCommandFailed"
+        "504":
+          $ref: "#/components/responses/RouterTimeout"
+  /v1/list:
+    get:
+      summary: Lista los clientes actualmente autorizados
+      responses:
+        "200":
+          description: Lista de clientes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/RouterCommandFailed"
+        "504":
+          $ref: "#/components/responses/RouterTimeout"
+  /v1/status:
+    get:
+      summary: Estado del router y latencia SSH
+      description: >
+        Nunca responde 5xx por condiciones del lado del router (tabla ausente,
+        router inalcanzable) — esas se reportan como 200 con los campos en
+        false/null. Solo 5xx para errores internos del propio agente.
+      responses:
+        "200":
+          description: Estado observado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /healthz:
+    get:
+      summary: Liveness del proceso (sin auth, sin SSH)
+      security: []
+      responses:
+        "200":
+          description: Proceso vivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+components:
+  securitySchemes:
+    RouterAgentToken:
+      type: apiKey
+      in: header
+      name: X-Router-Agent-Token
+  schemas:
+    AllowResponse:
+      type: object
+      properties:
+        ip: { type: string }
+        status: { type: string, enum: [allowed] }
+        timeout_min: { type: integer }
+    BlockResponse:
+      type: object
+      properties:
+        ip: { type: string }
+        status: { type: string, enum: [blocked] }
+    ClientEntry:
+      type: object
+      properties:
+        ip: { type: string }
+        permanent: { type: boolean }
+        expires_in_sec:
+          type: integer
+          nullable: true
+    ListResponse:
+      type: object
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClientEntry"
+    StatusResponse:
+      type: object
+      properties:
+        router_reachable: { type: boolean }
+        nft_table_present: { type: boolean, nullable: true }
+        ssh_latency_ms: { type: integer, nullable: true }
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          enum:
+            - invalid_ip
+            - invalid_timeout
+            - unauthorized
+            - forbidden_ip
+            - router_unreachable
+            - router_command_failed
+            - router_timeout
+            - internal_error
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: IP o timeout inválido
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Token ausente o inválido
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: IP de origen fuera del allowlist
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RouterCommandFailed:
+      description: El dispatcher del router devolvió un error operacional
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RouterTimeout:
+      description: El comando SSH excedió ROUTER_AGENT_SSH_TIMEOUT_MS
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

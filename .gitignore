@@ -56,6 +56,13 @@ config/openwrt-packages.txt
 # ── Backups locales del router (no versionar) ──
 backups/
 
+# ── router-agent (build artifacts y resultados de benchmark) ──
+router-agent/*/target/
+router-agent/go/router-agent
+router-agent/bench/results/*
+!router-agent/bench/results/.gitkeep
+router-agent/bench/mock-sshd/bench-key.pub
+
 # ── IDEs y editors ──
 .vscode/
 .idea/
