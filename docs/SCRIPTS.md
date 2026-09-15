@@ -242,6 +242,7 @@ Gestión completa de la configuración WiFi del router via UCI.
 scripts/router/setup-wifi.sh ap                           # detecta radios libres → SSID → pass → canal
 scripts/router/setup-wifi.sh ap --ssid MiRed --radio 5g  # pre-selecciona radio y SSID
 scripts/router/setup-wifi.sh ap --ssid Libre --open       # sin contraseña
+scripts/router/setup-wifi.sh ap --ssid MiRed --password clave1234 --hidden  # SSID oculto
 
 # Cliente WiFi — interactivo o con flags
 scripts/router/setup-wifi.sh client                        # elige banda → escanea → SSID → pass

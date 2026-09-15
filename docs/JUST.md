@@ -208,8 +208,8 @@ just router-reboot --ip 192.168.1.1 --wait
 
 | Recipe | Uso | Descripción |
 |--------|-----|-------------|
-| `router-wifi-setup` | `just router-wifi-setup <subcmd> [IP] [env] [ssid] [password] [radio] [channel] [open]` | Wrapper parametrizado para `setup-wifi.sh`. |
-| `router-wifi-ap` | `just router-wifi-ap [--radio <r>] [--ssid <s>] [--channel <c>] [--open] [--env <env>]` | Configura AP; sin flags guía interactivamente. |
+| `router-wifi-setup` | `just router-wifi-setup <subcmd> [IP] [env] [ssid] [password] [radio] [channel] [open] [hidden]` | Wrapper parametrizado para `setup-wifi.sh`. |
+| `router-wifi-ap` | `just router-wifi-ap [--radio <r>] [--ssid <s>] [--channel <c>] [--open] [--hidden] [--env <env>]` | Configura AP; sin flags guía interactivamente. |
 | `router-wifi-client` | `just router-wifi-client [--radio <r>] [--ssid <s>] [--env <env>]` | Conecta el router como cliente WiFi; puede escanear y pedir password. |
 | `router-wifi-disconnect` | `just router-wifi-disconnect [radio] [IP] [env]` | Elimina interfaz STA/wwan; sin radio desconecta todos los clientes STA. |
 | `router-wifi-scan` | `just router-wifi-scan [--radio <r>] [--ip <IP>] [--env <env>]` | Escanea redes WiFi disponibles. |

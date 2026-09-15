@@ -47,6 +47,7 @@ _BSSID=""
 _CHANNEL="auto"
 _ENCRYPTION="psk2"
 _OPEN=false
+_HIDDEN=false
 
 _show_help() {
     cat << 'HELP'
@@ -67,6 +68,7 @@ Opciones:
   --ssid <nombre>      Nombre de red
   --password <pass>    Contraseña WPA2 (≥8 chars)
   --open               Sin contraseña
+  --hidden             Oculta el SSID (no se anuncia en broadcast; solo AP)
   --channel <n>        Canal (auto por defecto)
   --encryption <tipo>  none|psk|psk2 (default: psk2)
   --ip <IP>            IP del router
@@ -76,6 +78,7 @@ Ejemplos:
   setup-wifi.sh ap --ssid "MiRed" --password "clave1234"
   setup-wifi.sh ap --ssid "MiRed5G" --radio 5g --channel 36
   setup-wifi.sh ap --ssid "Libre" --open
+  setup-wifi.sh ap --ssid "MiRed" --password "clave1234" --hidden
   setup-wifi.sh client --ssid "RedExterna" --password "supass"
   setup-wifi.sh client --ssid "RedExterna" --radio radio1 --password "supass"
   setup-wifi.sh scan
@@ -103,6 +106,7 @@ while [[ $# -gt 0 ]]; do
         --encryption) _ENCRYPTION="${2:?}"; shift 2 ;;
         --bssid)      _BSSID="${2:?}"; shift 2 ;;
         --open)       _OPEN=true; _ENCRYPTION="none"; shift ;;
+        --hidden)     _HIDDEN=true; shift ;;
         -h|--help)    _show_help; exit 0 ;;
         *) log_error "Opción desconocida: $1"; exit 1 ;;
     esac
@@ -258,6 +262,7 @@ _ap() {
     echo "   SSID:    ${_SSID}"
     echo "   Cifrado: ${_ENCRYPTION}"
     echo "   Canal:   ${_CHANNEL}"
+    "${_HIDDEN}" && echo "   Oculto:  sí (no se anuncia en broadcast)"
     echo ""
     read -r -p "¿Continuar? (s/N) " ans
     [ "$(echo "${ans}" | tr '[:upper:]' '[:lower:]')" != "s" ] && { echo "Cancelado."; exit 0; }
@@ -266,6 +271,7 @@ _ap() {
     local password="${_PASSWORD}"
     local encryption="${_ENCRYPTION}"
     local channel="${_CHANNEL}"
+    local hidden="${_HIDDEN}"
 
     router_ssh sh - << EOF
 set -eu
@@ -274,6 +280,7 @@ SSID="${ssid}"
 PASSWORD="${password}"
 ENCRYPTION="${encryption}"
 CHANNEL="${channel}"
+HIDDEN="${hidden}"
 
 echo "Buscando interfaz AP en \${RADIO}..."
 
@@ -303,6 +310,12 @@ fi
 uci set wireless.@wifi-iface[\$FOUND].ssid="\$SSID"
 uci set wireless.@wifi-iface[\$FOUND].disabled='0'
 
+if [ "\$HIDDEN" = "true" ]; then
+    uci set wireless.@wifi-iface[\$FOUND].hidden='1'
+else
+    uci set wireless.@wifi-iface[\$FOUND].hidden='0'
+fi
+
 if [ "\$ENCRYPTION" = "none" ]; then
     uci set wireless.@wifi-iface[\$FOUND].encryption='none'
     uci -q delete wireless.@wifi-iface[\$FOUND].key 2>/dev/null || true
@@ -328,10 +341,15 @@ echo "✅ AP configurado:"
 echo "   SSID:    \$SSID"
 echo "   Cifrado: \$ENCRYPTION"
 echo "   Radio:   \$RADIO"
+[ "\$HIDDEN" = "true" ] && echo "   Oculto:  sí"
 EOF
 
     echo ""
-    log_info "✅ Access Point listo. Busca '${_SSID}' en tus dispositivos."
+    if "${_HIDDEN}"; then
+        log_info "✅ Access Point listo. SSID '${_SSID}' oculto — conéctate ingresando el nombre de red manualmente."
+    else
+        log_info "✅ Access Point listo. Busca '${_SSID}' en tus dispositivos."
+    fi
 }
 
 # ---------------------------------------------------------------------------

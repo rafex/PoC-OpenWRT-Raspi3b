@@ -648,7 +648,7 @@ router-agent-bench target="mock-sshd":
 
 # router-wifi-setup: Configura WiFi en el router (AP o cliente)
 # Ver subcomandos con: just router-wifi-setup help
-router-wifi-setup subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" open="false":
+router-wifi-setup subcmd="" ip="" env="prod" ssid="" password="" radio="" channel="" open="false" hidden="false":
     #!/usr/bin/env bash
     set -euo pipefail
     ARGS="{{ subcmd }} --env {{ env }}"
@@ -658,6 +658,7 @@ router-wifi-setup subcmd="" ip="" env="prod" ssid="" password="" radio="" channe
     if [ -n "{{ radio }}" ];    then ARGS="${ARGS} --radio {{ radio }}"; fi
     if [ -n "{{ channel }}" ];  then ARGS="${ARGS} --channel {{ channel }}"; fi
     if [ "{{ open }}" = "true" ]; then ARGS="${ARGS} --open"; fi
+    if [ "{{ hidden }}" = "true" ]; then ARGS="${ARGS} --hidden"; fi
     # shellcheck disable=SC2086
     scripts/router/setup-wifi.sh ${ARGS}
 
