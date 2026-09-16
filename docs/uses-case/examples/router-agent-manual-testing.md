@@ -6,6 +6,8 @@ Levantar `router-agent` (Go y Rust en paralelo) en una máquina con acceso direc
 
 Validado en vivo: Go en `:8443`, Rust en `:8444`, ambos contra el mismo router real, mismas mutaciones visibles desde ambos (`allow` por uno, `list` por el otro).
 
+> Si preferís un cliente gráfico (Postman/Insomnia/Bruno) en vez de `curl`, importá [`router-agent/openapi/openapi.yaml`](../../../router-agent/openapi/openapi.yaml) — genera las 5 requests solo, con los ejemplos de este documento ya cargados. Ver [`router-agent/openapi/README.md`](../../../router-agent/openapi/README.md).
+
 ## Prerrequisitos
 
 1. La máquina donde corre `router-agent` necesita **acceso directo a la LAN del router** (no basta con acceso a internet) — no funciona detrás de un bridge SSH como se usó en otras partes de este proyecto.

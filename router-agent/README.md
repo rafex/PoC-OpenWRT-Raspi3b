@@ -31,7 +31,7 @@ backend externo (portal cautivo) --HTTP+token--> router-agent (contenedor)
 
 - **Llave SSH restringida**: aprovisionada por [`scripts/router/setup-captive-agent.sh`](../scripts/router/setup-captive-agent.sh) (`just router-agent-provision`). Independiente de la llave admin de `setup-auth.sh`. Forzada por Dropbear (`command=` en `authorized_keys`) a solo poder ejecutar el dispatcher.
 - **Dispatcher en el router**: [`shared/router-dispatch/agent-dispatch.sh`](shared/router-dispatch/agent-dispatch.sh) — gramática cerrada (`allow`/`block`/`list`/`status`), nunca `eval`, replica exactamente las primitivas `nft` que ya usa `setup-captive.sh`.
-- **Contrato HTTP**: [`shared/openapi.yaml`](shared/openapi.yaml) — única fuente de verdad; las implementaciones Go y Rust deben cumplirlo de forma idéntica.
+- **Contrato HTTP**: [`openapi/openapi.yaml`](openapi/openapi.yaml) — única fuente de verdad; las implementaciones Go y Rust deben cumplirlo de forma idéntica. Importable directo en Postman/Insomnia/Bruno — ver [`openapi/README.md`](openapi/README.md).
 - **Dos implementaciones hermanas**: [`go/`](go/) y [`rust/`](rust/), benchmarcadas con [`bench/`](bench/) para decidir cuál se queda.
 
 ## Uso rápido
