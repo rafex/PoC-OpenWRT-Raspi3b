@@ -924,6 +924,31 @@ router-dns-reset *args='':
     scripts/router/setup-dns.sh reset {{args}}
 
 # ---------------------------------------------------------------------------
+# Política de Lease DHCP
+# ---------------------------------------------------------------------------
+
+# router-dhcp-lease-set: Configura la duración del lease DHCP
+# Uso: just router-dhcp-lease-set --leasetime 24h [--interface lan] [--env dev]
+router-dhcp-lease-set *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-dhcp-lease.sh set {{args}}
+
+# router-dhcp-lease-show: Muestra la duración de lease actual y los leases activos
+# Uso: just router-dhcp-lease-show [--ip 192.168.x.x] [--env dev]
+router-dhcp-lease-show *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-dhcp-lease.sh show {{args}}
+
+# router-dhcp-lease-reset: Restaura el leasetime por defecto de OpenWRT (12h)
+# Uso: just router-dhcp-lease-reset [--ip 192.168.x.x] [--env dev]
+router-dhcp-lease-reset *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/setup-dhcp-lease.sh reset {{args}}
+
+# ---------------------------------------------------------------------------
 # Clientes DHCP
 # ---------------------------------------------------------------------------
 

@@ -373,6 +373,25 @@ just router-dns-show
 just router-dns-reset
 ```
 
+## Lease DHCP
+
+| Recipe | Uso | Descripción |
+|--------|-----|-------------|
+| `router-dhcp-lease-set` | `just router-dhcp-lease-set --leasetime <valor> [--interface <nombre>] [--ip <IP>] [--env <env>]` | Configura la duración del lease DHCP (`<n>h`, `<n>m`, `<n>s`, o `infinite`). |
+| `router-dhcp-lease-show` | `just router-dhcp-lease-show [--ip <IP>] [--env <env>]` | Muestra la duración configurada y los leases activos. |
+| `router-dhcp-lease-reset` | `just router-dhcp-lease-reset [--ip <IP>] [--env <env>]` | Restaura el default de OpenWRT (`12h`). |
+
+Ejemplos:
+
+```bash
+just router-dhcp-lease-set --leasetime 24h
+just router-dhcp-lease-set --leasetime 8h
+just router-dhcp-lease-show
+just router-dhcp-lease-reset
+```
+
+Nota: cambiar el leasetime no afecta leases ya otorgados, solo los nuevos o renovados a partir del cambio.
+
 ## SOCKS Forward
 
 Expone el proxy SOCKS de una Raspi/Tor desde el router mediante port forwarding.

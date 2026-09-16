@@ -41,6 +41,7 @@ scripts/
 │   ├── setup-routing.sh        # Prioridad de rutas y source-based routing
 │   ├── setup-static-ip.sh      # IPs estáticas por MAC address (DHCP leases)
 │   ├── setup-dns.sh            # Servidores DNS upstream de dnsmasq
+│   ├── setup-dhcp-lease.sh     # Duración del lease DHCP dinámico
 │   ├── show-clients.sh         # Lista dispositivos conectados (leases DHCP + ARP)
 │   ├── setup-socks-forward.sh  # Port forwarding del proxy SOCKS de Raspi3b/Tor
 │   ├── setup-tor-onion.sh      # Transparent proxy para dominios .onion
@@ -317,6 +318,24 @@ scripts/router/setup-dns.sh reset
 ```
 
 Subcomandos: `set`, `show`, `reset`. El `show` verifica también la resolución con `nslookup`.
+
+### router/setup-dhcp-lease.sh
+
+Controla la duración del lease DHCP dinámico (`option leasetime` en UCI `dhcp.<interfaz>`) — cuánto tiempo un dispositivo conserva una IP antes de que dnsmasq la libere si no renueva.
+
+```bash
+# Configurar duración
+scripts/router/setup-dhcp-lease.sh set --leasetime 24h
+scripts/router/setup-dhcp-lease.sh set --leasetime 8h
+
+# Ver duración actual y leases activos
+scripts/router/setup-dhcp-lease.sh show
+
+# Restaurar el default de OpenWRT (12h)
+scripts/router/setup-dhcp-lease.sh reset
+```
+
+Subcomandos: `set`, `show`, `reset`. Acepta `<n>h`, `<n>m`, `<n>s`, o `infinite`. Importante: cambiar el leasetime no afecta leases ya otorgados — solo aplica a leases nuevos o renovados a partir del cambio.
 
 ### router/setup-routing.sh
 

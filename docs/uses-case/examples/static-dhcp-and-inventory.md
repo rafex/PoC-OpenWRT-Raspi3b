@@ -56,3 +56,16 @@ just router-lan-doctor --ip 192.168.1.1 \
   --target 192.168.1.167 \
   --target 192.168.1.139
 ```
+
+## Política de duración del lease
+
+Cuánto tiempo dnsmasq deja a un dispositivo con una IP dinámica antes de que el lease expire (independiente de las reservas estáticas de arriba, que no expiran).
+
+```bash
+just router-dhcp-lease-set --leasetime 24h --ip 192.168.1.1
+just router-dhcp-lease-set --leasetime 8h --ip 192.168.1.1
+just router-dhcp-lease-show --ip 192.168.1.1
+just router-dhcp-lease-reset --ip 192.168.1.1   # vuelve a 12h (default OpenWRT)
+```
+
+Cambiar el leasetime no afecta leases ya otorgados — solo los nuevos o renovados a partir del cambio.
