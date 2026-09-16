@@ -591,51 +591,94 @@ router-agent-build-go tag="router-agent-go:dev":
 router-agent-build-rust tag="router-agent-rust:dev":
     podman build --network=host -t {{ tag }} -f router-agent/rust/Containerfile router-agent/rust
 
-# router-agent-run-go: Corre el contenedor del agente Go localmente para pruebas
-# Extrae la llave privada de secrets solo en memoria/tmp — nunca la commitea.
-# Uso: just router-agent-run-go [env=] [tag=]
-router-agent-run-go env="prod" tag="router-agent-go:dev":
+# router-agent-run-go: Corre el contenedor del agente Go en background para pruebas
+# La llave privada viaja por `podman secret` (nunca un archivo temporal en el
+# host montado con -v — eso se rompe apenas el proceso que la generó sale,
+# justo lo que pasaría al pasar este contenedor a -d/background).
+# Uso: just router-agent-run-go [env=] [port=8443] [cidrs=] [tag=]
+router-agent-run-go env="prod" port="8443" cidrs="192.168.3.0/24,127.0.0.1/32" tag="router-agent-go:dev":
     #!/usr/bin/env bash
     set -euo pipefail
     source scripts/install/ensure-secrets.sh
     SECRETS_TMP=$(ensure_secrets "{{ env }}")
-    KEY_TMP=$(mktemp)
-    trap 'rm -f "${KEY_TMP}"; cleanup_secrets' EXIT
-    get_secret_value "CAPTIVE_AGENT_SSH_PRIVATE_KEY" "${SECRETS_TMP}" > "${KEY_TMP}"
-    # 644, no 600: ambas imágenes corren como UID no-root (65532) dentro del
-    # contenedor, distinto al UID dueño de este archivo en el host — sin
-    # esto, sshclient falla con "permission denied" al leer la llave.
-    chmod 644 "${KEY_TMP}"
-    podman run --rm -it \
-        -p 8443:8443 \
-        -v "${KEY_TMP}:/secrets/captive-agent-key:ro" \
-        -v "$(pwd)/environments/{{ env }}/.router-known-hosts:/secrets/router-known-hosts:ro" \
-        -e ROUTER_AGENT_SSH_HOST="$(source environments/{{ env }}/.env.public; echo "${ROUTER_IP:-192.168.1.1}")" \
-        -e ROUTER_AGENT_SSH_KEY_PATH=/secrets/captive-agent-key \
-        -e ROUTER_AGENT_SSH_KNOWN_HOSTS_PATH=/secrets/router-known-hosts \
-        {{ tag }}
+    trap cleanup_secrets EXIT
+    TOKEN=$(get_secret_value "CAPTIVE_AGENT_API_TOKEN" "${SECRETS_TMP}")
+    if [ -z "${TOKEN}" ]; then
+        echo "ERROR: CAPTIVE_AGENT_API_TOKEN vacío en secrets — corre: just router-agent-provision" >&2
+        exit 1
+    fi
+    SSH_HOST=$(source "environments/{{ env }}/.env.public"; echo "${ROUTER_IP:-192.168.1.1}")
 
-# router-agent-run-rust: Corre el contenedor del agente Rust localmente para pruebas
-router-agent-run-rust env="prod" tag="router-agent-rust:dev":
+    podman secret rm router-agent-go-key >/dev/null 2>&1 || true
+    get_secret_value "CAPTIVE_AGENT_SSH_PRIVATE_KEY" "${SECRETS_TMP}" | podman secret create router-agent-go-key - >/dev/null
+
+    podman rm -f router-agent-go >/dev/null 2>&1 || true
+    podman run -d --rm --name router-agent-go \
+        -p {{ port }}:8443 \
+        --secret router-agent-go-key,target=/secrets/captive-agent-key,mode=0644 \
+        -v "$(pwd)/environments/{{ env }}/.router-known-hosts:/secrets/router-known-hosts:ro" \
+        -e ROUTER_AGENT_API_TOKEN="${TOKEN}" \
+        -e ROUTER_AGENT_ALLOWED_CIDRS="{{ cidrs }}" \
+        -e ROUTER_AGENT_SSH_HOST="${SSH_HOST}" \
+        -e ROUTER_AGENT_SSH_KEY_PATH=/secrets/captive-agent-key \
+        -e ROUTER_AGENT_SSH_KNOWN_HOSTS_PATH=/secrets/router-known-hosts \
+        {{ tag }} >/dev/null
+    echo "✅ router-agent-go escuchando en :{{ port }}"
+    echo "   just router-agent-logs-go   # ver logs"
+    echo "   just router-agent-stop-go   # parar"
+
+# router-agent-logs-go: Sigue los logs del agente Go corriendo en background
+router-agent-logs-go:
+    podman logs -f router-agent-go
+
+# router-agent-stop-go: Para el agente Go y limpia su secret de Podman
+router-agent-stop-go:
+    podman stop router-agent-go >/dev/null 2>&1 || true
+    podman secret rm router-agent-go-key >/dev/null 2>&1 || true
+    echo "✅ router-agent-go detenido"
+
+# router-agent-run-rust: Corre el contenedor del agente Rust en background para pruebas
+# Uso: just router-agent-run-rust [env=] [port=8444] [cidrs=] [tag=]
+router-agent-run-rust env="prod" port="8444" cidrs="192.168.3.0/24,127.0.0.1/32" tag="router-agent-rust:dev":
     #!/usr/bin/env bash
     set -euo pipefail
     source scripts/install/ensure-secrets.sh
     SECRETS_TMP=$(ensure_secrets "{{ env }}")
-    KEY_TMP=$(mktemp)
-    trap 'rm -f "${KEY_TMP}"; cleanup_secrets' EXIT
-    get_secret_value "CAPTIVE_AGENT_SSH_PRIVATE_KEY" "${SECRETS_TMP}" > "${KEY_TMP}"
-    # 644, no 600: ambas imágenes corren como UID no-root (65532) dentro del
-    # contenedor, distinto al UID dueño de este archivo en el host — sin
-    # esto, sshclient falla con "permission denied" al leer la llave.
-    chmod 644 "${KEY_TMP}"
-    podman run --rm -it \
-        -p 8443:8443 \
-        -v "${KEY_TMP}:/secrets/captive-agent-key:ro" \
+    trap cleanup_secrets EXIT
+    TOKEN=$(get_secret_value "CAPTIVE_AGENT_API_TOKEN" "${SECRETS_TMP}")
+    if [ -z "${TOKEN}" ]; then
+        echo "ERROR: CAPTIVE_AGENT_API_TOKEN vacío en secrets — corre: just router-agent-provision" >&2
+        exit 1
+    fi
+    SSH_HOST=$(source "environments/{{ env }}/.env.public"; echo "${ROUTER_IP:-192.168.1.1}")
+
+    podman secret rm router-agent-rust-key >/dev/null 2>&1 || true
+    get_secret_value "CAPTIVE_AGENT_SSH_PRIVATE_KEY" "${SECRETS_TMP}" | podman secret create router-agent-rust-key - >/dev/null
+
+    podman rm -f router-agent-rust >/dev/null 2>&1 || true
+    podman run -d --rm --name router-agent-rust \
+        -p {{ port }}:8443 \
+        --secret router-agent-rust-key,target=/secrets/captive-agent-key,mode=0644 \
         -v "$(pwd)/environments/{{ env }}/.router-known-hosts:/secrets/router-known-hosts:ro" \
-        -e ROUTER_AGENT_SSH_HOST="$(source environments/{{ env }}/.env.public; echo "${ROUTER_IP:-192.168.1.1}")" \
+        -e ROUTER_AGENT_API_TOKEN="${TOKEN}" \
+        -e ROUTER_AGENT_ALLOWED_CIDRS="{{ cidrs }}" \
+        -e ROUTER_AGENT_SSH_HOST="${SSH_HOST}" \
         -e ROUTER_AGENT_SSH_KEY_PATH=/secrets/captive-agent-key \
         -e ROUTER_AGENT_SSH_KNOWN_HOSTS_PATH=/secrets/router-known-hosts \
-        {{ tag }}
+        {{ tag }} >/dev/null
+    echo "✅ router-agent-rust escuchando en :{{ port }}"
+    echo "   just router-agent-logs-rust   # ver logs"
+    echo "   just router-agent-stop-rust   # parar"
+
+# router-agent-logs-rust: Sigue los logs del agente Rust corriendo en background
+router-agent-logs-rust:
+    podman logs -f router-agent-rust
+
+# router-agent-stop-rust: Para el agente Rust y limpia su secret de Podman
+router-agent-stop-rust:
+    podman stop router-agent-rust >/dev/null 2>&1 || true
+    podman secret rm router-agent-rust-key >/dev/null 2>&1 || true
+    echo "✅ router-agent-rust detenido"
 
 # router-agent-bench: Corre el harness de benchmark Go vs Rust
 # Uso: just router-agent-bench [target=mock-sshd]

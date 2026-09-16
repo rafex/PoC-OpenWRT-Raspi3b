@@ -32,6 +32,7 @@ WIREGUARD_PRIVATE_KEY: ""            # Clave privada WireGuard
 DROPBEAR_RSA_HOST_KEY: ""            # Host key privada de Dropbear
 ROOT_PASSWORD_HASH: ""               # Hash SHA-512-crypt para /etc/shadow
 CAPTIVE_AGENT_SSH_PRIVATE_KEY: ""    # Clave privada SSH restringida del router-agent
+CAPTIVE_AGENT_API_TOKEN: ""          # Token de la API HTTP del router-agent
 ```
 
 Los **nombres de red** (SSID) van en `.env.public` — no son secretos:
@@ -41,11 +42,13 @@ WIFI_SSID_24=MiRed24
 WIFI_SSID_5=MiRed5G
 ```
 
-### Clave SSH restringida del router-agent
+### Clave SSH restringida y token del router-agent
 
 `CAPTIVE_AGENT_SSH_PRIVATE_KEY` es una llave SSH **independiente** de la que usa `setup-auth.sh` (la llave admin, con shell completo). Esta llave está limitada en el router por un `command=` forced-command de Dropbear que solo permite `allow`/`block`/`list`/`status` sobre el set nftables del portal cautivo — nunca un shell. La genera y guarda `just router-agent-provision` (ver [docs/SCRIPTS.md](SCRIPTS.md#routersetup-captive-agentsh)); la usa el contenedor `router-agent/{go,rust}` para exponer una API HTTP a un backend externo (p.ej. un portal cautivo con lógica de negocio propia) sin que ese backend externo reciba nunca la llave admin.
 
 La llave pública correspondiente se commitea sin encryptar como `environments/<env>/captive-agent-key.pub` (no es secreta, igual que `.age-pubkey.txt`).
+
+`CAPTIVE_AGENT_API_TOKEN` es el secreto compartido que el router-agent exige en el header `X-Router-Agent-Token` de cada request HTTP (salvo `/healthz`). Se genera junto con la llave SSH en el mismo `just router-agent-provision` (32 bytes aleatorios via `openssl rand -hex 32`). Es una credencial completamente independiente de la llave SSH — rotarla no requiere `rotate-key` ni afecta el acceso SSH, y viceversa.
 
 ## Setup inicial (una sola vez)
 

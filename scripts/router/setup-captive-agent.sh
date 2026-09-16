@@ -16,10 +16,12 @@
 #   solo añade una puerta de entrada adicional, más angosta, para operarla.
 #
 # Subcomandos:
-#   install     Genera la llave, la instala en el router, la guarda en secrets
-#   rotate-key  Genera una llave nueva, la instala junto a la vieja, prueba,
-#               y solo entonces retira la vieja (evita bloquearse)
-#   uninstall   Retira la llave y el dispatcher del router
+#   install     Genera la llave SSH + un token de API nuevo, instala la llave
+#               en el router, guarda ambos en secrets
+#   rotate-key  Genera una llave SSH nueva, la instala junto a la vieja, prueba,
+#               y solo entonces retira la vieja (evita bloquearse) — no toca
+#               el token de la API, es una credencial independiente
+#   uninstall   Retira la llave y el dispatcher del router, limpia ambos secrets
 #   status      Verifica el estado de la instalación
 #
 # Uso:
@@ -40,6 +42,7 @@ readonly DISPATCH_REMOTE_PATH="${CAPTIVE_DIR}/agent-dispatch.sh"
 readonly DISPATCH_LOCAL_SRC="${REPO_ROOT}/router-agent/shared/router-dispatch/agent-dispatch.sh"
 readonly AUTHKEYS="/etc/dropbear/authorized_keys"
 readonly SECRET_KEY_NAME="CAPTIVE_AGENT_SSH_PRIVATE_KEY"
+readonly SECRET_TOKEN_NAME="CAPTIVE_AGENT_API_TOKEN"
 readonly AGE_KEYFILE="${HOME}/.age/poc-openwrt-privkey.txt"
 
 _SUBCMD=""
@@ -250,11 +253,17 @@ _install() {
         exit 1
     fi
 
-    log_step "[5/5] Guardando llave privada en secrets (sops) y llave pública en el repo..."
+    log_step "[5/6] Guardando llave privada en secrets (sops) y llave pública en el repo..."
     sops set "${SECRETS_FILE}" "[\"${SECRET_KEY_NAME}\"]" "$(_json_string_from_file "${_NEW_PRIV}")"
     cp "${_NEW_PUB}" "${PUBKEY_FILE}"
     log_info "   ✅ ${SECRET_KEY_NAME} guardada en ${SECRETS_FILE}"
     log_info "   ✅ Llave pública commiteable en ${PUBKEY_FILE}"
+
+    log_step "[6/6] Generando token de la API HTTP del agente..."
+    local api_token
+    api_token="$(openssl rand -hex 32)"
+    sops set "${SECRETS_FILE}" "[\"${SECRET_TOKEN_NAME}\"]" "\"${api_token}\""
+    log_info "   ✅ ${SECRET_TOKEN_NAME} guardado en ${SECRETS_FILE}"
 
     echo ""
     log_info "✅ router-agent aprovisionado."
@@ -341,12 +350,14 @@ _uninstall() {
     router_ssh "rm -f ${DISPATCH_REMOTE_PATH}"
     log_info "   ✅ ${DISPATCH_REMOTE_PATH} eliminado"
 
-    log_step "[3/3] Limpiando llave local y secret..."
+    log_step "[3/3] Limpiando llave local y secrets..."
     rm -f "${PUBKEY_FILE}"
     if [ -f "${SECRETS_FILE}" ] && [ -f "${AGE_KEYFILE}" ]; then
         export SOPS_AGE_KEY_FILE="${AGE_KEYFILE}"
         sops set "${SECRETS_FILE}" "[\"${SECRET_KEY_NAME}\"]" '""' 2>/dev/null || \
             log_warn "   No se pudo limpiar ${SECRET_KEY_NAME} en secrets (hazlo manualmente con: just edit-secrets ${ROUTER_ENV})"
+        sops set "${SECRETS_FILE}" "[\"${SECRET_TOKEN_NAME}\"]" '""' 2>/dev/null || \
+            log_warn "   No se pudo limpiar ${SECRET_TOKEN_NAME} en secrets (hazlo manualmente con: just edit-secrets ${ROUTER_ENV})"
     fi
     log_info "   ✅ ${PUBKEY_FILE} eliminado"
 
