@@ -183,6 +183,9 @@ set -eu
 LAN_IP=$(uci -q get network.lan.ipaddr 2>/dev/null || \
          ip -4 addr show br-lan 2>/dev/null | grep -o 'inet [0-9.]*' | awk '{print $2}' | head -1 || \
          echo "192.168.1.1")
+# OpenWRT 21.02+ (config DSA) a veces guarda ipaddr en notación CIDR
+# ("192.168.1.1/24") en vez de IP simple — recortar el prefijo si está.
+LAN_IP="${LAN_IP%%/*}"
 LAN_IFACE=$(uci -q get network.lan.device 2>/dev/null || \
             uci -q get network.lan.ifname 2>/dev/null || \
             echo "br-lan")
