@@ -341,7 +341,9 @@ echo "✅ AP configurado:"
 echo "   SSID:    \$SSID"
 echo "   Cifrado: \$ENCRYPTION"
 echo "   Radio:   \$RADIO"
-[ "\$HIDDEN" = "true" ] && echo "   Oculto:  sí"
+if [ "\$HIDDEN" = "true" ]; then
+    echo "   Oculto:  sí"
+fi
 EOF
 
     echo ""
