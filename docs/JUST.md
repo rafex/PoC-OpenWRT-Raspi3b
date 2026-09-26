@@ -126,7 +126,7 @@ Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexi
 | `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `just host-recover-extroot-usb --device /dev/sdX1` | Repara ext4 con `e2fsck`, monta read-only y crea backup `.tar.gz` del USB extroot local. No formatea. |
 | `router-setup-logs-ram` | `just router-setup-logs-ram [IP] [env]` | Configura buffer de logs en RAM; no persiste reinicios. |
 | `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | Configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
-| `router-post-install` | `just router-post-install [grupo] [IP] [env]` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
+| `router-post-install` | `just router-post-install --group <grupo> --ip <IP> --env <env>` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
 
 `--env` selecciona el perfil de despliegue. `prod` usa los valores de producción y `dev` los valores de desarrollo; no cambia el modo del router. Si ambos perfiles apuntan a `192.168.1.1`, ambos operan sobre el mismo router físico.
 
@@ -146,7 +146,7 @@ just host-format-extroot-usb --list
 just host-recover-extroot-usb --device /dev/sdb1
 just host-format-extroot-usb --device /dev/sdb1
 just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
-just router-post-install captive_portal
+just router-post-install --group captive_portal
 ```
 
 En Debian, `host-recover-extroot-usb` necesita `e2fsck`, incluido en `e2fsprogs`:
@@ -158,7 +158,7 @@ sudo apt install -y e2fsprogs
 
 La recipe agrega automaticamente `/usr/sbin` y `/sbin` al `PATH`, porque algunas sesiones SSH no incluyen esas rutas aunque el paquete este instalado.
 
-`router-post-install` recibe `grupo`, `IP` y `env` por posicion. Para listar grupos disponibles sin instalar, usa el script:
+`router-post-install` acepta flags (`--group`, `--ip`, `--env`) y tambien conserva compatibilidad con la sintaxis `group=... ip=... env=...`. Para listar grupos disponibles sin instalar, usa:
 
 ```bash
 scripts/router/post-install.sh --list
@@ -291,7 +291,7 @@ just router-status --ip 192.168.1.1
 Requiere instalar el grupo post-flash `captive_portal` para tener `uhttpd`:
 
 ```bash
-just router-post-install captive_portal
+just router-post-install --group captive_portal
 ```
 
 | Recipe | Uso | Descripción |

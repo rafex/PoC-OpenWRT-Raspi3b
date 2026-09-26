@@ -22,3 +22,7 @@ packages = ["tcpdump", "bind-dig"]
 [utilidades]
 description = "Utilidades generales de administración"
 packages = ["htop", "nano", "diffutils"]
+
+[usb_tethering]
+description = "Módulos USB para tethering RNDIS/CDC-Ethernet"
+packages = ["kmod-usb-net", "kmod-usb-net-rndis", "kmod-usb-net-cdc-ether"]

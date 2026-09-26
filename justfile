@@ -438,23 +438,31 @@ router-copy-keys *args='':
     # shellcheck disable=SC2086
     scripts/router/setup-auth.sh --keys-only {{args}}
 
-# router-post-install: Instala paquetes adicionales en el router via opkg (post-flash)
-# Lee config/openwrt-router-post-install-packages.toml
-# Uso: just router-post-install [group=<grupo>] [ip=<IP>] [env=<env>]
-#      just router-post-install group=captive_portal
+# router-post-install: Instala paquetes adicionales en el router via apk/opkg
+# Lee config/openwrt-post-install-packages.toml
+# Uso: just router-post-install --group <grupo> --ip <IP> --env <env>
+#      just router-post-install group=<grupo> ip=<IP> env=<env>
 #      just router-post-install --list  → muestra grupos disponibles
-router-post-install group="" ip="" env="prod":
+router-post-install *args='':
     #!/usr/bin/env bash
     set -euo pipefail
-    ARGS="--env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
-    if [ -n "{{ group }}" ]; then ARGS="${ARGS} --group {{ group }}"; fi
-    # shellcheck disable=SC2086
-    scripts/router/post-install.sh ${ARGS}
+    ARGS=()
+    for arg in {{args}}; do
+        case "${arg}" in
+            group=*) ARGS+=(--group "${arg#group=}") ;;
+            ip=*)    ARGS+=(--ip "${arg#ip=}") ;;
+            env=*)   ARGS+=(--env "${arg#env=}") ;;
+            --group=* ) ARGS+=(--group "${arg#--group=}") ;;
+            --ip=* )    ARGS+=(--ip "${arg#--ip=}") ;;
+            --env=* )   ARGS+=(--env "${arg#--env=}") ;;
+            *)       ARGS+=("${arg}") ;;
+        esac
+    done
+    scripts/router/post-install.sh "${ARGS[@]}"
 
 # ---------------------------------------------------------------------------
 # Portal cautivo (nftables + uhttpd, sin OpenNDS)
-# Flujo: just router-post-install group=captive_portal → just router-captive-setup
+# Flujo: just router-post-install --group captive_portal → just router-captive-setup
 # ---------------------------------------------------------------------------
 
 # router-captive-setup: Instala el portal cautivo en el router
