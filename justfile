@@ -787,34 +787,25 @@ router-wifi-disable radio="" ip="" env="prod":
 # ---------------------------------------------------------------------------
 
 # router-usb-tether-enable: Detecta el dispositivo USB de red y lo usa como uplink
-# Uso: just router-usb-tether-enable [ip=] [env=]
-router-usb-tether-enable ip="" env="prod":
+# Uso: just router-usb-tether-enable --ip <IP> --env <env>
+router-usb-tether-enable *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="enable --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-usb-tether.sh ${ARGS}
+    scripts/router/setup-usb-tether.sh enable {{args}}
 
 # router-usb-tether-disable: Retira el uplink USB (no toca el dispositivo/teléfono)
-# Uso: just router-usb-tether-disable [ip=] [env=]
-router-usb-tether-disable ip="" env="prod":
+# Uso: just router-usb-tether-disable --ip <IP> --env <env>
+router-usb-tether-disable *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="disable --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-usb-tether.sh ${ARGS}
+    scripts/router/setup-usb-tether.sh disable {{args}}
 
 # router-usb-tether-status: Dispositivo USB detectado + estado del uplink
-# Uso: just router-usb-tether-status [ip=] [env=]
-router-usb-tether-status ip="" env="prod":
+# Uso: just router-usb-tether-status --ip <IP> --env <env>
+router-usb-tether-status *args='':
     #!/usr/bin/env bash
-    set -euo pipefail
-    ARGS="status --env {{ env }}"
-    if [ -n "{{ ip }}" ]; then ARGS="${ARGS} --ip {{ ip }}"; fi
     # shellcheck disable=SC2086
-    scripts/router/setup-usb-tether.sh ${ARGS}
+    scripts/router/setup-usb-tether.sh status {{args}}
 
 # ---------------------------------------------------------------------------
 # Routing (prioridad WAN vs WiFi cliente y source-based routing)

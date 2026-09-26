@@ -284,9 +284,9 @@ Modo cliente crea la interfaz `wwan` (protocolo DHCP), la añade a la zona WAN d
 Usa un teléfono conectado por USB (con tethering/"Compartir internet" activado) como uplink alternativo, igual que `setup-wifi.sh client` hace con WiFi pero para el dispositivo de red que expone el teléfono via USB (RNDIS o CDC-Ethernet).
 
 ```bash
-scripts/router/setup-usb-tether.sh enable    # detecta el dispositivo USB y lo configura como uplink
-scripts/router/setup-usb-tether.sh status    # dispositivo detectado + estado del uplink (IP, gateway)
-scripts/router/setup-usb-tether.sh disable   # retira el uplink (no toca el dispositivo/teléfono)
+just router-usb-tether-enable --ip 192.168.1.1 --env prod
+just router-usb-tether-status --ip 192.168.1.1 --env prod
+just router-usb-tether-disable --ip 192.168.1.1 --env prod
 ```
 
 Subcomandos: `enable`, `disable`, `status`.
