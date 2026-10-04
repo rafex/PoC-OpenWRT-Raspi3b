@@ -60,7 +60,8 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-copy-keys` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
 | `just router-setup-auth` | Copia clave SSH pública + contraseña root |
 | `just router-setup-extroot` | Configura USB como extroot (`/overlay`) |
-| `just host-recover-extroot-usb` | Repara ext4 y respalda un USB extroot desde el host |
+| `just router-extroot-recover` | Captura diagnóstico en vivo y corrige fstab tras reparar USB en el host |
+| `just host-recover-extroot-usb` | Respalda archivos legibles y repara ext4 opcionalmente desde el host |
 | `just host-format-extroot-usb` | Formatea una particion USB como ext4 para extroot |
 | `just router-setup-logs` | Logs persistentes en USB |
 | `just router-post-install` | Instala paquetes adicionales via `apk`/`opkg` |

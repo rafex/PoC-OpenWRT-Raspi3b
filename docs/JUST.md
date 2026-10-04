@@ -122,8 +122,9 @@ Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexi
 | `router-copy-keys` | `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root. |
 | `router-setup-auth` | `just router-setup-auth [--ip <IP>] [--env <dev\|prod>] [--key <path>] [--man]` | Copia clave SSH y configura contraseña root. |
 | `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | Configura USB como extroot. Requiere USB ext4. |
+| `router-extroot-recover` | `just router-extroot-recover prepare [--ip <IP>] [--uuid <UUID>]` o `finish --ip <IP> --uuid <UUID>` | Captura diagnóstico y desmonta la USB en el router; tras repararla en host, corrige el UUID sin copiar datos ni reiniciar. |
 | `host-format-extroot-usb` | `just host-format-extroot-usb --list` o `just host-format-extroot-usb --device /dev/sdX1` | Borra/formatea una particion USB local como ext4 para extroot. Ejecutar desde `bastion-wifi` o la maquina con el USB conectado. |
-| `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `just host-recover-extroot-usb --device /dev/sdX1` | Repara ext4 con `e2fsck`, monta read-only y crea backup `.tar.gz` del USB extroot local. No formatea. |
+| `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `--uuid <UUID> [--repair]` | Respalda archivos legibles y logs en host; `--repair` intenta `e2fsck -f -p` tras confirmación. No formatea. |
 | `router-setup-logs-ram` | `just router-setup-logs-ram [IP] [env]` | Configura buffer de logs en RAM; no persiste reinicios. |
 | `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | Configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
 | `router-post-install` | `just router-post-install --group <grupo> --ip <IP> --env <env>` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
@@ -143,11 +144,19 @@ just router-copy-keys --ip 192.168.1.1
 just router-setup-auth --ip 192.168.1.1 --env prod
 just router-setup-auth --ip 192.168.1.1 --key ~/.ssh/id_ed25519.pub
 just host-format-extroot-usb --list
-just host-recover-extroot-usb --device /dev/sdb1
+just router-extroot-recover prepare --ip 192.168.1.1
+just host-recover-extroot-usb --uuid 930f6101-f2aa-4ced-9e9e-f69d4ce17baa --repair
+just router-extroot-recover finish --ip 192.168.1.1 --uuid 930f6101-f2aa-4ced-9e9e-f69d4ce17baa
 just host-format-extroot-usb --device /dev/sdb1
 just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
 just router-post-install --group captive_portal
 ```
+
+Para un extroot que no puede arrancar, deja primero que OpenWrt arranque sin la USB, conéctala y ejecuta `router-extroot-recover prepare`. Guarda el UUID que informa; captura `logread`, `dmesg`, fstab y montajes, y desmonta la USB si estaba montada fuera de `/overlay`. Retírala y conéctala a esta máquina Linux.
+
+En el host, `host-recover-extroot-usb --uuid <UUID>` resuelve el nombre actual del dispositivo, comprueba ext4 en solo lectura y guarda todos los archivos legibles, un manifiesto de estado, advertencias y logs reconocidos en `~/openwrt-extroot-backups/`. Añade `--repair` para solicitar confirmación escribiendo `REPARAR <UUID>` y ejecutar `e2fsck -f -p`. La reparación automática no corrige problemas que requieren decisiones manuales; el script se detiene si la comprobación posterior sigue encontrando errores.
+
+Solo después de una reparación verificada, reconecta la USB al router y ejecuta `router-extroot-recover finish --uuid <UUID>`. Este paso valida los marcadores extroot y corrige fstab sin copiar, limpiar ni reiniciar. Reinicia manualmente después de revisar el resultado.
 
 En Debian, `host-recover-extroot-usb` necesita `e2fsck`, incluido en `e2fsprogs`:
 
@@ -175,7 +184,7 @@ just build-prod
 just router-update-force --ip 192.168.1.1
 ```
 
-Despues recupera el USB desde el bastion con `host-recover-extroot-usb`, decide si lo reutilizas o formateas, ejecuta `router-setup-extroot` y confirma con `router-status` que `Extroot` este activo. El procedimiento completo esta en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
+Despues arranca el router sin USB y sigue `router-extroot-recover prepare` → recuperación host por UUID → `router-extroot-recover finish`; reinicia manualmente y confirma con `router-status` que `Extroot` este activo. Usa `router-setup-extroot` solo para copiar un overlay nuevo al USB. El procedimiento completo esta en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
 
 ## Estado, Clientes, Backup y Reinicio
 

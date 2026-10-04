@@ -9,7 +9,7 @@ flowchart TD
     backup --> image["just build-prod"]
     image --> clean["just router-update-force"]
     clean --> usb["USB recuperado en bastion-wifi"]
-    usb --> repair{"e2fsck y backup exitosos?"}
+    usb --> repair{"Diagnóstico y respaldo USB"}
     repair -- si --> reuse["Reutilizar USB sin formatear"]
     repair -- no --> format["Formatear USB ext4"]
     reuse --> setup["router-setup-extroot"]
@@ -24,7 +24,7 @@ flowchart TD
 
 No formatea automaticamente el USB. El USB debe tratarse por separado:
 
-- `host-recover-extroot-usb` repara ext4 y crea un backup sin formatear.
+- `host-recover-extroot-usb` diagnostica y respalda ext4 sin repararlo por defecto; `--repair` habilita la reparación confirmada sin formatear.
 - `host-format-extroot-usb` borra la particion y la crea de nuevo como ext4.
 - `router-setup-extroot` copia el overlay limpio al USB y configura `/overlay`.
 
@@ -91,13 +91,20 @@ sudo apt update
 sudo apt install -y e2fsprogs
 ```
 
-Ejecuta la reparacion sobre la particion USB, por ejemplo:
+Diagnostica y respalda la particion USB, por ejemplo:
 
 ```bash
-just host-recover-extroot-usb --device /dev/sdb1
+USB_UUID="<UUID que muestra --list>"
+just host-recover-extroot-usb --uuid "$USB_UUID"
 ```
 
-Confirma escribiendo exactamente `REPARAR /dev/sdb1`. Un resultado con `FILE SYSTEM WAS MODIFIED` significa que `e2fsck` corrigio el filesystem; la recipe continuara y creara el backup en `~/openwrt-extroot-backups/`.
+El modo predeterminado monta el USB en solo lectura sin replay del journal, ejecuta `e2fsck -fn` y crea un respaldo completo o parcial, conservando los archivos legibles y registrando errores. Revisa los archivos generados en `~/openwrt-extroot-backups/`. Si quieres intentar reparar los errores que reporte el diagnóstico, ejecuta:
+
+```bash
+just host-recover-extroot-usb --uuid "$USB_UUID" --repair
+```
+
+La reparación pide escribir exactamente `REPARAR <UUID>` después de guardar el respaldo previo y ejecuta `e2fsck -f -p`. Si quedan errores que requieren decisiones manuales, se detiene sin intentar reconectar extroot. Si ext4 queda limpio, genera también un respaldo posterior.
 
 ## 5. Elegir reutilizar o formatear
 

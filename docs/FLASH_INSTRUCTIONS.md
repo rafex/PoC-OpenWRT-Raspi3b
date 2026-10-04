@@ -111,10 +111,13 @@ Despues del reinicio, recupera el USB desde `bastion-wifi` antes de volver a usa
 ```bash
 cd /opt/repository/github/PoC-OpenWRT-Raspi3b
 just host-recover-extroot-usb --list
-just host-recover-extroot-usb --device /dev/sdb1
+just router-extroot-recover prepare --ip 192.168.1.1
+USB_UUID="<UUID reportado por prepare>"
+just host-recover-extroot-usb --uuid "$USB_UUID" --repair
+just router-extroot-recover finish --ip 192.168.1.1 --uuid "$USB_UUID"
 ```
 
-La recipe repara ext4 y crea un backup en `~/openwrt-extroot-backups/`. Si el backup es valido, puedes reutilizar el USB. Si necesitas una instalacion vacia, formatealo con `host-format-extroot-usb` y confirma la eliminacion.
+Arranca primero el router sin USB. Después conéctala y ejecuta `prepare` para guardar sus logs y desmontarla de forma segura. Mueve la USB a esta máquina Linux y repara por su UUID; el host guarda un respaldo completo o parcial de lo legible antes de `e2fsck -p`. Tras la verificación, vuelve a conectarla al router y ejecuta `finish`, que actualiza fstab sin copiar ni borrar archivos. El router no reinicia automáticamente. Si quieres una instalación vacía, usa `host-format-extroot-usb` solo después de conservar lo que necesites.
 
 Conecta de nuevo el USB al router y prepara extroot:
 

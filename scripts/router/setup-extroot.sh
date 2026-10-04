@@ -219,10 +219,9 @@ if [ "\${DO_CLEAN}" = "yes" ]; then
         sync
         umount "\${MNT}" 2>/dev/null || true
         echo ""
-        echo "      Repara o reformatea el USB en una máquina Linux:"
-        echo "        sudo e2fsck -f \${DEVICE}"
-        echo "        # o, si vas a borrar todo:"
-        echo "        sudo mkfs.ext4 -F \${DEVICE}"
+        echo "      Desmonta la USB y conéctala a una máquina Linux para recuperarla."
+        echo "      Usa: just host-recover-extroot-usb --list"
+        echo "      Después selecciona su UUID con --repair; no ejecutes fsck en el router."
         exit 1
     fi
 

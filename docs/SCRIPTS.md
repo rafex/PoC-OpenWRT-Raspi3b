@@ -32,6 +32,7 @@ scripts/
 │   ├── post-install.sh         # Instala paquetes adicionales via apk/opkg
 │   ├── setup-auth.sh           # Copia clave SSH pública + contraseña root
 │   ├── setup-extroot.sh        # Configura USB como extroot (/overlay)
+│   ├── recover-extroot.sh      # Captura estado live y corrige UUID tras reparación host
 │   ├── setup-logs-ram.sh       # Buffer de logs en RAM (64 KB, sin USB)
 │   ├── setup-logs-file.sh      # Logs persistentes en archivo (USB/extroot)
 │   ├── setup-captive.sh        # Portal cautivo nftables + uhttpd
@@ -137,6 +138,19 @@ scripts/router/setup-extroot.sh --ip 192.168.1.1 --device /dev/sdb1
 ```
 
 Prerrequisito: formatear el USB como ext4 antes de conectarlo al router.
+
+### router/recover-extroot.sh
+
+Flujo de recuperación de extroot en dos etapas. `prepare` se ejecuta cuando OpenWrt ya arrancó desde almacenamiento interno y la USB se conecta en caliente; guarda logs/estado y desmonta la USB si no está activa como `/overlay`. La reparación física se realiza en Linux con `host-recover-extroot-usb`. `finish` valida ext4 y los marcadores `upper/`, `work/`, y corrige el UUID de fstab sin copiar datos ni reiniciar.
+
+```bash
+just router-extroot-recover prepare --ip 192.168.1.1
+USB_UUID="<UUID reportado por prepare>"
+just host-recover-extroot-usb --uuid "$USB_UUID" --repair
+just router-extroot-recover finish --ip 192.168.1.1 --uuid "$USB_UUID"
+```
+
+No uses `router-setup-extroot` para reparar un extroot existente: ese flujo copia el overlay actual y puede limpiar los archivos de la USB.
 
 ### router/setup-logs-ram.sh
 
@@ -644,6 +658,18 @@ Tras cada `add` o `remove` se ejecuta `uci commit firewall` y `/etc/init.d/firew
 ---
 
 ## Scripts de soporte (commons/, deps/, install/, git/)
+
+### install/recover-extroot-usb.sh
+
+Diagnostica y recupera una partición ext4 conectada a Linux. Resuelve por UUID para tolerar cambios de `/dev/sdX1`, crea un respaldo de archivos legibles, manifiesto de advertencias y archivo separado con logs reconocidos (`messages`, `syslog`, `dmesg`, `kern.log`, `daemon.log`). El respaldo predeterminado queda en `~/openwrt-extroot-backups/`.
+
+```bash
+just host-recover-extroot-usb --list
+just host-recover-extroot-usb --uuid <UUID>
+just host-recover-extroot-usb --uuid <UUID> --repair
+```
+
+El modo normal usa `e2fsck -fn` y montaje `ro,noload`; continúa ante rutas ilegibles y las registra. `--repair` pide confirmación después del respaldo antes de ejecutar `e2fsck -f -p`; deja la USB sin montar si e2fsck requiere intervención manual.
 
 ### commons/logging.sh
 

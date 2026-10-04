@@ -383,6 +383,15 @@ router-setup-extroot *args='':
     # shellcheck disable=SC2086
     scripts/router/setup-extroot.sh {{args}}
 
+# router-extroot-recover: Flujo en dos etapas para preservar/reparar USB extroot
+# prepare captura logs y desmonta la USB en OpenWrt; finish corrige UUID sin copiar datos ni reiniciar.
+# Uso: just router-extroot-recover prepare [--ip <IP>] [--uuid <UUID>]
+# Uso: just router-extroot-recover finish --ip <IP> --uuid <UUID>
+router-extroot-recover *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/router/recover-extroot.sh {{args}}
+
 # host-format-extroot-usb: Borra/formatea un USB local como ext4 para extroot
 # Ejecutar desde la máquina donde está conectado el USB, ej. ssh bastion-wifi
 # Uso: just host-format-extroot-usb --list
@@ -392,10 +401,11 @@ host-format-extroot-usb *args='':
     # shellcheck disable=SC2086
     scripts/install/format-extroot-usb.sh {{args}}
 
-# host-recover-extroot-usb: Repara ext4 y respalda un USB extroot local
+# host-recover-extroot-usb: Diagnostica/respalda USB extroot local; reparación segura opcional
 # Ejecutar desde la máquina donde está conectado el USB, ej. ssh bastion-wifi
 # Uso: just host-recover-extroot-usb --list
-# Uso: just host-recover-extroot-usb --device /dev/sdX1 [--backup-dir <dir>] [--yes]
+# Uso: just host-recover-extroot-usb --uuid <UUID> [--backup-dir <dir>] [--repair]
+# Uso: just host-recover-extroot-usb --device /dev/sdX1 [--backup-dir <dir>] [--repair]
 host-recover-extroot-usb *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086

@@ -57,97 +57,42 @@ Tambien puedes revisar directo:
 ssh root@192.168.1.1 'block info; ls /dev/sd* 2>/dev/null; df -h /overlay; mount | grep -E " /overlay |/dev/sd"'
 ```
 
-## 3. Verificar que el USB tenga extroot existente
+## 3. Capturar estado y desmontar desde OpenWrt
 
-Antes de ejecutar cualquier setup que pueda limpiar el USB, monta temporalmente el dispositivo y mira su contenido:
-
-```bash
-ssh root@192.168.1.1 '
-set -eu
-mkdir -p /mnt/usb-check
-mount /dev/sda1 /mnt/usb-check 2>/dev/null || true
-find /mnt/usb-check -mindepth 1 -maxdepth 2 | head -80
-umount /mnt/usb-check 2>/dev/null || true
-'
-```
-
-Si ves algo como esto, el USB ya tiene extroot:
-
-```text
-/mnt/usb-check/upper
-/mnt/usb-check/work
-/mnt/usb-check/.fs_state
-```
-
-En ese caso no uses `just router-setup-extroot` para repararlo, porque ese flujo esta pensado para preparar/copiar extroot y puede pedir limpiar el USB si detecta contenido previo.
-
-## 4. Reparar el UUID en fstab
-
-Obtiene el UUID real de `/dev/sda1` y actualiza `fstab.extroot`:
+Arranca el router sin USB. Cuando SSH esté disponible, conecta la USB y ejecuta:
 
 ```bash
-ssh root@192.168.1.1 '
-set -eu
-UUID=$(block info /dev/sda1 | sed -n "s/.*UUID=\"\([^\"]*\)\".*/\1/p")
-[ -n "$UUID" ]
-
-uci -q set fstab.@global[0].auto_mount=1 || true
-uci -q set fstab.@global[0].delay_root=15 || true
-uci -q set fstab.@global[0].check_fs=0 || true
-uci -q delete fstab.extroot.device || true
-uci set fstab.extroot=mount
-uci set fstab.extroot.target=/overlay
-uci set fstab.extroot.fstype=ext4
-uci set fstab.extroot.options=rw,sync
-uci set fstab.extroot.enabled=1
-uci set fstab.extroot.enabled_fsck=0
-uci set fstab.extroot.uuid="$UUID"
-uci commit fstab
-
-echo "configured_uuid=$UUID"
-uci show fstab.extroot
-'
+just router-extroot-recover prepare --ip 192.168.1.1
 ```
 
-## 5. Reiniciar
+El comando guarda `logread`, `dmesg`, `block info`, fstab y montajes en `~/openwrt-extroot-backups/`. Informa el UUID y desmonta la USB si se montó fuera de `/overlay`. Si indica que la unidad es `/overlay` activo o que no pudo desmontarla, no la retires.
+
+## 4. Reparar ext4 en esta máquina Linux
+
+Retira la USB del router y conéctala físicamente al host. Usa el UUID reportado; no dependas del nombre variable `/dev/sdX1`:
 
 ```bash
-ssh root@192.168.1.1 reboot
+USB_UUID="<UUID reportado por prepare>"
+just host-recover-extroot-usb --uuid "$USB_UUID" --repair
 ```
 
-Espera uno o dos minutos y verifica que SSH vuelva:
+El comando guarda un respaldo completo o parcial de los archivos legibles y luego ejecuta `e2fsck -f -p` tras pedir confirmación. Si la verificación posterior deja errores sin resolver, detente: no intentes activar extroot todavía. No uses `router-setup-extroot` para recuperar datos existentes porque ese flujo copia el overlay actual y puede limpiar la USB.
+
+## 5. Actualizar UUID y validar extroot
+
+Solo si la verificación host terminó sin errores, reconecta la USB al router y actualiza fstab sin copiar ni limpiar archivos:
 
 ```bash
-ssh root@192.168.1.1 'echo up'
+just router-extroot-recover finish --ip 192.168.1.1 --uuid "$USB_UUID"
 ```
 
-## 6. Validar que extroot quedo activo
+El comando no reinicia. Revisa el resultado y después reinicia manualmente. Al volver, valida:
 
 ```bash
 just router-status --ip 192.168.1.1
 ```
 
-El estado esperado es:
-
-```text
-/overlay     ... / 57.6G
-USB       : detectado
-/dev/sda1    ext4 ... /overlay
-Extroot   : activo (/dev/sda1, ext4)
-fstab     : extroot enabled=1 target=/overlay uuid=<uuid-actual>
-```
-
-Validacion directa:
-
-```bash
-ssh root@192.168.1.1 'df -h / /overlay; grep -E " /overlay |/dev/sda1" /proc/mounts; block info /dev/sda1; uci show fstab.extroot'
-```
-
-## 7. Corregir fstab dentro del extroot activo
-
-Si despues del primer reinicio `/dev/sda1` ya esta montado en `/overlay`, revisa de nuevo `uci show fstab.extroot`. Si el UUID vuelve a aparecer viejo, significa que el extroot activo tenia una copia antigua de `/etc/config/fstab`. Corrigelo una vez mas con el mismo bloque del paso 4.
-
-Despues de eso, el siguiente reinicio conservara el UUID correcto.
+El estado esperado es `Extroot: activo` y `/dev/sdX1` montado en `/overlay`.
 
 ## 8. Reponer configuraciones que estaban solo en la flash interna
 
@@ -175,7 +120,7 @@ just host-recover-extroot-usb --device /dev/sdX1
 just host-format-extroot-usb --device /dev/sdX1
 ```
 
-Primero intenta `host-recover-extroot-usb`: ejecuta `e2fsck`, monta el USB read-only y crea un backup `.tar.gz` en `~/openwrt-extroot-backups`. Si el backup sale bien y decides borrar, usa `host-format-extroot-usb`.
+Primero ejecuta `host-recover-extroot-usb` en modo diagnóstico: desmonta la partición si hace falta, comprueba ext4 con `e2fsck -fn`, monta `ro,noload`, guarda un backup completo y extrae los logs encontrados. No modifica ext4. Si el diagnóstico reporta errores y decides repararlos, ejecuta `just host-recover-extroot-usb --device /dev/sdX1 --repair`; el script requiere confirmación textual después del respaldo. Si el backup sale bien y decides borrar, usa `host-format-extroot-usb`.
 
 La recipe de formateo exige confirmacion textual antes de borrar. Reemplaza `/dev/sdX1` por la particion USB real que muestre `--list`.
 
