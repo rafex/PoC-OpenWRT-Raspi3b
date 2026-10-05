@@ -27,6 +27,7 @@ just create-password prod # Hash SHA-512 de root
 
 # Compilar
 just build-prod
+just build-prod-both  # Imagen anterior + safe-boot
 ```
 
 ## Documentación
@@ -86,6 +87,8 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-port-forward-list` / `just router-port-forward-add` / `just router-port-forward-remove` | Port forwarding DNAT desde WAN (TCP/UDP/ambos) |
 
 No conectes la unidad como extroot. Enciende primero el router desde la flash; después conecta la unidad ext4 firmada con etiqueta `OPENWRT_PROFILE`. El modo base expone el SSID oculto definido para recuperación en ambas bandas. Consulta [el caso de perfiles USB](docs/uses-case/examples/usb-hotplug-profile-safe-boot.md) antes de migrar.
+
+Se conservan dos variantes: `just build-prod-legacy` reproduce la imagen anterior con AP separados; `just build-prod` construye la nueva imagen safe-boot. `just build-prod-both` genera ambas y guarda los artefactos separados en `dist/openwrt/prod-legacy/` y `dist/openwrt/prod-safe/`.
 | `just router-socks-enable` / `just router-socks-disable` / `just router-socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
 | `just router-onion-enable` / `just router-onion-disable` / `just router-onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
 | `just router-onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |

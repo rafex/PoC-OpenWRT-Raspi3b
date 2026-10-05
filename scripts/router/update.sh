@@ -3,11 +3,12 @@
 # update.sh — Actualiza firmware del router via SSH + sysupgrade
 #
 # Uso:
-#   scripts/build/update.sh [--ip <IP>] [--force] [--env <dev|prod>]
+#   scripts/router/update.sh [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy>]
 #
 # Opciones:
 #   --ip <IP>     IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)
 #   --env <env>   Entorno para leer .env.public (default: prod)
+#   --variant    Imagen safe o legacy (default: safe)
 #   --force       Resetear configuración del router al actualizar
 #                 Sin --force: mantiene la configuración actual (default)
 # ============================================================================
@@ -21,6 +22,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # Defaults
 # ---------------------------------------------------------------------------
 ROUTER_ENV="prod"
+IMAGE_VARIANT="safe"
 _ROUTER_IP_CLI=""
 _FORCE=false
 
@@ -49,18 +51,27 @@ while [[ $# -gt 0 ]]; do
             ROUTER_ENV="$2"
             shift 2
             ;;
+        --variant)
+            if [ -z "${2:-}" ]; then
+                log_error "--variant requiere un argumento: --variant <safe|legacy>"
+                exit 1
+            fi
+            IMAGE_VARIANT="$2"
+            shift 2
+            ;;
         -h|--help)
-            echo "Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>]"
+            echo "Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy>]"
             echo ""
             echo "  --ip <IP>   IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)"
             echo "  --env       Entorno para leer .env.public (default: prod)"
+            echo "  --variant   Variante guardada en dist/openwrt/<env>-<variant> (default: safe)"
             echo "  --force     Resetear configuración del router al actualizar"
             echo "              Sin --force: mantiene la configuración actual"
             exit 0
             ;;
         *)
             log_error "Argumento desconocido: $1"
-            echo "   Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>]"
+            echo "   Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy>]"
             exit 1
             ;;
     esac
@@ -73,32 +84,48 @@ router_load_env "${ROUTER_ENV}"
 OPENWRT_VERSION="${OPENWRT_VERSION:-}"
 PROFILE="${PROFILE:-tplink_tl-wdr3600-v1}"
 
+case "${IMAGE_VARIANT}" in safe|legacy) ;; *)
+    log_error "Variante desconocida '${IMAGE_VARIANT}'; usa safe o legacy"
+    exit 2
+    ;;
+esac
+
 # ---------------------------------------------------------------------------
 # Encontrar imagen sysupgrade
 # ---------------------------------------------------------------------------
 _find_sysupgrade() {
-    local bin
+    local bin artifact_dir
+    artifact_dir="${REPO_ROOT}/dist/openwrt/${ROUTER_ENV}-${IMAGE_VARIANT}"
     if [ -n "${OPENWRT_VERSION}" ]; then
-        bin=$(find "${REPO_ROOT}/openwrt-builder" \
+        bin=$(find "${artifact_dir}" \
               -name "openwrt-${OPENWRT_VERSION}-*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
               | sort -r | head -1)
         if [ -z "${bin}" ]; then
-            log_error "No se encontró imagen sysupgrade para ${PROFILE} en OpenWRT ${OPENWRT_VERSION}" >&2
+            log_error "No se encontró imagen ${IMAGE_VARIANT} para ${PROFILE} en OpenWRT ${OPENWRT_VERSION}" >&2
             echo "   Solución:" >&2
             echo "     just setup-env ${ROUTER_ENV}" >&2
-            echo "     just build-${ROUTER_ENV}" >&2
+            if [ "${IMAGE_VARIANT}" = "legacy" ]; then
+                echo "     just build-${ROUTER_ENV}-legacy" >&2
+            else
+                echo "     just build-${ROUTER_ENV}" >&2
+            fi
             echo "" >&2
-            echo "   No se usará una imagen de otra versión." >&2
+            echo "   Se buscaron artefactos en ${artifact_dir}; no se usará otra variante." >&2
             exit 1
         fi
     else
-        bin=$(find "${REPO_ROOT}/openwrt-builder" -name "*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
+        bin=$(find "${artifact_dir}" -name "*-${PROFILE}-squashfs-sysupgrade.bin" 2>/dev/null \
               | sort -r | head -1)
     fi
 
     if [ -z "${bin}" ]; then
-        log_error "No se encontró imagen sysupgrade para ${PROFILE}${OPENWRT_VERSION:+ en OpenWRT ${OPENWRT_VERSION}}" >&2
-        echo "   Solución: just build-prod" >&2
+        log_error "No se encontró imagen ${IMAGE_VARIANT} para ${PROFILE}${OPENWRT_VERSION:+ en OpenWRT ${OPENWRT_VERSION}}" >&2
+        if [ "${IMAGE_VARIANT}" = "legacy" ]; then
+            echo "   Solución: just build-${ROUTER_ENV}-legacy" >&2
+        else
+            echo "   Solución: just build-${ROUTER_ENV}" >&2
+        fi
+        echo "   Directorio esperado: ${artifact_dir}" >&2
         exit 1
     fi
     echo "${bin}"
@@ -132,6 +159,7 @@ main() {
     log_step "Configuración:"
     echo "   Router:  root@${ROUTER_IP}:${SSH_PORT}"
     echo "   Imagen:  ${bin_name}"
+    echo "   Variante: ${IMAGE_VARIANT}"
     echo "   Modo:    ${mode_label}"
     echo ""
 

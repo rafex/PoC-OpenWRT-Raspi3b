@@ -744,7 +744,8 @@ just setup-hooks    # git config core.hooksPath .githooks
 
 ```bash
 just decrypt-secrets prod
-./scripts/templates/generate.sh prod   # genera configs en config/overlay/prod/
+./scripts/templates/generate.sh prod "" safe    # genera config/overlay/prod/safe/
+./scripts/templates/generate.sh prod "" legacy # genera config/overlay/prod/legacy/
 ```
 
 ---

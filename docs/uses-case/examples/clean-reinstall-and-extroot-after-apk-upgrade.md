@@ -6,7 +6,7 @@ Caso: se ejecuto `apk upgrade` antes de montar el USB como extroot. Los paquetes
 flowchart TD
     start["apk upgrade sin extroot"] --> inspect["just router-status"]
     inspect --> backup["just router-backup"]
-    backup --> image["just build-prod"]
+    backup --> image["just build-prod-legacy"]
     image --> clean["just router-update-force"]
     clean --> usb["USB recuperado en bastion-wifi"]
     usb --> repair{"Diagnóstico y respaldo USB"}
@@ -20,7 +20,7 @@ flowchart TD
 
 ## Que implica
 
-`just router-update-force` instala la imagen sysupgrade compilada y ejecuta `sysupgrade -n`. Esto borra los cambios persistentes del router en `/overlay`, incluyendo contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`. Los valores que `build-prod` haya incluido en la imagen vuelven a aplicarse.
+`just router-update-force --variant legacy` instala el sysupgrade anterior y ejecuta `sysupgrade -n`. Esto borra los cambios persistentes del router en `/overlay`, incluyendo contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`. Los valores que `build-prod-legacy` haya incluido en la imagen vuelven a aplicarse.
 
 No formatea automaticamente el USB. El USB debe tratarse por separado:
 
@@ -46,7 +46,7 @@ Verifica que el entorno use OpenWrt 25.12.5, el target `ath79/generic` y el perf
 
 ```bash
 just setup-env prod
-just build-prod
+just build-prod-legacy
 ```
 
 La imagen debe terminar en `openwrt-25.12.5-ath79-generic-tplink_tl-wdr3600-v1-squashfs-sysupgrade.bin`. No uses una imagen de otro modelo.
@@ -56,7 +56,7 @@ La imagen debe terminar en `openwrt-25.12.5-ath79-generic-tplink_tl-wdr3600-v1-s
 Conecta el router por Ethernet y ejecuta:
 
 ```bash
-just router-update-force --ip 192.168.1.1
+just router-update-force --variant legacy --ip 192.168.1.1
 ```
 
 Confirma solo despues de revisar la advertencia. El router reiniciara y la conexion SSH se interrumpira durante el proceso.

@@ -37,7 +37,9 @@ El TL-WDR3600 tiene un servidor TFTP integrado en el bootloader para recuperaci�
 
 3. **Copiar la imagen factory al directorio TFTP**:
    ```bash
-   cp bin/targets/ath79/generic/*-tplink_tl-wdr3600-v1-squashfs-factory.bin /srv/tftp/
+   # Elige la variante que vas a instalar: prod-safe o prod-legacy
+   cp dist/openwrt/prod-safe/*-tplink_tl-wdr3600-v1-squashfs-factory.bin /srv/tftp/
+   # Para la imagen anterior, cambia prod-safe por prod-legacy en la ruta.
    
    # Renombrar (algunos bootloaders requieren nombres específicos)
    cd /srv/tftp/
@@ -71,14 +73,20 @@ El TL-WDR3600 tiene un servidor TFTP integrado en el bootloader para recuperaci�
 Si ya tienes OpenWRT instalado y solo actualizas, usa las recipes `router-update`:
 
 ```bash
-# Actualizar manteniendo configuración (IP desde environments/prod/.env.public)
+# Actualizar la variante safe manteniendo configuración (IP desde environments/prod/.env.public)
 just router-update
 
 # Actualizar con IP distinta
 just router-update --ip 192.168.0.1
 
+# Instalar explícitamente la imagen anterior
+just router-update --variant legacy
+
 # Actualizar borrando configuración del router (vuelve a defaults de OpenWRT)
 just router-update-force
+
+# Instalar la imagen anterior borrando la configuración actual
+just router-update-force --variant legacy
 ```
 
 O manualmente:
@@ -96,7 +104,11 @@ ssh root@192.168.1.1 "sysupgrade -n -v /tmp/openwrt-*-sysupgrade.bin"
 
 ### Arranque independiente de la USB
 
-El firmware nuevo siempre usa la configuración en flash. Configura `WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH`, genera la firma con `just profile-keygen prod`, y crea la imagen con `just build-prod`. Para migrar desde extroot, respalda primero y ejecuta `just router-update-force`: la actualización limpia elimina fstab y overlay anteriores. Arranca sin USB, verifica SSH y el AP oculto en ambas bandas; luego prepara un volumen ext4 con etiqueta `OPENWRT_PROFILE`, firma el perfil con `just profile-pack` y conéctalo al router ya encendido. Sigue [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md).
+Se generan dos variantes: `just build-prod-legacy` recupera el diseño anterior con SSID/AP separados; `just build-prod` crea la nueva imagen safe-boot. Para conservar ambas, ejecuta `just build-prod-both`: quedan en `dist/openwrt/prod-legacy/` y `dist/openwrt/prod-safe/`, cada una con su sysupgrade y checksum.
+
+Para migrar al safe-boot, configura `WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH`, genera la firma con `just profile-keygen prod`, y flashea el sysupgrade de `prod-safe`. Desde extroot, respalda primero y ejecuta `just router-update-force`: la actualización limpia elimina fstab y overlay anteriores. Arranca sin USB, verifica SSH y el AP oculto en ambas bandas; después conecta un volumen ext4 firmado con etiqueta `OPENWRT_PROFILE`. Sigue [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md).
+
+La variante `prod-legacy` no trae el supervisor ni aplica el SSID oculto; usa `WIFI_SSID_24/WIFI_KEY_24` y `WIFI_SSID_5/WIFI_KEY_5`, como la imagen anterior.
 
 Las recetas `router-setup-extroot` y `router-extroot-recover` quedan disponibles solo para unidades antiguas y diagnóstico/migración. No las ejecutes para el nuevo flujo; no configures la partición como `/overlay`.
 

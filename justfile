@@ -268,9 +268,11 @@ build-dev:
     set -euo pipefail
     echo "=== Build DEV ==="
     SECRETS_TMP=$(scripts/install/ensure-secrets.sh dev) || exit 1
-    ./scripts/templates/generate.sh dev "${SECRETS_TMP}"
+    trap 'rm -f "${SECRETS_TMP}"' EXIT
+    ./scripts/templates/generate.sh dev "${SECRETS_TMP}" safe
     rm -f "${SECRETS_TMP}"
-    ENV=dev make build
+    ENV=dev VARIANT=safe make build
+    ENV=dev VARIANT=safe ./scripts/build/verify.sh dist/openwrt/dev-safe
 
 # build-prod: Compilar imagen para producción y verificar resultado
 # Carga variables públicas de prod + intenta descifrar secrets de prod.
@@ -281,12 +283,32 @@ build-prod:
     set -euo pipefail
     echo "=== Build PROD ==="
     SECRETS_TMP=$(scripts/install/ensure-secrets.sh prod) || exit 1
-    ./scripts/templates/generate.sh prod "${SECRETS_TMP}"
+    trap 'rm -f "${SECRETS_TMP}"' EXIT
+    ./scripts/templates/generate.sh prod "${SECRETS_TMP}" safe
     rm -f "${SECRETS_TMP}"
-    ENV=prod make build
-    ENV=prod ./scripts/build/verify.sh || true
+    ENV=prod VARIANT=safe make build
+    ENV=prod VARIANT=safe ./scripts/build/verify.sh dist/openwrt/prod-safe
     echo ""
-    echo "✅ Imagen lista. Siguiente paso: ver docs/FLASH_INSTRUCTIONS.md"
+    echo "✅ Imagen safe lista en dist/openwrt/prod-safe."
+
+# build-prod-legacy: Recompilar la imagen anterior con dos SSID/AP independientes
+# Conserva el perfil Wi-Fi clásico y no incluye el supervisor USB safe-boot.
+build-prod-legacy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Build PROD LEGACY ==="
+    SECRETS_TMP=$(scripts/install/ensure-secrets.sh prod) || exit 1
+    trap 'rm -f "${SECRETS_TMP}"' EXIT
+    ./scripts/templates/generate.sh prod "${SECRETS_TMP}" legacy
+    rm -f "${SECRETS_TMP}"
+    ENV=prod VARIANT=legacy make build
+    ENV=prod VARIANT=legacy ./scripts/build/verify.sh dist/openwrt/prod-legacy
+    echo "✅ Imagen legacy lista en dist/openwrt/prod-legacy."
+
+# build-prod-both: Crear las dos imágenes de producción en directorios separados
+build-prod-both:
+    just build-prod-legacy
+    just build-prod
 
 # build: Compilar sin secrets (usa valores por defecto del entorno)
 build:
@@ -294,8 +316,8 @@ build:
     make build
 
 # generate-config: Generar archivos de configuración desde templates + secrets
-generate-config ENV:
-    ./scripts/templates/generate.sh {{ ENV }}
+generate-config ENV VARIANT="safe":
+    ./scripts/templates/generate.sh {{ ENV }} "" {{ VARIANT }}
 
 # ─────────────────────────────────────────────────────
 # Paquetes
@@ -394,13 +416,13 @@ router-add-known-host ENV="prod" ip="":
 # ─────────────────────────────────────────────────────
 
 # router-update: Actualizar firmware del router via sysupgrade (mantiene configuración)
-# Uso: just router-update [--ip <IP>] [--env <dev|prod>]
+# Uso: just router-update [--ip <IP>] [--env <dev|prod>] [--variant <safe|legacy>]
 # La IP se infiere de environments/<env>/.env.public o usa 192.168.1.1 por defecto
 router-update *args='':
     @scripts/router/update.sh {{args}}
 
 # router-update-force: Actualizar firmware borrando la configuración del router
-# Uso: just router-update-force [--ip <IP>] [--env <dev|prod>]
+# Uso: just router-update-force [--ip <IP>] [--env <dev|prod>] [--variant <safe|legacy>]
 router-update-force *args='':
     @scripts/router/update.sh --force {{args}}
 

@@ -20,6 +20,7 @@ TOML_FILE="${REPO_ROOT}/config/openwrt-packages.toml"
 BUILDER_DIR="${BUILDER_DIR:-}"
 OVERLAY_DIR="${OVERLAY_DIR:-}"
 ENV="${ENV:-}"
+VARIANT="${VARIANT:-safe}"
 
 # ---------------------------------------------------------------------------
 # Parse command-line arguments
@@ -31,6 +32,7 @@ parse_args() {
             --packages) PACKAGES_FILE="$2"; shift 2 ;;
             --builder)  BUILDER_DIR="$2"; shift 2 ;;
             --overlay)  OVERLAY_DIR="$2"; shift 2 ;;
+            --variant) VARIANT="$2"; shift 2 ;;
             --help|-h)  usage; exit 0 ;;
             *) log_error "Unknown option: $1"; usage; exit 1 ;;
         esac
@@ -46,6 +48,7 @@ Options:
   --packages FILE        Packages config file (default: config/openwrt-packages.txt)
   --builder DIR          Path to extracted Image Builder directory
   --overlay DIR          Path to config overlay directory (for custom configs)
+  --variant NAME         Image variant: safe or legacy (default: safe)
   --help, -h             Show this help
 
 Environment:
@@ -65,13 +68,14 @@ EOF
 # ---------------------------------------------------------------------------
 report_results() {
     local builder="$1"
+    local artifact_dir="$2"
 
     echo ""
     echo "==============================================="
     echo " Build Results"
     echo "==============================================="
 
-    local bin_dir="${builder}/bin/targets"
+    local bin_dir="${artifact_dir}"
 
     if [ -d "${bin_dir}" ]; then
         echo ""
@@ -85,7 +89,7 @@ report_results() {
         echo ""
         log_info "Next steps:"
         echo "  1. Verify the image:"
-        echo "     ${SCRIPT_DIR}/verify.sh ${bin_dir}/ath79/generic"
+        echo "     ${SCRIPT_DIR}/verify.sh ${bin_dir}"
         echo ""
         echo "  2. Flash the router:"
         echo "     See docs/FLASH_INSTRUCTIONS.md"
@@ -99,6 +103,8 @@ report_results() {
 # ---------------------------------------------------------------------------
 main() {
     parse_args "$@"
+
+    case "${VARIANT}" in safe|legacy) ;; *) log_error "Unknown variant '${VARIANT}'; use safe or legacy"; exit 2 ;; esac
 
     if [ -n "${ENV}" ]; then
         local env_file="${REPO_ROOT}/environments/${ENV}/.env.public"
@@ -140,22 +146,27 @@ main() {
         log_error "Packages file not found: ${PACKAGES_FILE}"
         exit 1
     }
+    if [[ "${VARIANT}" == "legacy" ]]; then
+        packages="${packages//usign/}"
+    fi
     local count
     count=$(echo "${packages}" | wc -w | xargs)
     log_info "Packages: ${count} from ${PACKAGES_FILE}"
 
     # Step 3: Compile
-    if [ -z "${OVERLAY_DIR}" ] && [ -n "${ENV}" ] && [ -d "${REPO_ROOT}/config/overlay/${ENV}" ]; then
-        OVERLAY_DIR="${REPO_ROOT}/config/overlay/${ENV}"
+    if [ -z "${OVERLAY_DIR}" ] && [ -n "${ENV}" ] && [ -d "${REPO_ROOT}/config/overlay/${ENV}/${VARIANT}" ]; then
+        OVERLAY_DIR="${REPO_ROOT}/config/overlay/${ENV}/${VARIANT}"
     fi
     if [ -n "${OVERLAY_DIR}" ] && [[ "${OVERLAY_DIR}" != /* ]]; then
         OVERLAY_DIR="$(cd "$(dirname "${OVERLAY_DIR}")" && pwd)/$(basename "${OVERLAY_DIR}")"
     fi
 
-    "${SCRIPT_DIR}/compile.sh" "${builder}" "${packages}" "${PROFILE}" "${OVERLAY_DIR}" || exit $?
+    local artifact_env="${ENV:-manual}"
+    local artifact_dir="${ARTIFACT_DIR:-${REPO_ROOT}/dist/openwrt/${artifact_env}-${VARIANT}}"
+    "${SCRIPT_DIR}/compile.sh" "${builder}" "${packages}" "${PROFILE}" "${OVERLAY_DIR}" "${artifact_dir}" || exit $?
 
     # Step 4: Report
-    report_results "${builder}"
+    report_results "${builder}" "${artifact_dir}"
 }
 
 # Allow running standalone

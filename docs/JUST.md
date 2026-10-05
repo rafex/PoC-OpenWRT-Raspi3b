@@ -79,10 +79,12 @@ just edit-secrets prod
 | `setup-env` | `just setup-env [prod]` | Descarga y extrae el OpenWrt Image Builder definido en `.env.public`. |
 | `packages` | `just packages` | Muestra la configuración de paquetes desde `config/openwrt-packages.toml`. |
 | `refresh-packages` | `just refresh-packages` | Regenera `config/openwrt-packages.txt` desde el TOML. |
-| `generate-config` | `just generate-config prod` | Genera `config/overlay/<env>/` desde templates y secrets. |
+| `generate-config` | `just generate-config prod [safe\|legacy]` | Genera `config/overlay/<env>/<variant>/` desde templates y secrets. |
 | `build` | `just build` | Compila sin secrets usando valores por defecto. |
 | `build-dev` | `just build-dev` | Verifica secrets dev, genera overlay dev y compila. |
 | `build-prod` | `just build-prod` | Verifica secrets prod, genera overlay prod, compila y verifica imagen. |
+| `build-prod-legacy` | `just build-prod-legacy` | Compila la imagen anterior con AP separados; sin supervisor USB safe-boot. |
+| `build-prod-both` | `just build-prod-both` | Compila ambas variantes y conserva los artefactos en directorios distintos. |
 | `validate` | `just validate` | Ejecuta `shellcheck` vía `make validate`. |
 | `clean` | `just clean` | Limpia artefactos de compilación y `/tmp/secrets-*.yaml`. |
 | `clean-all` | `just clean-all` | Limpia artefactos, overlay generado y `/tmp/secrets-*.yaml`. |
@@ -93,14 +95,15 @@ Flujo típico:
 just setup-env prod
 just refresh-packages
 just build-prod
+just build-prod-both   # Deja prod-legacy/ y prod-safe/ en dist/openwrt/
 ```
 
 ## Firmware / Sysupgrade
 
 | Recipe | Uso | Descripción |
 |--------|-----|-------------|
-| `router-update` | `just router-update [--ip <IP>] [--env <env>]` | Ejecuta `sysupgrade` manteniendo configuración. |
-| `router-update-force` | `just router-update-force [--ip <IP>] [--env <env>]` | Ejecuta `sysupgrade -n`; borra configuración del router. |
+| `router-update` | `just router-update [--ip <IP>] [--env <env>] [--variant <safe|legacy>]` | Instala el artefacto persistente de esa variante y mantiene configuración. |
+| `router-update-force` | `just router-update-force [--ip <IP>] [--env <env>] [--variant <safe|legacy>]` | Instala el artefacto elegido con `sysupgrade -n`; borra configuración del router. |
 | `profile-keygen` | `just profile-keygen [dev\|prod]` | Crea clave `usign`; pública en el entorno, privada local al host. |
 | `profile-pack` | `just profile-pack prod profile.conf /media/usb [backend]` | Empaqueta y firma el perfil USB. |
 | `profile-status` | `just profile-status [ip=<IP>] [env=<env>]` | Consulta el perfil activo o el modo base. |
@@ -111,9 +114,10 @@ Ejemplos:
 ```bash
 just router-update --ip 192.168.1.1
 just router-update-force --ip 192.168.1.1
+just router-update-force --variant legacy --ip 192.168.1.1
 ```
 
-`router-update` mantiene la configuración persistente actual. `router-update-force` usa `sysupgrade -n`: borra el `/overlay` persistente del router y aplica la configuración incluida en la imagen. Se perderán los cambios persistentes de contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`; los valores que `build-prod` haya incluido en la imagen volverán a aplicarse.
+El actualizador busca imágenes en `dist/openwrt/<env>-<variant>/` y nunca selecciona otra variante como sustituto. `safe` es el valor predeterminado; para instalar la imagen clásica usa `--variant legacy`. `router-update` mantiene la configuración persistente actual. `router-update-force` usa `sysupgrade -n`: borra el `/overlay` persistente del router y aplica la configuración incluida en la imagen. Se perderán los cambios persistentes de contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`; los valores que se compilaron en la variante elegida volverán a aplicarse.
 
 `router-update-force` no formatea una USB. El flujo vigente no usa extroot: la USB se conecta tras arrancar y carga un perfil firmado. Consulta [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md). Las recipes extroot de más abajo son solo para recuperar instalaciones antiguas.
 

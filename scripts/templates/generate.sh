@@ -17,8 +17,9 @@ source "${SCRIPT_DIR}/../commons/secrets.sh"
 
 ENV="${1:-prod}"
 SECRETS_FILE="${2:-}"
+VARIANT="${3:-safe}"
 PUBLIC_ENV_FILE="${REPO_ROOT}/environments/${ENV}/.env.public"
-OVERLAY_DIR="${REPO_ROOT}/config/overlay/${ENV}"
+OVERLAY_DIR="${REPO_ROOT}/config/overlay/${ENV}/${VARIANT}"
 _SECRETS_OWNED=false
 
 # ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ _validate_output() {
 
 # ---------------------------------------------------------------------------
 main() {
+    case "${VARIANT}" in safe|legacy) ;; *) log_error "Unknown image variant: ${VARIANT} (use safe or legacy)"; exit 2 ;; esac
     if [ ! -f "${PUBLIC_ENV_FILE}" ]; then
         log_error "${PUBLIC_ENV_FILE} not found"
         echo "  Run: just create-environments"
@@ -143,9 +145,9 @@ main() {
     mkdir -p "${OVERLAY_DIR}/etc"
     mkdir -p "${OVERLAY_DIR}/usr/sbin"
 
-    # Production fallback credentials are mandatory: the router must be
-    # reachable and protected even when no USB profile is available.
-    if [[ "${ENV}" == "prod" ]]; then
+    if [[ "${VARIANT}" == "safe" && "${ENV}" == "prod" ]]; then
+        # Production fallback credentials are mandatory: the router must be
+        # reachable and protected even when no USB profile is available.
         for required in WIFI_SAFE_SSID ROOT_PASSWORD_HASH WIFI_SAFE_KEY; do
             value="${!required:-}"
             if [[ "${required}" != WIFI_SAFE_SSID ]]; then
@@ -168,19 +170,37 @@ main() {
             exit 1
         fi
         export WIFI_SAFE_KEY
-    else
+    elif [[ "${VARIANT}" == "safe" ]]; then
         WIFI_SAFE_KEY="$(yq eval -r '.WIFI_SAFE_KEY // ""' "${SECRETS_FILE}")"
         ROOT_PASSWORD_HASH="$(yq eval -r '.ROOT_PASSWORD_HASH // ""' "${SECRETS_FILE}")"
         export WIFI_SAFE_KEY ROOT_PASSWORD_HASH
+    elif [[ "${VARIANT}" == "legacy" && "${ENV}" == "prod" ]]; then
+        # Refuse to silently produce a legacy image without its two APs.
+        for required in WIFI_SSID_24 WIFI_SSID_5; do
+            value="${!required:-}"
+            if [[ ! "${value}" =~ ^[A-Za-z0-9_@%+=:,./-]{1,32}$ ]]; then
+                log_error "${required} must be 1-32 characters from A-Z, a-z, 0-9, _@%+=:,./- for the production legacy image"
+                exit 1
+            fi
+        done
+        for required in WIFI_KEY_24 WIFI_KEY_5; do
+            value="$(yq eval -r ".${required} // \"\"" "${SECRETS_FILE}")"
+            if [[ ! "${value}" =~ ^[A-Za-z0-9_@%+=:,./-]{8,63}$ ]]; then
+                log_error "${required} must be 8-63 characters from A-Z, a-z, 0-9, _@%+=:,./- for the production legacy image"
+                exit 1
+            fi
+        done
     fi
 
-    # The verification key is public and checked into the environment folder.
-    PROFILE_PUBKEY="${REPO_ROOT}/environments/${ENV}/profile-signing.pub"
-    if [ -f "${PROFILE_PUBKEY}" ]; then
-        cp "${PROFILE_PUBKEY}" "${OVERLAY_DIR}/etc/router-profile.pub"
-    elif [[ "${ENV}" == "prod" ]]; then
-        log_error "Missing ${PROFILE_PUBKEY}; create a signing key with: just profile-keygen prod"
-        exit 1
+    if [[ "${VARIANT}" == "safe" ]]; then
+        # The verification key is public and checked into the environment folder.
+        PROFILE_PUBKEY="${REPO_ROOT}/environments/${ENV}/profile-signing.pub"
+        if [ -f "${PROFILE_PUBKEY}" ]; then
+            cp "${PROFILE_PUBKEY}" "${OVERLAY_DIR}/etc/router-profile.pub"
+        elif [[ "${ENV}" == "prod" ]]; then
+            log_error "Missing ${PROFILE_PUBKEY}; create a signing key with: just profile-keygen prod"
+            exit 1
+        fi
     fi
 
     replace_template "${REPO_ROOT}/templates/etc/dropbear/dropbear_rsa_host_key.template" \
@@ -189,25 +209,32 @@ main() {
     replace_template "${REPO_ROOT}/templates/etc/wireguard/wg0.conf.template" \
                      "${OVERLAY_DIR}/etc/wireguard/wg0.conf"
 
-    replace_template "${REPO_ROOT}/templates/etc/config/wireless.template" \
+    if [[ "${VARIANT}" == "legacy" ]]; then
+        WIRELESS_TEMPLATE="${REPO_ROOT}/templates/variants/legacy/etc/config/wireless.template"
+    else
+        WIRELESS_TEMPLATE="${REPO_ROOT}/templates/etc/config/wireless.template"
+    fi
+    replace_template "${WIRELESS_TEMPLATE}" \
                      "${OVERLAY_DIR}/etc/config/wireless"
 
-    replace_template "${REPO_ROOT}/templates/etc/uci-defaults/10-root-password.template" \
-                     "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
-    cp "${REPO_ROOT}/templates/usr/sbin/router-profile" "${OVERLAY_DIR}/usr/sbin/router-profile"
-    cp "${REPO_ROOT}/templates/etc/init.d/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile"
-    cp "${REPO_ROOT}/templates/etc/init.d/router-agent-profile" "${OVERLAY_DIR}/etc/init.d/router-agent-profile"
-    cp "${REPO_ROOT}/templates/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile"
-    chmod 755 "${OVERLAY_DIR}/usr/sbin/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile" \
-              "${OVERLAY_DIR}/etc/init.d/router-agent-profile" \
-              "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
+    if [[ "${VARIANT}" == "safe" ]]; then
+        replace_template "${REPO_ROOT}/templates/etc/uci-defaults/10-root-password.template" \
+                         "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
+        cp "${REPO_ROOT}/templates/usr/sbin/router-profile" "${OVERLAY_DIR}/usr/sbin/router-profile"
+        cp "${REPO_ROOT}/templates/etc/init.d/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile"
+        cp "${REPO_ROOT}/templates/etc/init.d/router-agent-profile" "${OVERLAY_DIR}/etc/init.d/router-agent-profile"
+        cp "${REPO_ROOT}/templates/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile"
+        chmod 755 "${OVERLAY_DIR}/usr/sbin/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile" \
+                  "${OVERLAY_DIR}/etc/init.d/router-agent-profile" \
+                  "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
+    fi
 
     echo ""
     _validate_output
     log_info "Config generated at: ${OVERLAY_DIR}"
     echo ""
     echo "To build with this overlay:"
-    echo "  just build-${ENV}"
+    echo "  just build-${ENV} (safe variant)"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

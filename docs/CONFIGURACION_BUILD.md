@@ -161,7 +161,9 @@ Los placeholders tienen forma:
 {{WIREGUARD_PRIVATE_KEY}}
 ```
 
-`just generate-config prod` lee:
+`just generate-config prod safe` lee la configuración de safe-boot. Para volver a la imagen anterior usa `just generate-config prod legacy`.
+
+El build safe escribe:
 
 - `environments/prod/.env.public`
 - `/tmp/secrets-prod.yaml`, generado por `scripts/install/ensure-secrets.sh prod`
@@ -169,10 +171,10 @@ Los placeholders tienen forma:
 y escribe:
 
 ```bash
-config/overlay/prod/
+config/overlay/prod/safe/
 ```
 
-`just build-prod` pasa ese overlay al Image Builder con `FILES=...`, por lo que esos archivos entran al firmware.
+`just build-prod` pasa ese overlay al Image Builder con `FILES=...`, por lo que esos archivos entran al firmware. La variante anterior se genera en `config/overlay/prod/legacy/`; `just build-prod-both` conserva los dos binarios bajo `dist/openwrt/`.
 
 ## Flujo Completo
 

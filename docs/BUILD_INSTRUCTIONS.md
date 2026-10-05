@@ -80,6 +80,8 @@ just refresh-packages
 # Recomendado: con just
 just build-dev       # Desarrollo (valores dummy)
 just build-prod      # Producción (con secrets reales)
+just build-prod-legacy # Imagen anterior, AP separados
+just build-prod-both # Genera ambas variantes en directorios separados
 
 # O con scripts modulares:
 ./scripts/build/openwrt.sh --builder openwrt-builder/*/
@@ -106,7 +108,9 @@ just build --profile tplink_tl-wdr3600-v1
 
 ```bash
 # Recomendado: con just
-just build-prod      # Compila + verifica
+just build-prod       # Compila + verifica la variante safe-boot
+just build-prod-legacy # Compila + verifica la variante anterior
+just build-prod-both # Genera ambas en dist/openwrt/prod-{legacy,safe}/
 
 # O con script modular:
 ENV=prod ./scripts/build/verify.sh
@@ -119,7 +123,12 @@ El script verifica:
 
 ## Artefactos generados
 
-Después de una compilación exitosa, encontrarás en `bin/targets/ath79/generic/`:
+Después de compilar con las recipes `just`, encontrarás los artefactos persistidos por variante:
+
+- `dist/openwrt/prod-safe/` — imagen safe-boot
+- `dist/openwrt/prod-legacy/` — imagen anterior
+
+Cada directorio contiene:
 
 | Archivo | Descripción |
 |---------|-------------|
@@ -127,6 +136,8 @@ Después de una compilación exitosa, encontrarás en `bin/targets/ath79/generic
 | `*-sysupgrade.bin` | Imagen para actualización (desde OpenWRT existente) |
 | `sha256sums` | Checksums de verificación |
 | `*.manifest` | Lista de paquetes incluidos |
+
+El Image Builder conserva temporalmente su salida en `openwrt-builder/bin/targets/ath79/generic/`; para flashear selecciona siempre el artefacto de la variante deseada en `dist/openwrt/`.
 
 ## Resolución de problemas
 

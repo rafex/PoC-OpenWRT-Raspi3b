@@ -44,7 +44,7 @@ WIFI_SSID_5=MiRed5G
 WIFI_SAFE_SSID=OpenWRT-Recovery
 ```
 
-`WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH` son obligatorios para `just build-prod`. La clave root se aplica al primer arranque de la imagen.
+`WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH` son obligatorios para `just build-prod` (safe-boot) y `just build-prod-both`. La variante anterior `just build-prod-legacy` usa `WIFI_SSID_24/5` y `WIFI_KEY_24/5`; si ejecutas `build-prod-both`, debes completar también esos cuatro valores para que la imagen legacy no salga sin sus AP. La clave root se aplica al primer arranque de la imagen safe-boot.
 
 ### Firma de perfiles USB
 
@@ -180,4 +180,4 @@ sops updatekeys environments/dev/secrets.enc.yaml
 
 ### ¿Qué hace `just generate-config`?
 
-Toma los templates en `templates/etc/` y reemplaza los placeholders `{{VARIABLE}}` con los valores de `.env.public` y los secrets desencriptados. El resultado se guarda en `config/overlay/<env>/` (no committeado por `.gitignore`).
+Toma los templates de la variante y reemplaza los placeholders `{{VARIABLE}}` con los valores de `.env.public` y los secrets desencriptados. El resultado se guarda en `config/overlay/<env>/<safe|legacy>/` (no se commitea por `.gitignore`).
