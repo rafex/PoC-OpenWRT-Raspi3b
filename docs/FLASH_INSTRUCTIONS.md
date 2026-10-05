@@ -94,39 +94,11 @@ ssh root@192.168.1.1 "sysupgrade -v /tmp/openwrt-*-sysupgrade.bin"
 ssh root@192.168.1.1 "sysupgrade -n -v /tmp/openwrt-*-sysupgrade.bin"
 ```
 
-### Reinstalacion limpia despues de `apk upgrade`
+### Arranque independiente de la USB
 
-Si se ejecuto `apk upgrade` antes de activar extroot, los paquetes actualizados quedaron en el overlay interno. Para volver a una imagen conocida y liberar ese espacio:
+El firmware nuevo siempre usa la configuración en flash. Configura `WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH`, genera la firma con `just profile-keygen prod`, y crea la imagen con `just build-prod`. Para migrar desde extroot, respalda primero y ejecuta `just router-update-force`: la actualización limpia elimina fstab y overlay anteriores. Arranca sin USB, verifica SSH y el AP oculto en ambas bandas; luego prepara un volumen ext4 con etiqueta `OPENWRT_PROFILE`, firma el perfil con `just profile-pack` y conéctalo al router ya encendido. Sigue [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md).
 
-```bash
-just router-backup --ip 192.168.1.1
-just build-prod
-just router-update-force --ip 192.168.1.1
-```
-
-`router-update-force` borra los cambios persistentes del router mediante `sysupgrade -n`: contrasena root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente. Los valores que `build-prod` haya incluido en la imagen vuelven a aplicarse. No formatea el USB externo.
-
-Despues del reinicio, recupera el USB desde `bastion-wifi` antes de volver a usarlo como extroot:
-
-```bash
-cd /opt/repository/github/PoC-OpenWRT-Raspi3b
-just host-recover-extroot-usb --list
-just router-extroot-recover prepare --ip 192.168.1.1
-USB_UUID="<UUID reportado por prepare>"
-just host-recover-extroot-usb --uuid "$USB_UUID" --repair
-just router-extroot-recover finish --ip 192.168.1.1 --uuid "$USB_UUID"
-```
-
-Arranca primero el router sin USB. Después conéctala y ejecuta `prepare` para guardar sus logs y desmontarla de forma segura. Mueve la USB a esta máquina Linux y repara por su UUID; el host guarda un respaldo completo o parcial de lo legible antes de `e2fsck -p`. Tras la verificación, vuelve a conectarla al router y ejecuta `finish`, que actualiza fstab sin copiar ni borrar archivos. El router no reinicia automáticamente. Si quieres una instalación vacía, usa `host-format-extroot-usb` solo después de conservar lo que necesites.
-
-Conecta de nuevo el USB al router y prepara extroot:
-
-```bash
-just router-setup-extroot --ip 192.168.1.1 --device /dev/sda1
-just router-status --ip 192.168.1.1
-```
-
-No ejecutes `apk upgrade` ni instales paquetes post-flash hasta que `router-status` muestre `Extroot : activo`.
+Las recetas `router-setup-extroot` y `router-extroot-recover` quedan disponibles solo para unidades antiguas y diagnóstico/migración. No las ejecutes para el nuevo flujo; no configures la partición como `/overlay`.
 
 ## Configuración inicial post-flasheo
 
@@ -134,13 +106,13 @@ No ejecutes `apk upgrade` ni instales paquetes post-flash hasta que `router-stat
 
 Después del flasheo, OpenWRT arranca con:
 - **IP:** 192.168.1.1
-- **SSH:** puerto 22 (sin contraseña en primer arranque — configurar inmediatamente)
+- **SSH:** puerto 22, protegido con la contraseña definida en `ROOT_PASSWORD_HASH` durante el build de producción
 
 ```bash
 ssh root@192.168.1.1
 ```
 
-### 2. Establecer contraseña
+### 2. Cambiar la contraseña (opcional)
 
 ```bash
 passwd

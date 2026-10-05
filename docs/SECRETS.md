@@ -28,6 +28,7 @@ environments/{dev,prod}/
 ```yaml
 WIFI_KEY_24: ""                      # Contraseña red 2.4 GHz
 WIFI_KEY_5: ""                       # Contraseña red 5 GHz
+WIFI_SAFE_KEY: ""                    # Clave compartida para los AP ocultos de recuperación
 WIREGUARD_PRIVATE_KEY: ""            # Clave privada WireGuard
 DROPBEAR_RSA_HOST_KEY: ""            # Host key privada de Dropbear
 ROOT_PASSWORD_HASH: ""               # Hash SHA-512-crypt para /etc/shadow
@@ -40,7 +41,14 @@ Los **nombres de red** (SSID) van en `.env.public` — no son secretos:
 ```bash
 WIFI_SSID_24=MiRed24
 WIFI_SSID_5=MiRed5G
+WIFI_SAFE_SSID=OpenWRT-Recovery
 ```
+
+`WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH` son obligatorios para `just build-prod`. La clave root se aplica al primer arranque de la imagen.
+
+### Firma de perfiles USB
+
+`just profile-keygen prod` crea una clave privada `usign` en `~/.config/poc-openwrt/profile-signing-prod.key` y una clave pública en `environments/prod/profile-signing.pub`. La clave pública se incluye en el firmware y debe commitearse; la privada permanece solo en los hosts autorizados. Los perfiles se firman con `just profile-pack`. El bundle puede contener claves y contraseñas en claro: la firma detecta modificaciones, pero no cifra el contenido.
 
 ### Clave SSH restringida y token del router-agent
 

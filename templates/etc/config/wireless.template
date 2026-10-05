@@ -1,6 +1,4 @@
-# Wireless Configuration Template (OpenWRT)
-# Generado por scripts/generate-config.sh
-
+# Base de emergencia: dos AP con el mismo SSID oculto, independiente de la USB.
 config wifi-device 'radio0'
     option type 'mac80211'
     option channel 'auto'
@@ -12,9 +10,10 @@ config wifi-iface 'default_radio0'
     option device 'radio0'
     option network 'lan'
     option mode 'ap'
-    option ssid '{{WIFI_SSID_24}}'
+    option ssid '{{WIFI_SAFE_SSID}}'
+    option hidden '1'
     option encryption 'psk2'
-    option key '{{WIFI_KEY_24}}'
+    option key '{{WIFI_SAFE_KEY}}'
 
 config wifi-device 'radio1'
     option type 'mac80211'
@@ -27,6 +26,7 @@ config wifi-iface 'default_radio1'
     option device 'radio1'
     option network 'lan'
     option mode 'ap'
-    option ssid '{{WIFI_SSID_5}}'
+    option ssid '{{WIFI_SAFE_SSID}}'
+    option hidden '1'
     option encryption 'psk2'
-    option key '{{WIFI_KEY_5}}'
+    option key '{{WIFI_SAFE_KEY}}'

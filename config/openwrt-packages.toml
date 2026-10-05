@@ -3,7 +3,7 @@
 # ============================================================================
 # Profile: tplink_tl-wdr3600-v1
 # Target:  ath79/generic
-# RAM:     64 MB (WDR3600 hardware limit)
+# RAM:     128 MB (TL-WDR3600 v1 hardware specification; verify on device)
 #
 # This is the authoritative package list. The legacy config/openwrt-packages.txt
 # is auto-generated from this file — do NOT edit it manually.
@@ -12,7 +12,7 @@
 [metadata]
 profile = "tplink_tl-wdr3600-v1"
 target = "ath79/generic"
-ram_mb = 64
+ram_mb = 128
 
 # ============================================================================
 # INCLUDED PACKAGES
@@ -43,7 +43,8 @@ ram_mb = 64
   "kmod-usb-storage-uas",
   "kmod-scsi-core",
   "kmod-fs-ext4",
-  "block-mount"
+  "block-mount",
+  "usign"
 ]
 "USB Networking (tethering)" = [
   "kmod-usb-net",
@@ -104,12 +105,12 @@ ram_mb = 64
 # ============================================================================
 
 [warnings]
-tor = "Consumes 50-80 MB RAM on 64 MB device. High OOM risk — removed from build."
+tor = "Consumes 50-80 MB RAM on the 128 MB device and can still create memory pressure; removed from build."
 tor_integration = "Tor runs on the Raspberry Pi 3B; OpenWRT only manages forwarding/proxy rules."
 flash_limit = "TL-WDR3600 has 8 MB flash. Keep total squashfs < 5.5 MB compressed."
 
 [notes]
-extroot = "USB extroot uses ext4 filesystem only. FAT32/exFAT support not required."
+usb_profiles = "USB is an optional signed profile volume (label OPENWRT_PROFILE), never /overlay; base config boots from flash first."
 ca_certificates = "Removed: redundant with ca-bundle. Saves ~300 KB."
 kmod_nls = "Removed kmod-nls-* and kmod-scsi-generic: only needed for FAT32/exFAT."
 e2fsprogs = "Removed: format ext4 USB drives on another machine before use."

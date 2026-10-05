@@ -129,12 +129,59 @@ main() {
     # shellcheck disable=SC1090
     source "${PUBLIC_ENV_FILE}"
     set +a
+    WIFI_SAFE_SSID="${WIFI_SAFE_SSID:-}"
+    export WIFI_SAFE_SSID
 
     log_step "Generating config for environment: ${ENV}"
 
     mkdir -p "${OVERLAY_DIR}/etc/dropbear"
     mkdir -p "${OVERLAY_DIR}/etc/wireguard"
     mkdir -p "${OVERLAY_DIR}/etc/config"
+    mkdir -p "${OVERLAY_DIR}/etc/uci-defaults"
+    mkdir -p "${OVERLAY_DIR}/etc/hotplug.d/block"
+    mkdir -p "${OVERLAY_DIR}/etc/init.d"
+    mkdir -p "${OVERLAY_DIR}/etc"
+    mkdir -p "${OVERLAY_DIR}/usr/sbin"
+
+    # Production fallback credentials are mandatory: the router must be
+    # reachable and protected even when no USB profile is available.
+    if [[ "${ENV}" == "prod" ]]; then
+        for required in WIFI_SAFE_SSID ROOT_PASSWORD_HASH WIFI_SAFE_KEY; do
+            value="${!required:-}"
+            if [[ "${required}" != WIFI_SAFE_SSID ]]; then
+                value="$(yq eval -r ".${required} // \"\"" "${SECRETS_FILE}")"
+            fi
+            if [[ "${required}" == WIFI_SAFE_KEY ]]; then
+                WIFI_SAFE_KEY="${value}"
+            fi
+            if [ -z "${value}" ]; then
+                log_error "${required} is required for the production safe-boot configuration"
+                exit 1
+            fi
+        done
+        if [[ ! "${WIFI_SAFE_SSID}" =~ ^[A-Za-z0-9_@%+=:,./-]{1,32}$ ]]; then
+            log_error "WIFI_SAFE_SSID must be 1-32 characters from A-Z, a-z, 0-9, _@%+=:,./-"
+            exit 1
+        fi
+        if [[ ! "${WIFI_SAFE_KEY}" =~ ^[A-Za-z0-9_@%+=:,./-]{8,63}$ ]]; then
+            log_error "WIFI_SAFE_KEY must be 8-63 characters from A-Z, a-z, 0-9, _@%+=:,./-"
+            exit 1
+        fi
+        export WIFI_SAFE_KEY
+    else
+        WIFI_SAFE_KEY="$(yq eval -r '.WIFI_SAFE_KEY // ""' "${SECRETS_FILE}")"
+        ROOT_PASSWORD_HASH="$(yq eval -r '.ROOT_PASSWORD_HASH // ""' "${SECRETS_FILE}")"
+        export WIFI_SAFE_KEY ROOT_PASSWORD_HASH
+    fi
+
+    # The verification key is public and checked into the environment folder.
+    PROFILE_PUBKEY="${REPO_ROOT}/environments/${ENV}/profile-signing.pub"
+    if [ -f "${PROFILE_PUBKEY}" ]; then
+        cp "${PROFILE_PUBKEY}" "${OVERLAY_DIR}/etc/router-profile.pub"
+    elif [[ "${ENV}" == "prod" ]]; then
+        log_error "Missing ${PROFILE_PUBKEY}; create a signing key with: just profile-keygen prod"
+        exit 1
+    fi
 
     replace_template "${REPO_ROOT}/templates/etc/dropbear/dropbear_rsa_host_key.template" \
                      "${OVERLAY_DIR}/etc/dropbear/dropbear_rsa_host_key"
@@ -144,6 +191,16 @@ main() {
 
     replace_template "${REPO_ROOT}/templates/etc/config/wireless.template" \
                      "${OVERLAY_DIR}/etc/config/wireless"
+
+    replace_template "${REPO_ROOT}/templates/etc/uci-defaults/10-root-password.template" \
+                     "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
+    cp "${REPO_ROOT}/templates/usr/sbin/router-profile" "${OVERLAY_DIR}/usr/sbin/router-profile"
+    cp "${REPO_ROOT}/templates/etc/init.d/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile"
+    cp "${REPO_ROOT}/templates/etc/init.d/router-agent-profile" "${OVERLAY_DIR}/etc/init.d/router-agent-profile"
+    cp "${REPO_ROOT}/templates/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile"
+    chmod 755 "${OVERLAY_DIR}/usr/sbin/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile" \
+              "${OVERLAY_DIR}/etc/init.d/router-agent-profile" \
+              "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
 
     echo ""
     _validate_output

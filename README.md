@@ -45,6 +45,7 @@ just build-prod
 
 - ✅ SSH (`dropbear`) · TLS/HTTPS · Firewall (`nftables`)
 - ✅ USB Storage (`ext4`, `block-mount`)
+- ✅ Arranque seguro sin USB y carga en caliente de perfiles USB firmados (`usign`); USB nunca es `/overlay`
 - ✅ VPN WireGuard · Wi-Fi Dual-Band (2.4/5 GHz)
 - ✅ Integración Tor vía Raspberry Pi 3B (SOCKS y proxy transparente `.onion`)
 - ❌ LuCi, uhttpd y módulos LuCI de `rpcd` excluidos
@@ -59,7 +60,9 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 |--------|-------------|
 | `just router-copy-keys` | Copia clave SSH pública a Dropbear sin cambiar contraseña root |
 | `just router-setup-auth` | Copia clave SSH pública + contraseña root |
-| `just router-setup-extroot` | Configura USB como extroot (`/overlay`) |
+| `just profile-keygen` / `just profile-pack` | Firma perfiles USB opcionales desde el host |
+| `just profile-status` | Muestra modo base o perfil USB activo |
+| `just router-agent-build-usb` | Compila el agente MIPS (Rust si está listo; Go como fallback) |
 | `just router-extroot-recover` | Captura diagnóstico en vivo y corrige fstab tras reparar USB en el host |
 | `just host-recover-extroot-usb` | Respalda archivos legibles y repara ext4 opcionalmente desde el host |
 | `just host-format-extroot-usb` | Formatea una particion USB como ext4 para extroot |
@@ -81,6 +84,8 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-wireguard-status` / `just router-wireguard-peer-list` | Estado del túnel WireGuard y peers activos |
 | `just router-wireguard-peer-add` / `just router-wireguard-peer-remove` | Añade / elimina peers WireGuard via UCI |
 | `just router-port-forward-list` / `just router-port-forward-add` / `just router-port-forward-remove` | Port forwarding DNAT desde WAN (TCP/UDP/ambos) |
+
+No conectes la unidad como extroot. Enciende primero el router desde la flash; después conecta la unidad ext4 firmada con etiqueta `OPENWRT_PROFILE`. El modo base expone el SSID oculto definido para recuperación en ambas bandas. Consulta [el caso de perfiles USB](docs/uses-case/examples/usb-hotplug-profile-safe-boot.md) antes de migrar.
 | `just router-socks-enable` / `just router-socks-disable` / `just router-socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
 | `just router-onion-enable` / `just router-onion-disable` / `just router-onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
 | `just router-onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |

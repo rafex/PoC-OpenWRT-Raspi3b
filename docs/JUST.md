@@ -101,6 +101,10 @@ just build-prod
 |--------|-----|-------------|
 | `router-update` | `just router-update [--ip <IP>] [--env <env>]` | Ejecuta `sysupgrade` manteniendo configuración. |
 | `router-update-force` | `just router-update-force [--ip <IP>] [--env <env>]` | Ejecuta `sysupgrade -n`; borra configuración del router. |
+| `profile-keygen` | `just profile-keygen [dev\|prod]` | Crea clave `usign`; pública en el entorno, privada local al host. |
+| `profile-pack` | `just profile-pack prod profile.conf /media/usb [backend]` | Empaqueta y firma el perfil USB. |
+| `profile-status` | `just profile-status [ip=<IP>] [env=<env>]` | Consulta el perfil activo o el modo base. |
+| `router-agent-build-usb` | `just router-agent-build-usb` | Compila el binario MIPS para bundle USB; prefiere Rust y usa Go como fallback. |
 
 Ejemplos:
 
@@ -111,7 +115,7 @@ just router-update-force --ip 192.168.1.1
 
 `router-update` mantiene la configuración persistente actual. `router-update-force` usa `sysupgrade -n`: borra el `/overlay` persistente del router y aplica la configuración incluida en la imagen. Se perderán los cambios persistentes de contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`; los valores que `build-prod` haya incluido en la imagen volverán a aplicarse.
 
-`router-update-force` no formatea un USB externo. Si usas extroot, el USB se debe reparar, respaldar o formatear por separado y después volver a configurar con `router-setup-extroot`. Consulta el caso completo en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
+`router-update-force` no formatea una USB. El flujo vigente no usa extroot: la USB se conecta tras arrancar y carga un perfil firmado. Consulta [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md). Las recipes extroot de más abajo son solo para recuperar instalaciones antiguas.
 
 Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexion SSH se interrumpira durante el reinicio.
 
@@ -121,12 +125,12 @@ Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexi
 |--------|-----|-------------|
 | `router-copy-keys` | `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root. |
 | `router-setup-auth` | `just router-setup-auth [--ip <IP>] [--env <dev\|prod>] [--key <path>] [--man]` | Copia clave SSH y configura contraseña root. |
-| `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | Configura USB como extroot. Requiere USB ext4. |
+| `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | LEGACY: configura USB como extroot. No usar en firmware con perfiles USB. |
 | `router-extroot-recover` | `just router-extroot-recover prepare [--ip <IP>] [--uuid <UUID>]` o `finish --ip <IP> --uuid <UUID>` | Captura diagnóstico y desmonta la USB en el router; tras repararla en host, corrige el UUID sin copiar datos ni reiniciar. |
 | `host-format-extroot-usb` | `just host-format-extroot-usb --list` o `just host-format-extroot-usb --device /dev/sdX1` | Borra/formatea una particion USB local como ext4 para extroot. Ejecutar desde `bastion-wifi` o la maquina con el USB conectado. |
 | `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `--uuid <UUID> [--repair]` | Respalda archivos legibles y logs en host; `--repair` intenta `e2fsck -f -p` tras confirmación. No formatea. |
 | `router-setup-logs-ram` | `just router-setup-logs-ram [IP] [env]` | Configura buffer de logs en RAM; no persiste reinicios. |
-| `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | Configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
+| `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | LEGACY: configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
 | `router-post-install` | `just router-post-install --group <grupo> --ip <IP> --env <env>` | Instala paquetes post-flash definidos en `config/openwrt-post-install-packages.toml`. |
 
 `--env` selecciona el perfil de despliegue. `prod` usa los valores de producción y `dev` los valores de desarrollo; no cambia el modo del router. Si ambos perfiles apuntan a `192.168.1.1`, ambos operan sobre el mismo router físico.
@@ -175,16 +179,9 @@ scripts/router/post-install.sh --list
 
 ## Reinstalacion limpia y extroot
 
-Cuando se actualizo el router con `apk upgrade` antes de montar el USB, usa este orden:
+LEGACY: esta receta documenta el antiguo modelo extroot. No lo sigas en instalaciones nuevas. Usa el caso de [perfiles USB con arranque seguro](uses-case/examples/usb-hotplug-profile-safe-boot.md).
 
-```bash
-just router-status --ip 192.168.1.1
-just router-backup --ip 192.168.1.1
-just build-prod
-just router-update-force --ip 192.168.1.1
-```
-
-Despues arranca el router sin USB y sigue `router-extroot-recover prepare` → recuperación host por UUID → `router-extroot-recover finish`; reinicia manualmente y confirma con `router-status` que `Extroot` este activo. Usa `router-setup-extroot` solo para copiar un overlay nuevo al USB. El procedimiento completo esta en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
+Los scripts `router-setup-extroot`, `router-extroot-recover`, `host-format-extroot-usb` y `host-recover-extroot-usb` se conservan únicamente para migrar/recuperar unidades del modelo anterior. El procedimiento histórico está en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md); no reconectes la unidad como extroot después de recuperarla.
 
 ## Estado, Clientes, Backup y Reinicio
 

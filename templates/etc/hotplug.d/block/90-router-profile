@@ -1,0 +1,4 @@
+#!/bin/sh
+[ "$ACTION" = add ] && { ( sleep 15; /usr/sbin/router-profile add ) >/dev/null 2>&1 & }
+[ "$ACTION" = remove ] && { /usr/sbin/router-profile remove "$DEVNAME" >/dev/null 2>&1 & }
+exit 0

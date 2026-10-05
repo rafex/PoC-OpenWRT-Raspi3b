@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../commons/logging.sh"
 
 # Herramientas requeridas por el proyecto
-REQUIRED_TOOLS=("just" "make" "sops" "age" "shellcheck" "wget" "yq" "python3")
+REQUIRED_TOOLS=("just" "make" "sops" "age" "shellcheck" "wget" "yq" "python3" "usign")
 
 # ---------------------------------------------------------------------------
 # Validar herramienta individual
@@ -29,6 +29,9 @@ validate_tool() {
             sops|age|shellcheck|wget|yq|python3)
                 version=$(${tool} --version 2>/dev/null | head -1)
                 log_info "  ✅ ${tool} — ${version}"
+                ;;
+            usign)
+                log_info "  ✅ ${tool}"
                 ;;
             *)
                 log_info "  ✅ ${tool}"

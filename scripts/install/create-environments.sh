@@ -30,6 +30,7 @@ if [ ! -f environments/dev/.env.public ]; then
         '# Red WiFi (nombres de red — no contraseñas)' \
         'WIFI_SSID_24=TestWiFi24' \
         'WIFI_SSID_5=TestWiFi5G' \
+        'WIFI_SAFE_SSID=OpenWRT-Recovery-Test' \
         > environments/dev/.env.public
     echo "✅ environments/dev/.env.public creado"
 fi
@@ -50,6 +51,7 @@ if [ ! -f environments/prod/.env.public ]; then
         '# Red WiFi (nombres de red — no contraseñas)' \
         'WIFI_SSID_24=' \
         'WIFI_SSID_5=' \
+        'WIFI_SAFE_SSID=OpenWRT-Recovery' \
         > environments/prod/.env.public
     echo "✅ environments/prod/.env.public creado"
 fi
@@ -64,7 +66,7 @@ export SOPS_AGE_KEY_FILE="$HOME/.age/poc-openwrt-privkey.txt"
 for env in dev prod; do
     SECRETS_FILE="environments/${env}/secrets.enc.yaml"
     if [ ! -f "$SECRETS_FILE" ]; then
-        printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIREGUARD_PRIVATE_KEY: ""\nDROPBEAR_RSA_HOST_KEY: ""\nROOT_PASSWORD_HASH: ""\n' > "$SECRETS_FILE"
+        printf 'WIFI_KEY_24: ""\nWIFI_KEY_5: ""\nWIFI_SAFE_KEY: ""\nWIREGUARD_PRIVATE_KEY: ""\nDROPBEAR_RSA_HOST_KEY: ""\nROOT_PASSWORD_HASH: ""\nCAPTIVE_AGENT_SSH_PRIVATE_KEY: ""\nCAPTIVE_AGENT_API_TOKEN: ""\n' > "$SECRETS_FILE"
         sops --config .sops.yaml --encrypt --in-place "$SECRETS_FILE"
         echo "✅ environments/${env}/secrets.enc.yaml creado y encriptado"
         echo "   Llena tus datos con: just edit-secrets ${env}"

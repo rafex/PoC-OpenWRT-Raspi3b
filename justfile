@@ -301,6 +301,36 @@ generate-config ENV:
 # Paquetes
 # ─────────────────────────────────────────────────────
 
+# profile-keygen: Crear la clave de firma host/router para perfiles USB
+# La privada queda bajo ~/.config/poc-openwrt; la pública se commitea en environments/<env>.
+profile-keygen ENV="prod":
+    @bash scripts/profiles/keygen.sh {{ ENV }}
+
+# profile-pack: Empaquetar y firmar profile.conf (opcionalmente un backend) para una USB ext4
+# Uso: just profile-pack prod profile.conf /media/usb [backend-ejecutable]
+profile-pack ENV PROFILE OUTPUT_DIR BACKEND="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -n "{{ BACKEND }}" ]; then
+        scripts/profiles/pack.sh "{{ ENV }}" "{{ PROFILE }}" "{{ OUTPUT_DIR }}" "{{ BACKEND }}"
+    else
+        scripts/profiles/pack.sh "{{ ENV }}" "{{ PROFILE }}" "{{ OUTPUT_DIR }}"
+    fi
+
+# profile-status: Mostrar si el router usa el modo base o un perfil USB
+profile-status ip="" env="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source scripts/commons/router-base.sh
+    router_load_env "{{ env }}"
+    if [ -n "{{ ip }}" ]; then ROUTER_IP="{{ ip }}"; fi
+    router_check_ssh
+    router_ssh /usr/sbin/router-profile status
+
+# router-agent-build-usb: Compilar router-agent para MIPS (Rust preferido, Go fallback)
+router-agent-build-usb:
+    @bash scripts/profiles/build-router-agent.sh
+
 # packages: Mostrar configuración de paquetes (TOML → display estructurado)
 packages:
     @./scripts/build/show-packages.sh
@@ -374,7 +404,7 @@ router-update *args='':
 router-update-force *args='':
     @scripts/router/update.sh --force {{args}}
 
-# router-setup-extroot: Configurar USB como extroot en el router via SSH
+# router-setup-extroot: LEGACY — configura USB como extroot, no usar con perfiles opcionales
 # Monta el USB, copia /overlay, configura fstab y reinicia.
 # Prerrequisito: USB formateado como ext4 antes de conectar al router.
 # Uso: just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]

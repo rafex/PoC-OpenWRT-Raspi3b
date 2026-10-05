@@ -23,6 +23,7 @@ session-ses_*.md
 **/*.priv
 **/.age/poc-openwrt-privkey.txt
 **/.age/keys*.txt
+profile.tar.gz*
 .envrc
 
 # ── Archivos de entorno (solo .env.public puede subirse) ──
@@ -58,6 +59,7 @@ backups/
 
 # ── router-agent (build artifacts y resultados de benchmark) ──
 router-agent/*/target/
+router-agent/build/
 router-agent/go/router-agent
 router-agent/bench/results/*
 !router-agent/bench/results/.gitkeep

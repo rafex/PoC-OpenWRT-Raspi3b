@@ -1,0 +1,14 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+start() {
+    # Keep boot on the internal base configuration; probing the USB is async.
+    [ -x /etc/init.d/captive ] && /etc/init.d/captive stop >/dev/null 2>&1 || true
+    ( sleep 12; /usr/sbin/router-profile scan ) >/dev/null 2>&1 &
+}
+
+stop() {
+    /usr/sbin/router-profile stop
+}

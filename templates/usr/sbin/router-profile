@@ -1,0 +1,205 @@
+#!/bin/sh
+# USB profile supervisor. Firmware configuration on flash remains the fallback.
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LABEL=OPENWRT_PROFILE
+MOUNT=/mnt/router-profile
+RUNTIME=/tmp/router-profile
+PUBKEY=/etc/router-profile.pub
+STATUS=/tmp/router-profile.status
+LOCK=/tmp/router-profile.lock
+BUNDLE=profile.tar.gz
+SIGNATURE=profile.tar.gz.sig
+
+log() { logger -t router-profile "$*"; }
+status_set() { printf '%s\n' "$*" > "$STATUS"; log "$*"; }
+
+mounted() { mount | grep -q " on $MOUNT type "; }
+
+lock_acquire() {
+    attempt=0
+    while ! mkdir "$LOCK" 2>/dev/null; do
+        attempt=$((attempt + 1))
+        [ "$attempt" -lt 15 ] || return 1
+        sleep 1
+    done
+}
+
+rollback() {
+    [ -x /etc/init.d/router-agent-profile ] && /etc/init.d/router-agent-profile stop >/dev/null 2>&1 || true
+    [ -x /etc/init.d/captive ] && /etc/init.d/captive stop >/dev/null 2>&1 || true
+    uci -q revert wireless
+    uci -q revert network
+    uci -q revert dhcp
+    wifi reload >/dev/null 2>&1 || true
+    /etc/init.d/network reload >/dev/null 2>&1 || true
+    /etc/init.d/dnsmasq reload >/dev/null 2>&1 || true
+    rm -rf "$RUNTIME"
+}
+
+fail() {
+    status_set "fallback: $*"
+    rollback
+    mounted && umount "$MOUNT" 2>/dev/null || true
+    exit 1
+}
+
+get() { uci -q -c "$RUNTIME" get "router_profile.main.$1" 2>/dev/null || true; }
+
+valid_secret() {
+    case "$1" in
+        ''|*[!A-Za-z0-9_@%+=:,./-]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+find_usb_netdev() {
+    for path in /sys/class/net/*/device; do
+        [ -e "$path" ] || continue
+        resolved="$(readlink -f "$path" 2>/dev/null)"
+        case "$resolved" in */usb*/*) printf '%s\n' "${path%/device}" | sed 's#.*/##'; return 0 ;; esac
+    done
+    return 1
+}
+
+mount_profile() {
+    mkdir -p "$MOUNT"
+    mounted && return 0
+    device="$(block info 2>/dev/null | sed -n '/LABEL="'"$LABEL"'"/s/:.*//p' | head -n 1)"
+    [ -n "$device" ] || return 1
+    mount -t ext4 -o ro,noload,nodev,nosuid,noexec "$device" "$MOUNT" 2>/dev/null || return 1
+    mounted
+}
+
+apply_profile() {
+    mode="$(get uplink_mode)"
+    ap_ssid="$(get ap_ssid)"
+    ap_key="$(get ap_key)"
+    [ -n "$mode" ] || fail "profile has no uplink_mode"
+    valid_secret "$ap_ssid" && valid_secret "$ap_key" || fail "invalid AP credentials"
+    [ "${#ap_key}" -ge 8 ] && [ "${#ap_key}" -le 63 ] || fail "AP key must be 8-63 characters"
+
+    case "$mode" in
+        usb_tether)
+            usbdev="$(find_usb_netdev)" || fail "no USB network interface detected"
+            uci set network.wan=interface
+            uci set network.wan.proto=dhcp
+            uci set "network.wan.device=$usbdev"
+            uci set wireless.default_radio0.mode=ap
+            uci set wireless.default_radio1.mode=ap
+            uci set wireless.default_radio0.network=lan
+            uci set wireless.default_radio1.network=lan
+            uci set "wireless.default_radio0.ssid=$ap_ssid"
+            uci set "wireless.default_radio1.ssid=$ap_ssid"
+            uci set "wireless.default_radio0.key=$ap_key"
+            uci set "wireless.default_radio1.key=$ap_key"
+            uci set wireless.default_radio0.hidden=0
+            uci set wireless.default_radio1.hidden=0
+            ;;
+        wifi_uplink_2g_ap_5g|wifi_uplink_5g_ap_2g)
+            uplink_ssid="$(get uplink_ssid)"
+            uplink_key="$(get uplink_key)"
+            valid_secret "$uplink_ssid" && valid_secret "$uplink_key" || fail "invalid Wi-Fi uplink credentials"
+            [ "${#uplink_key}" -ge 8 ] && [ "${#uplink_key}" -le 63 ] || fail "uplink key must be 8-63 characters"
+            uci set network.wan=interface
+            uci set network.wan.proto=dhcp
+            uci -q delete network.wan.device || true
+            if [ "$mode" = wifi_uplink_2g_ap_5g ]; then
+                sta=default_radio0; ap=default_radio1
+            else
+                sta=default_radio1; ap=default_radio0
+            fi
+            uci set "wireless.$sta.mode=sta"
+            uci set "wireless.$sta.network=wan"
+            uci set "wireless.$sta.ssid=$uplink_ssid"
+            uci set "wireless.$sta.encryption=psk2"
+            uci set "wireless.$sta.key=$uplink_key"
+            uci set "wireless.$ap.mode=ap"
+            uci set "wireless.$ap.network=lan"
+            uci set "wireless.$ap.ssid=$ap_ssid"
+            uci set "wireless.$ap.encryption=psk2"
+            uci set "wireless.$ap.key=$ap_key"
+            uci set "wireless.$ap.hidden=0"
+            ;;
+        *) fail "unsupported uplink_mode: $mode" ;;
+    esac
+
+    wifi reload >/dev/null 2>&1 || fail "Wi-Fi reload failed"
+    /etc/init.d/network reload >/dev/null 2>&1 || fail "network reload failed"
+    /etc/init.d/dnsmasq reload >/dev/null 2>&1 || true
+
+    portal="$(get portal_enabled)"
+    case "$portal" in
+        ""|0) ;;
+        1) [ -x /etc/init.d/captive ] || fail "captive service is not installed"; /etc/init.d/captive start || fail "captive service failed to start" ;;
+        *) fail "portal_enabled must be 0 or 1" ;;
+    esac
+    if [ -x "$RUNTIME/backend" ]; then
+        [ -s "$RUNTIME/agent_key" ] && [ -s "$RUNTIME/agent_token" ] && [ -s "$RUNTIME/agent_known_hosts" ] || fail "backend bundle is missing router-agent credentials"
+        /etc/init.d/router-agent-profile start || fail "router-agent service failed to start"
+    fi
+    status_set "active: $mode (portal=${portal:-0})"
+}
+
+activate() {
+    lock_acquire || exit 0
+    trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+    if ! mount_profile; then
+        status_set "fallback: profile volume $LABEL not detected"
+        exit 0
+    fi
+    [ -f "$MOUNT/$BUNDLE" ] && [ -f "$MOUNT/$SIGNATURE" ] || fail "signed profile bundle is missing"
+    [ -f "$PUBKEY" ] || fail "firmware has no profile verification key"
+    case "$(cat "$STATUS" 2>/dev/null)" in active:*) exit 0 ;; esac
+    rm -rf "$RUNTIME"
+    mkdir -p "$RUNTIME"
+    cp "$MOUNT/$BUNDLE" "$RUNTIME/$BUNDLE" || fail "bundle copy failed"
+    cp "$MOUNT/$SIGNATURE" "$RUNTIME/$SIGNATURE" || fail "signature copy failed"
+    [ "$(wc -c < "$RUNTIME/$BUNDLE")" -le 16777216 ] || fail "profile archive exceeds 16 MiB limit"
+    usign -V -p "$PUBKEY" -m "$RUNTIME/$BUNDLE" -x "$RUNTIME/$SIGNATURE" >/dev/null 2>&1 || fail "signature verification failed"
+
+    # Only accept the two fixed paths understood below; reject links and extras.
+    tar -tzf "$RUNTIME/$BUNDLE" > "$RUNTIME/list" 2>/dev/null || fail "invalid profile archive"
+    awk 'BEGIN{ok=1;profile=0} $0=="router_profile/" {next} $0=="router_profile/config" {profile++;next} $0=="router_profile/backend" || $0=="router_profile/agent_key" || $0=="router_profile/agent_token" || $0=="router_profile/agent_known_hosts" {next} {ok=0} END{if(!ok||profile!=1)exit 1}' "$RUNTIME/list" || fail "unexpected archive paths"
+    tar -xzf "$RUNTIME/$BUNDLE" -C "$RUNTIME" router_profile/config 2>/dev/null || fail "archive extraction failed"
+    for member in backend agent_key agent_token agent_known_hosts; do
+        if grep -qx "router_profile/$member" "$RUNTIME/list"; then
+            tar -xzf "$RUNTIME/$BUNDLE" -C "$RUNTIME" "router_profile/$member" 2>/dev/null || fail "profile file extraction failed: $member"
+            mv "$RUNTIME/router_profile/$member" "$RUNTIME/$member"
+        fi
+    done
+    [ -f "$RUNTIME/router_profile/config" ] || fail "profile config missing"
+    mv "$RUNTIME/router_profile/config" "$RUNTIME/profile.config"
+    [ -x "$RUNTIME/backend" ] && chmod 700 "$RUNTIME/backend"
+    [ -f "$RUNTIME/agent_key" ] && chmod 600 "$RUNTIME/agent_key" "$RUNTIME/agent_token" "$RUNTIME/agent_known_hosts"
+    rmdir "$RUNTIME/router_profile" 2>/dev/null || true
+    mv "$RUNTIME/profile.config" "$RUNTIME/router_profile"
+    chmod 600 "$RUNTIME/router_profile"
+
+    # Isolate parsing from persistent UCI configuration.
+    uci -q -c "$RUNTIME" show router_profile >/dev/null 2>&1 || fail "invalid UCI profile"
+    apply_profile
+}
+
+deactivate() {
+    lock_acquire || exit 0
+    trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+    requested="${2:-}"
+    if ! mounted && [ ! -d "$RUNTIME" ]; then
+        exit 0
+    fi
+    if [ -n "$requested" ] && mounted && ! mount | grep -q "/dev/$requested on $MOUNT type "; then
+        exit 0
+    fi
+    rollback
+    mounted && umount "$MOUNT" 2>/dev/null || true
+    status_set "fallback: USB profile removed"
+}
+
+case "${1:-scan}" in
+    scan|add) activate ;;
+    remove) deactivate ;;
+    status) cat "$STATUS" 2>/dev/null || echo "fallback: no USB profile loaded" ;;
+    stop) deactivate ;;
+    *) echo "usage: $0 [scan|add|remove|status|stop]" >&2; exit 2 ;;
+esac

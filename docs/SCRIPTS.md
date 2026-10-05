@@ -27,6 +27,10 @@ scripts/
 │   ├── verify.sh               # Validación de imagen compilada
 │   ├── convert-toml-packages.sh # Conversor TOML → TXT (standalone)
 │   └── show-packages.sh        # Muestra paquetes configurados agrupados
+├── profiles/                   # Claves de firma y bundles USB
+│   ├── keygen.sh               # Genera par usign por entorno
+│   ├── pack.sh                 # Empaqueta y firma el perfil UCI
+│   └── build-router-agent.sh   # Cross-compile MIPS: Rust preferido, Go fallback
 ├── router/                     # Administración del router via SSH
 │   ├── update.sh               # Actualiza firmware via sysupgrade
 │   ├── post-install.sh         # Instala paquetes adicionales via apk/opkg
@@ -54,6 +58,8 @@ scripts/
 └── templates/                  # Generación de configuraciones
     └── generate.sh             # Reemplaza placeholders en templates con secrets
 ```
+
+El firmware instala además `templates/usr/sbin/router-profile`, un init service y un hotplug handler. El supervisor monta `OPENWRT_PROFILE` solo lectura, valida el bundle con `usign`, aplica cambios UCI solo en runtime y vuelve a flash al retirar la unidad. No invoca `just`, `make` ni `e2fsck` en el router.
 
 ## Wrapper raíz
 
@@ -129,6 +135,8 @@ Opciones: `--group <nombre>`, `--ip <IP>`, `--env <env>`, `--list`.
 Todos estos scripts se conectan al router via SSH. Leen `ROUTER_IP` y `SSH_PORT` de `environments/<env>/.env.public`.
 
 ### router/setup-extroot.sh
+
+LEGACY: instala el USB como `/overlay`. No lo uses con el modelo de perfiles USB opcionales.
 
 Configura un USB como extroot — monta `/dev/sda1` como `/overlay` para ampliar el espacio de almacenamiento del router. Copia el overlay actual, configura UCI fstab y reinicia.
 
