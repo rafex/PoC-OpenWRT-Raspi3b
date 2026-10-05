@@ -106,7 +106,7 @@ ssh root@192.168.1.1 "sysupgrade -n -v /tmp/openwrt-*-sysupgrade.bin"
 
 Se generan dos variantes: `just build-prod-legacy` recupera el diseño anterior con SSID/AP separados; `just build-prod` crea la nueva imagen safe-boot. Para conservar ambas, ejecuta `just build-prod-both`: quedan en `dist/openwrt/prod-legacy/` y `dist/openwrt/prod-safe/`, cada una con su sysupgrade y checksum.
 
-Para migrar al safe-boot, configura `WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH`, genera la firma con `just profile-keygen prod`, y flashea el sysupgrade de `prod-safe`. Desde extroot, respalda primero y ejecuta `just router-update-force`: la actualización limpia elimina fstab y overlay anteriores. Arranca sin USB, verifica SSH y el AP oculto en ambas bandas; después conecta un volumen ext4 firmado con etiqueta `OPENWRT_PROFILE`. Sigue [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md).
+Para migrar al safe-boot, configura `WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH`, genera la firma con `just profile-keygen prod`, y flashea el sysupgrade de `prod-safe`. Desde extroot, respalda primero y ejecuta `just router-update-force`: la actualización limpia elimina fstab y overlay anteriores. Arranca sin USB, verifica SSH y el AP oculto en ambas bandas; después conecta un volumen ext4 firmado con etiqueta `OPENWRT_PROFILE`. Sigue el [manual de instalación safe-boot y perfiles USB](MANUAL_SAFE_BOOT_USB.md) para los pasos completos y resolución de problemas.
 
 La variante `prod-legacy` no trae el supervisor ni aplica el SSID oculto; usa `WIFI_SSID_24/WIFI_KEY_24` y `WIFI_SSID_5/WIFI_KEY_5`, como la imagen anterior.
 

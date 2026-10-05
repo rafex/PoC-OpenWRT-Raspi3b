@@ -9,6 +9,7 @@ Esta carpeta documenta flujos operativos completos construidos con las herramien
 | Uplink WiFi 2.4 GHz + AP 5 GHz | [examples/wifi-uplink-24ghz-ap-5ghz.md](examples/wifi-uplink-24ghz-ap-5ghz.md) |
 | Uplink via tethering USB + compartir por WiFi (datos móviles de un teléfono) | [examples/usb-tether-uplink.md](examples/usb-tether-uplink.md) |
 | Arranque base sin USB y carga en caliente de perfiles firmados | [examples/usb-hotplug-profile-safe-boot.md](examples/usb-hotplug-profile-safe-boot.md) |
+| Manual de instalación safe-boot, preparación USB y recuperación | [../MANUAL_SAFE_BOOT_USB.md](../MANUAL_SAFE_BOOT_USB.md) |
 | Probar router-agent manualmente por REST (Go + Rust en paralelo) | [examples/router-agent-manual-testing.md](examples/router-agent-manual-testing.md) |
 | Reservas DHCP e inventario de clientes | [examples/static-dhcp-and-inventory.md](examples/static-dhcp-and-inventory.md) |
 | Diagnóstico de comunicación LAN | [examples/lan-connectivity-doctor.md](examples/lan-connectivity-doctor.md) |

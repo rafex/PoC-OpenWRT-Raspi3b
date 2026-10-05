@@ -40,6 +40,7 @@ just build-prod-both  # Imagen anterior + safe-boot
 | [Scripts](docs/SCRIPTS.md) | Referencia de scripts modulares |
 | [Compilación](docs/BUILD_INSTRUCTIONS.md) | Guía completa de compilación |
 | [Flasheo](docs/FLASH_INSTRUCTIONS.md) | Instalación en el router |
+| [Manual safe-boot y perfiles USB](docs/MANUAL_SAFE_BOOT_USB.md) | Instalación, configuración USB, diagnóstico y recuperación |
 | [Secrets](docs/SECRETS.md) | Gestión de secrets con sops+age |
 
 ## Características de la imagen

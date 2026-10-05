@@ -4,6 +4,8 @@
 
 Antes de compilar con `just build-prod`, revisa [Configuración de Build](CONFIGURACION_BUILD.md) para saber qué archivos controlan versión, modelo, paquetes, secrets y overlay.
 
+Para instalar safe-boot y preparar la USB paso a paso, consulta el [manual de instalación safe-boot y perfiles USB](MANUAL_SAFE_BOOT_USB.md).
+
 ```bash
 just --list
 just <recipe>
