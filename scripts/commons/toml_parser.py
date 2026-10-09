@@ -36,7 +36,7 @@ W = 70
 
 def parse_toml_structured(toml_path: str) -> dict:
     """Parse TOML into structured dict. Single pass, single source of truth."""
-    result = {"metadata": {}, "categories": {}, "exclusions": {},
+    result = {"metadata": {}, "categories": {}, "exclusions": {}, "variants": {},
               "warnings": {}, "notes": {}, "errors": [], "all_includes": [],
               "all_exclusions": []}
     current_section: Optional[str] = None
@@ -80,7 +80,10 @@ def parse_toml_structured(toml_path: str) -> dict:
                             break
                         rest = nxt.strip()
 
-                if current_section and current_section.startswith("exclusion"):
+                if current_section and current_section.startswith("variants."):
+                    _, variant_name = current_section.split(".", 1)
+                    result["variants"].setdefault(variant_name, {})[key] = values
+                elif current_section and current_section.startswith("exclusion"):
                     result["exclusions"][key] = values
                     result["all_exclusions"].extend(f"-{v}" for v in values)
                 else:
@@ -110,9 +113,15 @@ def _extract_array_segment(text: str) -> tuple[list[str], bool]:
     return values, closing
 
 
-def format_packages_list(data: dict) -> str:
+def format_packages_list(data: dict, variant: Optional[str] = None) -> str:
     """Build space-separated list (build mode)."""
     result = data["all_includes"] + data["all_exclusions"]
+    if variant == "extroot-firmware":
+        result.extend(f"-{pkg}" for pkg in data["variants"].get("extroot", {}).get("firmware_remove", []))
+    elif variant == "extroot-usb":
+        result.extend(data["variants"].get("extroot", {}).get("usb_add", []))
+    elif variant:
+        raise ValueError(f"Unknown package variant: {variant}")
     return " ".join(result)
 
 
@@ -159,6 +168,16 @@ def format_display(data: dict) -> str:
     else:
         total_exc = 0
 
+    extroot = data.get("variants", {}).get("extroot", {})
+    if extroot:
+        lines.append(box_mid("EXTROOT VARIANT"))
+        for key, title in (("firmware_remove", "Removed from flash"), ("usb_add", "Added to USB image")):
+            packages = extroot.get(key, [])
+            if packages:
+                lines.append(box_line(f"{BOLD}{GREEN}▸ {title}{RESET} ({len(packages)} packages)"))
+                for package in sorted(packages):
+                    lines.append(box_line(f"     {package}"))
+
     if data["warnings"] or data["notes"] or data["errors"]:
         lines.append(box_mid("INFO"))
     for key, msg in data["warnings"].items():
@@ -181,9 +200,12 @@ def format_display(data: dict) -> str:
 def main() -> int:
     mode = "build"
     toml_path = None
+    variant = None
     for arg in sys.argv[1:]:
         if arg.startswith("--mode="):
             mode = arg.split("=", 1)[1]
+        elif arg.startswith("--variant="):
+            variant = arg.split("=", 1)[1]
         elif arg in ("--display",):
             mode = "display"
         elif arg in ("--json",):
@@ -196,7 +218,7 @@ def main() -> int:
             toml_path = arg
 
     if not toml_path:
-        print("Usage: toml_parser.py <toml-file> [--mode=display|json]", file=sys.stderr)
+        print("Usage: toml_parser.py <toml-file> [--mode=display|json] [--variant=extroot-firmware|extroot-usb]", file=sys.stderr)
         return 1
     if not Path(toml_path).exists():
         print(f"TOML file not found: {toml_path}", file=sys.stderr)
@@ -216,7 +238,11 @@ def main() -> int:
         out["total_exclusions"] = len(data["all_exclusions"])
         print(json.dumps(out, indent=2, default=str))
     else:
-        print(format_packages_list(data))
+        try:
+            print(format_packages_list(data, variant))
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 2
 
     return 1 if data["errors"] else 0
 

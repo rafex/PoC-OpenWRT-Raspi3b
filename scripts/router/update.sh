@@ -3,12 +3,12 @@
 # update.sh — Actualiza firmware del router via SSH + sysupgrade
 #
 # Uso:
-#   scripts/router/update.sh [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy>]
+#   scripts/router/update.sh [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy|extroot>]
 #
 # Opciones:
 #   --ip <IP>     IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)
 #   --env <env>   Entorno para leer .env.public (default: prod)
-#   --variant    Imagen safe o legacy (default: safe)
+#   --variant    Imagen safe, legacy o extroot (default: safe)
 #   --force       Resetear configuración del router al actualizar
 #                 Sin --force: mantiene la configuración actual (default)
 # ============================================================================
@@ -53,14 +53,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --variant)
             if [ -z "${2:-}" ]; then
-                log_error "--variant requiere un argumento: --variant <safe|legacy>"
+                log_error "--variant requiere un argumento: --variant <safe|legacy|extroot>"
                 exit 1
             fi
             IMAGE_VARIANT="$2"
             shift 2
             ;;
         -h|--help)
-            echo "Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy>]"
+            echo "Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy|extroot>]"
             echo ""
             echo "  --ip <IP>   IP del router (default: ROUTER_IP de .env.public o 192.168.1.1)"
             echo "  --env       Entorno para leer .env.public (default: prod)"
@@ -71,7 +71,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             log_error "Argumento desconocido: $1"
-            echo "   Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy>]"
+            echo "   Uso: $0 [--ip <IP>] [--force] [--env <dev|prod>] [--variant <safe|legacy|extroot>]"
             exit 1
             ;;
     esac
@@ -84,11 +84,20 @@ router_load_env "${ROUTER_ENV}"
 OPENWRT_VERSION="${OPENWRT_VERSION:-}"
 PROFILE="${PROFILE:-tplink_tl-wdr3600-v1}"
 
-case "${IMAGE_VARIANT}" in safe|legacy) ;; *)
-    log_error "Variante desconocida '${IMAGE_VARIANT}'; usa safe o legacy"
+case "${IMAGE_VARIANT}" in safe|legacy|extroot) ;; *)
+    log_error "Variante desconocida '${IMAGE_VARIANT}'; usa safe, legacy o extroot"
     exit 2
     ;;
 esac
+if [[ "${IMAGE_VARIANT}" == "extroot" && "${_FORCE}" != true ]]; then
+    log_error "La variante extroot requiere --force para aplicar el UUID de fstab que corresponde a la imagen USB nueva."
+    log_error "Escribe también el archivo ext4 emparejado antes de arrancar con la USB."
+    exit 2
+fi
+if [[ "${IMAGE_VARIANT}" == "extroot" && "${ROUTER_ENV}" != "prod" ]]; then
+    log_error "La variante extroot solo está publicada para prod; genera sus artefactos con just build-prod-extroot."
+    exit 2
+fi
 
 # ---------------------------------------------------------------------------
 # Encontrar imagen sysupgrade
@@ -106,6 +115,8 @@ _find_sysupgrade() {
             echo "     just setup-env ${ROUTER_ENV}" >&2
             if [ "${IMAGE_VARIANT}" = "legacy" ]; then
                 echo "     just build-${ROUTER_ENV}-legacy" >&2
+            elif [ "${IMAGE_VARIANT}" = "extroot" ]; then
+                echo "     just build-${ROUTER_ENV}-extroot" >&2
             else
                 echo "     just build-${ROUTER_ENV}" >&2
             fi
@@ -122,6 +133,8 @@ _find_sysupgrade() {
         log_error "No se encontró imagen ${IMAGE_VARIANT} para ${PROFILE}${OPENWRT_VERSION:+ en OpenWRT ${OPENWRT_VERSION}}" >&2
         if [ "${IMAGE_VARIANT}" = "legacy" ]; then
             echo "   Solución: just build-${ROUTER_ENV}-legacy" >&2
+        elif [ "${IMAGE_VARIANT}" = "extroot" ]; then
+            echo "   Solución: just build-${ROUTER_ENV}-extroot" >&2
         else
             echo "   Solución: just build-${ROUTER_ENV}" >&2
         fi

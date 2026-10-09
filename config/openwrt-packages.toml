@@ -110,10 +110,30 @@ tor_integration = "Tor runs on the Raspberry Pi 3B; OpenWRT only manages forward
 flash_limit = "TL-WDR3600 has 8 MB flash. Keep total squashfs < 5.5 MB compressed."
 
 [notes]
-usb_profiles = "USB is an optional signed profile volume (label OPENWRT_PROFILE), never /overlay; base config boots from flash first."
+usb_profiles = "Safe variant uses a signed profile volume (OPENWRT_PROFILE), never /overlay; extroot is a separate paired variant."
 ca_certificates = "Removed: redundant with ca-bundle. Saves ~300 KB."
 kmod_nls = "Removed kmod-nls-* and kmod-scsi-generic: only needed for FAT32/exFAT."
-e2fsprogs = "Removed: format ext4 USB drives on another machine before use."
-usbutils = "Removed: lsusb debug tool not needed in production."
+e2fsprogs = "Excluded from flash; included in the extroot USB image for formatting and checking other ext4 drives."
+usbutils = "Excluded from flash; included in the extroot USB image for lsusb diagnostics."
 logrotate = "Removed: flash space too limited; use standard syslog rotation."
 htop_nano = "Removed: busybox ya incluye top y vi como editor."
+
+# extroot variant: keep only early-boot storage support in flash. The full
+# package set below is installed into the paired ext4 extroot image.
+[variants.extroot]
+firmware_remove = [
+  "kmod-usb-net",
+  "kmod-usb-net-rndis",
+  "kmod-usb-net-cdc-ether",
+  "usign"
+]
+usb_add = [
+  "e2fsprogs",
+  "parted",
+  "usbutils",
+  "rsync",
+  "tcpdump",
+  "bind-dig",
+  "wireguard-tools",
+  "kmod-wireguard"
+]

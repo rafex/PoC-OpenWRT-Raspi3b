@@ -305,6 +305,32 @@ build-prod-legacy:
     ENV=prod VARIANT=legacy ./scripts/build/verify.sh dist/openwrt/prod-legacy
     echo "✅ Imagen legacy lista en dist/openwrt/prod-legacy."
 
+# build-prod-extroot: Firmware mínimo + imagen ext4 USB con herramientas y paquetes instalados
+build-prod-extroot:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Build PROD EXTROOT ==="
+    SECRETS_TMP=$(scripts/install/ensure-secrets.sh prod) || exit 1
+    trap 'rm -f "${SECRETS_TMP}"' EXIT
+    EXTROOT_UUID=$(python3 -c 'import uuid; print(uuid.uuid4())')
+    BUILDER_DIR=$(find openwrt-builder -mindepth 1 -maxdepth 1 -type d -name 'openwrt-imagebuilder-*.Linux-x86_64' | sort -V | tail -1)
+    if [ -z "${BUILDER_DIR}" ]; then
+        echo "Image Builder no encontrado; ejecuta just setup-env prod" >&2
+        exit 1
+    fi
+    EXTROOT_UUID="${EXTROOT_UUID}" ./scripts/templates/generate.sh prod "${SECRETS_TMP}" extroot
+    rm -f "${SECRETS_TMP}"
+    EXTROOT_PACKAGES=$(python3 scripts/commons/toml_parser.py config/openwrt-packages.toml --variant=extroot-usb)
+    EXTROOT_UUID="${EXTROOT_UUID}" make extroot-stage \
+        BUILDER_DIR="${BUILDER_DIR}" \
+        EXTROOT_PACKAGES="${EXTROOT_PACKAGES}" \
+        EXTROOT_OVERLAY_DIR="${PWD}/config/overlay/prod/extroot" \
+        EXTROOT_ROOT_DIR=openwrt-builder/extroot-stage-root
+    EXTROOT_UUID="${EXTROOT_UUID}" EXTROOT_ROOT_DIR=openwrt-builder/extroot-stage-root \
+        BUILDER_DIR="${BUILDER_DIR}" ENV=prod VARIANT=extroot make build
+    EXTROOT_UUID="${EXTROOT_UUID}" ENV=prod VARIANT=extroot ./scripts/build/verify.sh dist/openwrt/prod-extroot
+    echo "✅ Firmware y USB extroot compatibles en dist/openwrt/prod-extroot."
+
 # build-prod-both: Crear las dos imágenes de producción en directorios separados
 build-prod-both:
     just build-prod-legacy
@@ -422,7 +448,7 @@ router-update *args='':
     @scripts/router/update.sh {{args}}
 
 # router-update-force: Actualizar firmware borrando la configuración del router
-# Uso: just router-update-force [--ip <IP>] [--env <dev|prod>] [--variant <safe|legacy>]
+# Uso: just router-update-force [--ip <IP>] [--env <dev|prod>] [--variant <safe|legacy|extroot>]
 router-update-force *args='':
     @scripts/router/update.sh --force {{args}}
 
@@ -452,6 +478,13 @@ host-format-extroot-usb *args='':
     #!/usr/bin/env bash
     # shellcheck disable=SC2086
     scripts/install/format-extroot-usb.sh {{args}}
+
+# host-write-extroot-usb: Escribir la imagen ext4 extroot del build en una partición USB
+# Uso: just host-write-extroot-usb --image dist/openwrt/prod-extroot/openwrt-tplink_tl-wdr3600-v1-extroot.ext4.img --device /dev/sdX1
+host-write-extroot-usb *args='':
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    scripts/install/write-extroot-usb.sh {{args}}
 
 # host-recover-extroot-usb: Diagnostica/respalda USB extroot local; reparación segura opcional
 # Ejecutar desde la máquina donde está conectado el USB, ej. ssh bastion-wifi

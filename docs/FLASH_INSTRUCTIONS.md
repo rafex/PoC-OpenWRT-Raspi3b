@@ -87,6 +87,9 @@ just router-update-force
 
 # Instalar la imagen anterior borrando la configuración actual
 just router-update-force --variant legacy
+
+# Instalar el firmware extroot borrando la configuración para alinear el UUID
+just router-update-force --variant extroot
 ```
 
 O manualmente:
@@ -104,13 +107,15 @@ ssh root@192.168.1.1 "sysupgrade -n -v /tmp/openwrt-*-sysupgrade.bin"
 
 ### Arranque independiente de la USB
 
-Se generan dos variantes: `just build-prod-legacy` recupera el diseño anterior con SSID/AP separados; `just build-prod` crea la nueva imagen safe-boot. Para conservar ambas, ejecuta `just build-prod-both`: quedan en `dist/openwrt/prod-legacy/` y `dist/openwrt/prod-safe/`, cada una con su sysupgrade y checksum.
+Se generan tres variantes: `just build-prod-legacy` recupera el diseño anterior con SSID/AP separados; `just build-prod` crea safe-boot; `just build-prod-extroot` genera firmware y USB extroot emparejados. `just build-prod-both` conserva safe y legacy en `dist/openwrt/`; extroot queda aparte en `dist/openwrt/prod-extroot/`.
 
 Para migrar al safe-boot, configura `WIFI_SAFE_SSID`, `WIFI_SAFE_KEY` y `ROOT_PASSWORD_HASH`, genera la firma con `just profile-keygen prod`, y flashea el sysupgrade de `prod-safe`. Desde extroot, respalda primero y ejecuta `just router-update-force`: la actualización limpia elimina fstab y overlay anteriores. Arranca sin USB, verifica SSH y el AP oculto en ambas bandas; después conecta un volumen ext4 firmado con etiqueta `OPENWRT_PROFILE`. Sigue el [manual de instalación safe-boot y perfiles USB](MANUAL_SAFE_BOOT_USB.md) para los pasos completos y resolución de problemas.
 
 La variante `prod-legacy` no trae el supervisor ni aplica el SSID oculto; usa `WIFI_SSID_24/WIFI_KEY_24` y `WIFI_SSID_5/WIFI_KEY_5`, como la imagen anterior.
 
-Las recetas `router-setup-extroot` y `router-extroot-recover` quedan disponibles solo para unidades antiguas y diagnóstico/migración. No las ejecutes para el nuevo flujo; no configures la partición como `/overlay`.
+En safe-boot, la USB firmada no se configura como `/overlay`. Para extroot, escribe `openwrt-<perfil>-extroot.ext4.img` del mismo build sobre la partición USB con `just host-write-extroot-usb`; usa ese firmware con `just router-update-force --variant extroot`. La variante extroot fuerza una configuración limpia para aplicar el UUID de fstab emparejado. Mantén la USB desconectada durante sysupgrade y conéctala después del primer arranque.
+
+`router-setup-extroot` queda como migración legacy para unidades antiguas; no lo uses para preparar la imagen preconstruida. `router-extroot-recover` y `host-recover-extroot-usb` siguen disponibles para diagnosticar unidades extroot existentes.
 
 ## Configuración inicial post-flasheo
 
@@ -151,6 +156,14 @@ wifi up
 ```
 
 ### 5. Configurar VPN (WireGuard)
+
+WireGuard viene preinstalado en la variante extroot. En `safe` y `legacy` no viene en la imagen base; con el router conectado a Internet, instala los paquetes opcionales:
+
+```bash
+just router-post-install --group wireguard --ip <IP_DEL_ROUTER> --env prod
+```
+
+Después configura la interfaz y los peers:
 
 ```bash
 # Crear clave privada

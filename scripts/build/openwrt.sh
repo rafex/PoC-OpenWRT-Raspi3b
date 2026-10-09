@@ -48,7 +48,7 @@ Options:
   --packages FILE        Packages config file (default: config/openwrt-packages.txt)
   --builder DIR          Path to extracted Image Builder directory
   --overlay DIR          Path to config overlay directory (for custom configs)
-  --variant NAME         Image variant: safe or legacy (default: safe)
+  --variant NAME         Image variant: safe, legacy, or extroot (default: safe)
   --help, -h             Show this help
 
 Environment:
@@ -80,7 +80,7 @@ report_results() {
     if [ -d "${bin_dir}" ]; then
         echo ""
         log_info "Generated files:"
-        find "${bin_dir}" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "sha256sums*" \) 2>/dev/null | while read -r f; do
+        find "${bin_dir}" -type f \( -name "*.bin" -o -name "*.img" -o -name "*.manifest" -o -name "sha256sums*" \) 2>/dev/null | while read -r f; do
             local size
             size=$(du -h "${f}" | awk '{print $1}')
             printf "  %s\t%s\n" "${size}" "${f}"
@@ -104,7 +104,7 @@ report_results() {
 main() {
     parse_args "$@"
 
-    case "${VARIANT}" in safe|legacy) ;; *) log_error "Unknown variant '${VARIANT}'; use safe or legacy"; exit 2 ;; esac
+    case "${VARIANT}" in safe|legacy|extroot) ;; *) log_error "Unknown variant '${VARIANT}'; use safe, legacy, or extroot"; exit 2 ;; esac
 
     if [ -n "${ENV}" ]; then
         local env_file="${REPO_ROOT}/environments/${ENV}/.env.public"
@@ -133,7 +133,7 @@ main() {
 
     # Step 2: Parse packages (TOML preferred, fallback to legacy .txt)
     log_step "Parsing package configuration..."
-    local packages
+    local packages extroot_packages
 
     if [ -f "${TOML_FILE}" ]; then
         log_info "Using TOML config: ${TOML_FILE}"
@@ -142,10 +142,17 @@ main() {
         log_info "Generated: ${PACKAGES_FILE}"
     fi
 
-    packages=$(parse_packages "${PACKAGES_FILE}") || {
-        log_error "Packages file not found: ${PACKAGES_FILE}"
-        exit 1
-    }
+    if [[ "${VARIANT}" == "extroot" ]]; then
+        packages=$(python3 "${REPO_ROOT}/scripts/commons/toml_parser.py" "${TOML_FILE}" --variant=extroot-firmware) || {
+            log_error "Could not resolve extroot firmware packages from ${TOML_FILE}"
+            exit 1
+        }
+    else
+        packages=$(parse_packages "${PACKAGES_FILE}") || {
+            log_error "Packages file not found: ${PACKAGES_FILE}"
+            exit 1
+        }
+    fi
     if [[ "${VARIANT}" == "legacy" ]]; then
         packages="${packages//usign/}"
     fi
@@ -163,7 +170,17 @@ main() {
 
     local artifact_env="${ENV:-manual}"
     local artifact_dir="${ARTIFACT_DIR:-${REPO_ROOT}/dist/openwrt/${artifact_env}-${VARIANT}}"
-    "${SCRIPT_DIR}/compile.sh" "${builder}" "${packages}" "${PROFILE}" "${OVERLAY_DIR}" "${artifact_dir}" || exit $?
+    if [[ "${VARIANT}" == "extroot" ]]; then
+        extroot_packages=$(python3 "${REPO_ROOT}/scripts/commons/toml_parser.py" "${TOML_FILE}" --variant=extroot-usb) || {
+            log_error "Could not resolve extroot USB packages from ${TOML_FILE}"
+            exit 1
+        }
+        EXTROOT_UUID="${EXTROOT_UUID:-$(python3 -c 'import uuid; print(uuid.uuid4())')}" \
+            "${SCRIPT_DIR}/compile-extroot.sh" "${builder}" "${packages}" "${extroot_packages}" \
+            "${PROFILE}" "${OVERLAY_DIR}" "${artifact_dir}" || exit $?
+    else
+        "${SCRIPT_DIR}/compile.sh" "${builder}" "${packages}" "${PROFILE}" "${OVERLAY_DIR}" "${artifact_dir}" || exit $?
+    fi
 
     # Step 4: Report
     report_results "${builder}" "${artifact_dir}"

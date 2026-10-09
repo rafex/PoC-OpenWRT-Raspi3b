@@ -176,6 +176,8 @@ config/overlay/prod/safe/
 
 `just build-prod` pasa ese overlay al Image Builder con `FILES=...`, por lo que esos archivos entran al firmware. La variante anterior se genera en `config/overlay/prod/legacy/`; `just build-prod-both` conserva los dos binarios bajo `dist/openwrt/`.
 
+`just build-prod-extroot` genera además un ext4 de 512 MiB con `upper/` y `work/`, UUID coordinado con fstab, y el paquete completo de extroot, WireGuard, tethering USB y utilidades. Los módulos para montar ext4 y el almacenamiento USB permanecen en el firmware para que extroot esté disponible durante el arranque.
+
 ## Flujo Completo
 
 Primera vez en una máquina:

@@ -109,7 +109,7 @@ _validate_output() {
 
 # ---------------------------------------------------------------------------
 main() {
-    case "${VARIANT}" in safe|legacy) ;; *) log_error "Unknown image variant: ${VARIANT} (use safe or legacy)"; exit 2 ;; esac
+    case "${VARIANT}" in safe|legacy|extroot) ;; *) log_error "Unknown image variant: ${VARIANT} (use safe, legacy, or extroot)"; exit 2 ;; esac
     if [ ! -f "${PUBLIC_ENV_FILE}" ]; then
         log_error "${PUBLIC_ENV_FILE} not found"
         echo "  Run: just create-environments"
@@ -145,7 +145,7 @@ main() {
     mkdir -p "${OVERLAY_DIR}/etc"
     mkdir -p "${OVERLAY_DIR}/usr/sbin"
 
-    if [[ "${VARIANT}" == "safe" && "${ENV}" == "prod" ]]; then
+    if [[ "${VARIANT}" =~ ^(safe|extroot)$ && "${ENV}" == "prod" ]]; then
         # Production fallback credentials are mandatory: the router must be
         # reachable and protected even when no USB profile is available.
         for required in WIFI_SAFE_SSID ROOT_PASSWORD_HASH WIFI_SAFE_KEY; do
@@ -170,7 +170,7 @@ main() {
             exit 1
         fi
         export WIFI_SAFE_KEY
-    elif [[ "${VARIANT}" == "safe" ]]; then
+    elif [[ "${VARIANT}" =~ ^(safe|extroot)$ ]]; then
         WIFI_SAFE_KEY="$(yq eval -r '.WIFI_SAFE_KEY // ""' "${SECRETS_FILE}")"
         ROOT_PASSWORD_HASH="$(yq eval -r '.ROOT_PASSWORD_HASH // ""' "${SECRETS_FILE}")"
         export WIFI_SAFE_KEY ROOT_PASSWORD_HASH
@@ -217,9 +217,12 @@ main() {
     replace_template "${WIRELESS_TEMPLATE}" \
                      "${OVERLAY_DIR}/etc/config/wireless"
 
-    if [[ "${VARIANT}" == "safe" ]]; then
+    if [[ "${VARIANT}" =~ ^(safe|extroot)$ ]]; then
         replace_template "${REPO_ROOT}/templates/etc/uci-defaults/10-root-password.template" \
                          "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
+    fi
+
+    if [[ "${VARIANT}" == "safe" ]]; then
         cp "${REPO_ROOT}/templates/usr/sbin/router-profile" "${OVERLAY_DIR}/usr/sbin/router-profile"
         cp "${REPO_ROOT}/templates/etc/init.d/router-profile" "${OVERLAY_DIR}/etc/init.d/router-profile"
         cp "${REPO_ROOT}/templates/etc/init.d/router-agent-profile" "${OVERLAY_DIR}/etc/init.d/router-agent-profile"
@@ -229,12 +232,40 @@ main() {
                   "${OVERLAY_DIR}/etc/hotplug.d/block/90-router-profile" "${OVERLAY_DIR}/etc/uci-defaults/10-root-password"
     fi
 
+    if [[ "${VARIANT}" == "extroot" ]]; then
+        EXTROOT_UUID="${EXTROOT_UUID:-$(python3 -c 'import uuid; print(uuid.uuid4())')}"
+        if [[ ! "${EXTROOT_UUID}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            log_error "EXTROOT_UUID must be a valid UUID"
+            exit 2
+        fi
+        cat > "${OVERLAY_DIR}/etc/config/fstab" <<EOF
+config global 'global'
+    option auto_mount '1'
+    option delay_root '15'
+    option check_fs '0'
+
+config mount 'extroot'
+    option target '/overlay'
+    option uuid '${EXTROOT_UUID}'
+    option fstype 'ext4'
+    option options 'rw,sync'
+    option enabled '1'
+    option enabled_fsck '0'
+EOF
+    fi
+
     echo ""
     _validate_output
     log_info "Config generated at: ${OVERLAY_DIR}"
     echo ""
     echo "To build with this overlay:"
-    echo "  just build-${ENV} (safe variant)"
+    if [[ "${VARIANT}" == "extroot" ]]; then
+        echo "  just build-${ENV}-extroot"
+    elif [[ "${VARIANT}" == "legacy" ]]; then
+        echo "  just build-${ENV}-legacy"
+    else
+        echo "  just build-${ENV}"
+    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

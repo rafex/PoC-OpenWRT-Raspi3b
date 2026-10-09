@@ -81,11 +81,12 @@ just edit-secrets prod
 | `setup-env` | `just setup-env [prod]` | Descarga y extrae el OpenWrt Image Builder definido en `.env.public`. |
 | `packages` | `just packages` | Muestra la configuración de paquetes desde `config/openwrt-packages.toml`. |
 | `refresh-packages` | `just refresh-packages` | Regenera `config/openwrt-packages.txt` desde el TOML. |
-| `generate-config` | `just generate-config prod [safe\|legacy]` | Genera `config/overlay/<env>/<variant>/` desde templates y secrets. |
+| `generate-config` | `just generate-config prod [safe\|legacy\|extroot]` | Genera `config/overlay/<env>/<variant>/` desde templates y secrets. |
 | `build` | `just build` | Compila sin secrets usando valores por defecto. |
 | `build-dev` | `just build-dev` | Verifica secrets dev, genera overlay dev y compila. |
 | `build-prod` | `just build-prod` | Verifica secrets prod, genera overlay prod, compila y verifica imagen. |
 | `build-prod-legacy` | `just build-prod-legacy` | Compila la imagen anterior con AP separados; sin supervisor USB safe-boot. |
+| `build-prod-extroot` | `just build-prod-extroot` | Genera firmware mínimo y una imagen ext4 USB de 512 MiB con paquetes extroot instalados. |
 | `build-prod-both` | `just build-prod-both` | Compila ambas variantes y conserva los artefactos en directorios distintos. |
 | `validate` | `just validate` | Ejecuta `shellcheck` vía `make validate`. |
 | `clean` | `just clean` | Limpia artefactos de compilación y `/tmp/secrets-*.yaml`. |
@@ -98,6 +99,7 @@ just setup-env prod
 just refresh-packages
 just build-prod
 just build-prod-both   # Deja prod-legacy/ y prod-safe/ en dist/openwrt/
+just build-prod-extroot # Deja firmware + USB extroot emparejados en dist/openwrt/prod-extroot/
 ```
 
 ## Firmware / Sysupgrade
@@ -105,7 +107,7 @@ just build-prod-both   # Deja prod-legacy/ y prod-safe/ en dist/openwrt/
 | Recipe | Uso | Descripción |
 |--------|-----|-------------|
 | `router-update` | `just router-update [--ip <IP>] [--env <env>] [--variant <safe|legacy>]` | Instala el artefacto persistente de esa variante y mantiene configuración. |
-| `router-update-force` | `just router-update-force [--ip <IP>] [--env <env>] [--variant <safe|legacy>]` | Instala el artefacto elegido con `sysupgrade -n`; borra configuración del router. |
+| `router-update-force` | `just router-update-force [--ip <IP>] [--env <env>] [--variant <safe|legacy|extroot>]` | Instala el artefacto elegido con `sysupgrade -n`; borra configuración del router. Extroot requiere `--force`. |
 | `profile-keygen` | `just profile-keygen [dev\|prod]` | Crea clave `usign`; pública en el entorno, privada local al host. |
 | `profile-pack` | `just profile-pack prod profile.conf /media/usb [backend]` | Empaqueta y firma el perfil USB. |
 | `profile-status` | `just profile-status [ip=<IP>] [env=<env>]` | Consulta el perfil activo o el modo base. |
@@ -117,11 +119,12 @@ Ejemplos:
 just router-update --ip 192.168.1.1
 just router-update-force --ip 192.168.1.1
 just router-update-force --variant legacy --ip 192.168.1.1
+just router-update-force --variant extroot --ip 192.168.1.1
 ```
 
 El actualizador busca imágenes en `dist/openwrt/<env>-<variant>/` y nunca selecciona otra variante como sustituto. `safe` es el valor predeterminado; para instalar la imagen clásica usa `--variant legacy`. `router-update` mantiene la configuración persistente actual. `router-update-force` usa `sysupgrade -n`: borra el `/overlay` persistente del router y aplica la configuración incluida en la imagen. Se perderán los cambios persistentes de contraseña root, claves SSH, WiFi, reservas DHCP, fstab y paquetes instalados posteriormente con `apk`; los valores que se compilaron en la variante elegida volverán a aplicarse.
 
-`router-update-force` no formatea una USB. El flujo vigente no usa extroot: la USB se conecta tras arrancar y carga un perfil firmado. Consulta [Arranque seguro y perfiles USB opcionales](uses-case/examples/usb-hotplug-profile-safe-boot.md). Las recipes extroot de más abajo son solo para recuperar instalaciones antiguas.
+`router-update-force` no escribe la imagen USB. Para extroot, usa el firmware y `openwrt-<perfil>-extroot.ext4.img` del mismo build: fstab contiene el UUID de esa imagen. Escribe la imagen ext4 sobre una partición USB de al menos 512 MiB desde el host, aplica sysupgrade con `--force` mientras la USB está desconectada y conéctala después del primer arranque. La variante `safe` conserva el flujo de perfiles USB firmados; no uses su USB como extroot.
 
 Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexion SSH se interrumpira durante el reinicio.
 
@@ -131,9 +134,10 @@ Usa siempre una imagen ya verificada y conecta el router por Ethernet. La conexi
 |--------|-----|-------------|
 | `router-copy-keys` | `just router-copy-keys [--ip <IP>] [--env <env>] [--key <path>]` | Copia clave SSH pública a Dropbear sin cambiar contraseña root. |
 | `router-setup-auth` | `just router-setup-auth [--ip <IP>] [--env <dev\|prod>] [--key <path>] [--man]` | Copia clave SSH y configura contraseña root. |
-| `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | LEGACY: configura USB como extroot. No usar en firmware con perfiles USB. |
+| `router-setup-extroot` | `just router-setup-extroot [--ip <IP>] [--device <dev>] [--env <env>] [--no-reboot]` | LEGACY: copia el overlay actual a una USB vacía y configura extroot. No usar con la variante safe ni con la imagen extroot preconstruida. |
 | `router-extroot-recover` | `just router-extroot-recover prepare [--ip <IP>] [--uuid <UUID>]` o `finish --ip <IP> --uuid <UUID>` | Captura diagnóstico y desmonta la USB en el router; tras repararla en host, corrige el UUID sin copiar datos ni reiniciar. |
 | `host-format-extroot-usb` | `just host-format-extroot-usb --list` o `just host-format-extroot-usb --device /dev/sdX1` | Borra/formatea una particion USB local como ext4 para extroot. Ejecutar desde `bastion-wifi` o la maquina con el USB conectado. |
+| `host-write-extroot-usb` | `just host-write-extroot-usb --image <imagen.ext4.img> --device /dev/sdX1` | Escribe con confirmación la imagen extroot de 512 MiB sobre una partición USB y verifica UUID/checksum. |
 | `host-recover-extroot-usb` | `just host-recover-extroot-usb --list` o `--uuid <UUID> [--repair]` | Respalda archivos legibles y logs en host; `--repair` intenta `e2fsck -f -p` tras confirmación. No formatea. |
 | `router-setup-logs-ram` | `just router-setup-logs-ram [IP] [env]` | Configura buffer de logs en RAM; no persiste reinicios. |
 | `router-setup-logs-file` | `just router-setup-logs-file [IP] [env]` | LEGACY: configura logs persistentes en `/overlay/log/messages`; requiere extroot. |
@@ -185,9 +189,9 @@ scripts/router/post-install.sh --list
 
 ## Reinstalacion limpia y extroot
 
-LEGACY: esta receta documenta el antiguo modelo extroot. No lo sigas en instalaciones nuevas. Usa el caso de [perfiles USB con arranque seguro](uses-case/examples/usb-hotplug-profile-safe-boot.md).
+Para una instalación nueva extroot, usa `just build-prod-extroot`, que genera el firmware y la imagen ext4 USB con UUID coordinado. El procedimiento se describe en [Compilación](BUILD_INSTRUCTIONS.md). La variante safe sigue disponible con perfiles USB firmados.
 
-Los scripts `router-setup-extroot`, `router-extroot-recover`, `host-format-extroot-usb` y `host-recover-extroot-usb` se conservan únicamente para migrar/recuperar unidades del modelo anterior. El procedimiento histórico está en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md); no reconectes la unidad como extroot después de recuperarla.
+`router-setup-extroot` se conserva para migrar instalaciones antiguas. `router-extroot-recover` y `host-recover-extroot-usb` siguen disponibles para recuperar USB extroot existentes. No uses `router-setup-extroot` para preparar la imagen preconstruida. El procedimiento histórico está en [Reinstalacion limpia y extroot despues de `apk upgrade`](uses-case/examples/clean-reinstall-and-extroot-after-apk-upgrade.md).
 
 ## Estado, Clientes, Backup y Reinicio
 
@@ -447,6 +451,8 @@ just router-onion-uninstall
 ```
 
 ## WireGuard
+
+WireGuard queda fuera de las imágenes base `safe` y `legacy`. Para usar los comandos siguientes, instala los paquetes bajo demanda con `just router-post-install --group wireguard --ip <IP_DEL_ROUTER> --env prod`.
 
 | Recipe | Uso | Descripción |
 |--------|-----|-------------|

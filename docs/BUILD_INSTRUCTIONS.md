@@ -15,7 +15,7 @@ Guía completa para compilar una imagen personalizada de OpenWRT 25.12.5 para el
 
 ```bash
 # Debian / Ubuntu
-sudo apt-get install build-essential libncurses-dev zstd wget unzip
+sudo apt-get install build-essential libncurses-dev zstd wget unzip e2fsprogs
 
 # macOS (Homebrew) — solo para inspección, no para compilar
 brew install coreutils zstd wget
@@ -81,6 +81,7 @@ just refresh-packages
 just build-dev       # Desarrollo (valores dummy)
 just build-prod      # Producción (con secrets reales)
 just build-prod-legacy # Imagen anterior, AP separados
+just build-prod-extroot # Firmware mínimo + imagen USB extroot emparejada
 just build-prod-both # Genera ambas variantes en directorios separados
 
 # O con scripts modulares:
@@ -110,6 +111,7 @@ just build --profile tplink_tl-wdr3600-v1
 # Recomendado: con just
 just build-prod       # Compila + verifica la variante safe-boot
 just build-prod-legacy # Compila + verifica la variante anterior
+just build-prod-extroot # Compila + verifica firmware e imagen ext4 de 512 MiB
 just build-prod-both # Genera ambas en dist/openwrt/prod-{legacy,safe}/
 
 # O con script modular:
@@ -127,6 +129,7 @@ Después de compilar con las recipes `just`, encontrarás los artefactos persist
 
 - `dist/openwrt/prod-safe/` — imagen safe-boot
 - `dist/openwrt/prod-legacy/` — imagen anterior
+- `dist/openwrt/prod-extroot/` — firmware y su imagen USB extroot emparejada
 
 Cada directorio contiene:
 
@@ -136,6 +139,31 @@ Cada directorio contiene:
 | `*-sysupgrade.bin` | Imagen para actualización (desde OpenWRT existente) |
 | `sha256sums` | Checksums de verificación |
 | `*.manifest` | Lista de paquetes incluidos |
+
+La variante `extroot` además contiene `openwrt-<perfil>-extroot.ext4.img` y
+`extroot-image.manifest`. La imagen USB es un filesystem ext4 de 512 MiB, no un
+disco con tabla de particiones. Escríbela sobre una partición USB ya creada de
+al menos 512 MiB; esto reemplaza todo el contenido de esa partición:
+
+```bash
+just host-write-extroot-usb \
+  --image dist/openwrt/prod-extroot/openwrt-tplink_tl-wdr3600-v1-extroot.ext4.img \
+  --device /dev/sdX1
+```
+
+El comando valida que el destino sea una partición USB sin montar, comprueba
+checksum/UUID/tamaño y pide confirmación antes de escribir. Usa el firmware y
+la imagen USB del mismo directorio: el UUID de fstab del firmware
+se empareja con el UUID de esa imagen. Para instalar el firmware extroot, el
+actualizador requiere `just router-update-force --variant extroot`; prepara la
+USB emparejada y mantenla desconectada durante el reinicio de sysupgrade. Tras
+el primer arranque, conecta la USB y reinicia el router.
+
+El firmware contiene los módulos de almacenamiento USB, ext4 y `block-mount`
+para poder montar extroot. Las herramientas de particionado/formato (`parted`,
+`e2fsprogs`) y administración (`usbutils`, `rsync`) van en extroot junto con
+WireGuard, tethering USB y diagnóstico de red. No formatees la unidad mientras
+esté activa como `/overlay`; las herramientas sirven para otras unidades.
 
 El Image Builder conserva temporalmente su salida en `openwrt-builder/bin/targets/ath79/generic/`; para flashear selecciona siempre el artefacto de la variante deseada en `dist/openwrt/`.
 

@@ -47,8 +47,9 @@ just build-prod-both  # Imagen anterior + safe-boot
 
 - ✅ SSH (`dropbear`) · TLS/HTTPS · Firewall (`nftables`)
 - ✅ USB Storage (`ext4`, `block-mount`)
-- ✅ Arranque seguro sin USB y carga en caliente de perfiles USB firmados (`usign`); USB nunca es `/overlay`
-- ✅ VPN WireGuard · Wi-Fi Dual-Band (2.4/5 GHz)
+- ✅ Variante `safe`: arranque seguro y perfiles USB firmados; esa USB nunca es `/overlay`
+- ✅ Variante `extroot`: firmware mínimo + imagen ext4 USB emparejada para `/overlay`
+- ✅ VPN WireGuard en extroot o post-flash · Wi-Fi Dual-Band (2.4/5 GHz)
 - ✅ Integración Tor vía Raspberry Pi 3B (SOCKS y proxy transparente `.onion`)
 - ❌ LuCi, uhttpd y módulos LuCI de `rpcd` excluidos
 - ✅ `rpcd` base incluido para servicios del sistema (`ubus`/`netifd`)
@@ -68,6 +69,8 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-extroot-recover` | Captura diagnóstico en vivo y corrige fstab tras reparar USB en el host |
 | `just host-recover-extroot-usb` | Respalda archivos legibles y repara ext4 opcionalmente desde el host |
 | `just host-format-extroot-usb` | Formatea una particion USB como ext4 para extroot |
+| `just host-write-extroot-usb` | Escribe la imagen ext4 extroot emparejada sobre una partición USB |
+| `just build-prod-extroot` | Genera firmware y USB extroot de 512 MiB con WireGuard, tethering y herramientas USB |
 | `just router-setup-logs` | Logs persistentes en USB |
 | `just router-post-install` | Instala paquetes adicionales via `apk`/`opkg` |
 | `just router-captive-setup` | Portal cautivo nftables + uhttpd (sin OpenNDS) |
@@ -87,9 +90,9 @@ Las recetas sin prefijo corren localmente (build, secrets, herramientas).
 | `just router-wireguard-peer-add` / `just router-wireguard-peer-remove` | Añade / elimina peers WireGuard via UCI |
 | `just router-port-forward-list` / `just router-port-forward-add` / `just router-port-forward-remove` | Port forwarding DNAT desde WAN (TCP/UDP/ambos) |
 
-No conectes la unidad como extroot. Enciende primero el router desde la flash; después conecta la unidad ext4 firmada con etiqueta `OPENWRT_PROFILE`. El modo base expone el SSID oculto definido para recuperación en ambas bandas. Consulta [el caso de perfiles USB](docs/uses-case/examples/usb-hotplug-profile-safe-boot.md) antes de migrar.
+Para el flujo `safe`, no conectes la unidad como extroot: enciende desde la flash y conecta después la unidad firmada `OPENWRT_PROFILE`. La variante separada `extroot` genera su propia imagen ext4 USB; úsala solo junto con el firmware del mismo build. Consulta [el manual safe-boot](docs/MANUAL_SAFE_BOOT_USB.md) o la [guía de compilación](docs/BUILD_INSTRUCTIONS.md).
 
-Se conservan dos variantes: `just build-prod-legacy` reproduce la imagen anterior con AP separados; `just build-prod` construye la nueva imagen safe-boot. `just build-prod-both` genera ambas y guarda los artefactos separados en `dist/openwrt/prod-legacy/` y `dist/openwrt/prod-safe/`.
+`just build-prod-legacy` reproduce la imagen anterior con AP separados; `just build-prod` construye safe-boot; `just build-prod-extroot` genera la pareja firmware/USB extroot. `just build-prod-both` genera legacy y safe en directorios separados.
 | `just router-socks-enable` / `just router-socks-disable` / `just router-socks-status` | Port forwarding del proxy SOCKS de Raspi3b/Tor |
 | `just router-onion-enable` / `just router-onion-disable` / `just router-onion-uninstall` | Transparent proxy `.onion` vía Tor (dnsmasq + nftables DNAT) |
 | `just router-onion-doctor` | Diagnóstico capa por capa del stack `.onion` (DHCP → dnsmasq → nftables → puertos Tor) |
